@@ -1,0 +1,180 @@
+import { useEffect, type ReactNode } from 'react'
+import { AnimatePresence, motion, useSpring, useTransform } from 'motion/react'
+
+/** Flat top (the island hangs from the screen edge), rounded bottom. */
+function radii(r: number) {
+  return {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: r,
+    borderBottomRightRadius: r,
+  }
+}
+
+export interface Shape {
+  w: number
+  h: number
+  r: number
+}
+
+interface Props {
+  shape: Shape
+  /** changes whenever the content should cross-fade */
+  contentKey: string
+  children: ReactNode
+  /** timer bubble that splits off to the right of the pill */
+  bubble: { split: boolean; content: ReactNode } | null
+  onClick: (e: React.MouseEvent) => void
+  onHover: (hovering: boolean) => void
+  spring: { stiffness: number; damping: number; mass: number }
+}
+
+const BUBBLE = 34
+const TOP = 0
+/** The shape extends this far above the screen edge so its top corners never show. */
+const HIDDEN_TOP = 40
+/** Radius of the concave "ears" where the sides curve out into the screen edge. */
+const EAR = 14
+/** Must match .stage width in App.css. */
+const STAGE_W = 520
+
+/**
+ * The island outline as a crisp SVG path: concave ears at the top, straight sides,
+ * rounded bottom corners. Drawn without the goo filter so the curves stay smooth.
+ */
+function notchPath(w: number, h: number, r: number) {
+  const x0 = STAGE_W / 2 - w / 2
+  const x1 = STAGE_W / 2 + w / 2
+  const rr = Math.max(0, Math.min(r, h / 2, w / 2))
+  const e = Math.min(EAR, Math.max(0, h - rr))
+  const t = -HIDDEN_TOP
+  return [
+    `M ${x0 - e} ${t}`,
+    `L ${x0 - e} 0`,
+    `A ${e} ${e} 0 0 1 ${x0} ${e}`,
+    `L ${x0} ${h - rr}`,
+    `A ${rr} ${rr} 0 0 0 ${x0 + rr} ${h}`,
+    `L ${x1 - rr} ${h}`,
+    `A ${rr} ${rr} 0 0 0 ${x1} ${h - rr}`,
+    `L ${x1} ${e}`,
+    `A ${e} ${e} 0 0 1 ${x1 + e} 0`,
+    `L ${x1 + e} ${t}`,
+    'Z',
+  ].join(' ')
+}
+
+/**
+ * Three layers: the goo layer holds plain black blobs run through the SVG goo filter
+ * (so the pill and the timer bubble melt into each other), the outline layer redraws the
+ * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
+ * so text stays sharp.
+ */
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring }: Props) {
+  const SPRING = { type: 'spring', ...spring } as const
+  const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
+
+  const w = useSpring(shape.w, spring)
+  const h = useSpring(shape.h, spring)
+  const r = useSpring(shape.r, spring)
+  useEffect(() => {
+    w.set(shape.w)
+    h.set(shape.h)
+    r.set(shape.r)
+  }, [shape.w, shape.h, shape.r, w, h, r])
+  const d = useTransform([w, h, r], ([wv, hv, rv]: number[]) => notchPath(wv, hv, rv))
+
+  return (
+    <div className="stage">
+      <div className="goo-layer">
+        {/* Only needed to melt the timer bubble into the pill. Inset a little so the crisp
+            outline above is the only thing that defines the visible edge. */}
+        {bubble && (
+          <>
+            <motion.div
+              className="blob"
+              initial={false}
+              style={{ marginTop: -HIDDEN_TOP }}
+              animate={{
+                width: shape.w - 4,
+                height: shape.h - 2 + HIDDEN_TOP,
+                ...radii(Math.max(0, shape.r - 2)),
+              }}
+              transition={SPRING}
+            />
+            <motion.div
+              className="blob bubble"
+              initial={false}
+              animate={{ x: bubbleX, scale: bubble.split ? 1 : 0.4 }}
+              transition={SPRING}
+            />
+          </>
+        )}
+      </div>
+
+      <svg className="outline-layer" aria-hidden>
+        <motion.path d={d} fill="#000" />
+      </svg>
+
+      <div className="content-layer">
+        <motion.div
+          className="content-clip"
+          initial={false}
+          animate={{ width: shape.w, height: shape.h, ...radii(shape.r) }}
+          transition={SPRING}
+          onClick={onClick}
+          onHoverStart={() => onHover(true)}
+          onHoverEnd={() => onHover(false)}
+        >
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={contentKey}
+              className="content"
+              initial={{ opacity: 0, filter: 'blur(6px)', scale: 0.96 }}
+              animate={{
+                opacity: 1,
+                filter: 'blur(0px)',
+                scale: 1,
+                transition: { delay: 0.1, duration: 0.22 },
+              }}
+              exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.1 } }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+
+        {bubble && (
+          <motion.div
+            className="bubble-content"
+            initial={false}
+            animate={{ x: bubbleX, opacity: bubble.split ? 1 : 0 }}
+            transition={bubble.split ? { ...SPRING, opacity: { delay: 0.15 } } : { duration: 0.1 }}
+            style={{ width: BUBBLE, height: BUBBLE, top: TOP }}
+          >
+            {bubble.content}
+          </motion.div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function GooFilter() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+      <defs>
+        <filter id="goo" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur" />
+          <feColorMatrix
+            in="blur"
+            mode="matrix"
+            values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 14 -6"
+          />
+        </filter>
+      </defs>
+    </svg>
+  )
+}
+
+export const ISLAND_TOP = TOP
+export const BUBBLE_SIZE = BUBBLE
