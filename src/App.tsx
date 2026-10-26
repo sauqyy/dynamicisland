@@ -269,24 +269,26 @@ export default function App() {
   const lyricIdx = track?.lyrics ? currentLineIndex(track.lyrics, position) : -1
   const lyricText = lyricIdx >= 0 ? track!.lyrics![lyricIdx].text : ''
   const showLyricPeek = playing && !!lyricText
+  // idle pill shows the lyric line instead of the clock when asked to and one is available
+  const idleLyric = settings.idle === 'lyrics' && showLyricPeek
 
   const mode = expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
 
   // every page uses the same card size so the navigation arrows never move
-  const expandedHeight = 308
+  const expandedHeight = settings.cardH
 
   const shape: Shape = useMemo(() => {
     switch (mode) {
       case 'expanded':
-        return { w: 460, h: expandedHeight, r: 44 }
+        return { w: settings.cardW, h: expandedHeight, r: 44 }
       case 'alert':
         return { w: 320, h: 60, r: 26 }
       case 'peek':
         return { w: showLyricPeek ? 300 : 230, h: 40, r: 16 }
       default:
-        return { w: 140, h: 34, r: 13 }
+        return { w: idleLyric ? 300 : 140, h: 34, r: 13 }
     }
-  }, [mode, expandedHeight, showLyricPeek])
+  }, [mode, expandedHeight, settings.cardW, showLyricPeek, idleLyric])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -303,8 +305,10 @@ export default function App() {
 
   const hitW = shape.w + (bubble?.split ? 100 : 0)
   useEffect(() => {
-    if (IS_TAURI) invoke('set_hit_area', { w: hitW, h: shape.h }).catch(() => {})
-  }, [hitW, shape.h])
+    if (IS_TAURI) {
+      invoke('set_hit_area', { w: hitW * settings.scale, h: shape.h * settings.scale }).catch(() => {})
+    }
+  }, [hitW, shape.h, settings.scale])
 
   const go = (dir: -1 | 1) =>
     setTab((t) => {
@@ -470,11 +474,11 @@ export default function App() {
         </div>
       )
   } else {
-    contentKey = 'idle'
+    contentKey = idleLyric ? `idle-lyric-${lyricIdx}` : 'idle'
     content = (
-      <div className="idle">
+      <div className={`idle ${idleLyric ? 'lyric-idle' : ''}`}>
         {playing && track && <Bars active hue={track.hue} />}
-        <span>{clock}</span>
+        {idleLyric ? <span className="idle-lyric">{lyricText}</span> : <span>{clock}</span>}
         {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
         {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
       </div>
@@ -484,7 +488,7 @@ export default function App() {
   return (
     <div
       className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''}`}
-      style={{ ['--accent' as string]: settings.accent }}
+      style={{ ['--accent' as string]: settings.accent, ['--scale' as string]: settings.scale }}
       onClick={() => !IS_TAURI && setExpanded(false)}
       onDragOver={(e) => {
         if (IS_TAURI) return

@@ -18,9 +18,8 @@ use tauri_plugin_autostart::MacosLauncher;
 const TOP: f64 = 0.0;
 /// Extra grab area around the pill so hover feels forgiving, in logical px.
 const MARGIN: f64 = 10.0;
-/// Window size in logical px: wide and tall enough for the expanded card.
-const WIN_W: f64 = 520.0;
-const WIN_H: f64 = 340.0;
+/// Window size in logical px: wide and tall enough for the expanded card at the chosen scale.
+static WIN_SIZE: Mutex<(f64, f64)> = Mutex::new((520.0, 340.0));
 
 /// Size of the interactive area in logical px, reported by the frontend.
 struct HitArea(Mutex<(f64, f64)>);
@@ -35,6 +34,12 @@ fn set_hit_area(state: State<HitArea>, w: f64, h: f64) {
 }
 
 #[tauri::command]
+fn set_window_size(window: WebviewWindow, w: f64, h: f64) {
+    *WIN_SIZE.lock().unwrap() = (w.clamp(300.0, 1400.0), h.clamp(120.0, 900.0));
+    place_window(&window);
+}
+
+#[tauri::command]
 fn set_monitor(index: usize) {
     MONITOR.store(index, Ordering::Relaxed);
 }
@@ -42,6 +47,35 @@ fn set_monitor(index: usize) {
 #[tauri::command]
 fn set_hide_on_fullscreen(enabled: bool) {
     HIDE_ON_FULLSCREEN.store(enabled, Ordering::Relaxed);
+}
+
+/// Downloads the installer from a GitHub release of this project, runs it and quits.
+#[tauri::command]
+async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    if !url.starts_with("https://github.com/sauqyy/dynamicisland/releases/download/") || url.contains('\'') {
+        return Err("unexpected update url".into());
+    }
+    let dest = std::env::temp_dir().join("dynamic-island-update.exe");
+    let script = format!(
+        "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri '{url}' -OutFile '{}'",
+        dest.display()
+    );
+    let status = tauri::async_runtime::spawn_blocking(move || {
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(0x0800_0000)
+            .status()
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if !status.success() || !dest.exists() {
+        return Err("download failed".into());
+    }
+    std::process::Command::new(&dest).spawn().map_err(|e| e.to_string())?;
+    app.exit(0);
+    Ok(())
 }
 
 #[tauri::command]
@@ -66,7 +100,8 @@ fn target_monitor(window: &WebviewWindow) -> Option<Monitor> {
 fn place_window(window: &WebviewWindow) {
     let Some(monitor) = target_monitor(window) else { return };
     let scale = monitor.scale_factor();
-    let want = PhysicalSize::new((WIN_W * scale).round() as u32, (WIN_H * scale).round() as u32);
+    let (win_w, win_h) = *WIN_SIZE.lock().unwrap();
+    let want = PhysicalSize::new((win_w * scale).round() as u32, (win_h * scale).round() as u32);
     let x = monitor.position().x + (monitor.size().width as i32 - want.width as i32) / 2;
     let y = monitor.position().y;
 
@@ -138,9 +173,11 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             set_hit_area,
+            set_window_size,
             set_monitor,
             set_hide_on_fullscreen,
             monitor_count,
+            install_update,
             files::file_info,
             files::open_path,
             files::reveal_path,
