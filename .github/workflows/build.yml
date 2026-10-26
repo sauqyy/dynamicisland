@@ -25,6 +25,9 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/upload-artifact@v4
         with:
           name: dynamic-island-macos
