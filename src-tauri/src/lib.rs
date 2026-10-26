@@ -1,8 +1,26 @@
 mod auth;
+#[cfg(windows)]
 mod files;
+#[cfg(windows)]
 mod media;
+#[cfg(windows)]
 mod screen;
+#[cfg(windows)]
 mod system;
+#[cfg(target_os = "macos")]
+#[path = "files_mac.rs"]
+mod files;
+#[cfg(target_os = "macos")]
+#[path = "media_mac.rs"]
+mod media;
+#[cfg(target_os = "macos")]
+#[path = "screen_mac.rs"]
+mod screen;
+#[cfg(target_os = "macos")]
+#[path = "system_mac.rs"]
+mod system;
+#[cfg(target_os = "macos")]
+mod macos;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -101,6 +119,7 @@ fn download_installer(app: &AppHandle, url: &str, dest: &std::path::Path) -> Res
 
 /// Downloads the installer from a GitHub release of this project (reporting progress to the
 /// island), then runs it silently as an in-place upgrade; the new version starts by itself.
+#[cfg(windows)]
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
@@ -134,6 +153,34 @@ async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
     Ok(())
 }
 
+/// macOS: downloads the disk image and opens it, so the user can drag the new app over the old one.
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
+    if !url.starts_with("https://github.com/sauqyy/dynamicisland/releases/download/") || !url.ends_with(".dmg") {
+        return Err("unexpected update url".into());
+    }
+    let dest = std::env::temp_dir().join("dynamic-island-update.dmg");
+    let _ = app.emit("update-progress", UpdateProgress { stage: "downloading", percent: 0 });
+    let (app2, dest2) = (app.clone(), dest.clone());
+    let result = tauri::async_runtime::spawn_blocking(move || download_installer(&app2, &url, &dest2))
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|r| r);
+    let result = result.and_then(|_| std::process::Command::new("open").arg(&dest).spawn().map(|_| ()).map_err(|e| e.to_string()));
+    match result {
+        Ok(()) => {
+            let _ = app.emit("update-progress", UpdateProgress { stage: "installing", percent: 100 });
+            Ok(())
+        }
+        Err(e) => {
+            let _ = app.emit("update-progress", UpdateProgress { stage: "failed", percent: 0 });
+            Err(e)
+        }
+    }
+}
+
+#[cfg(windows)]
 async fn pause_before_exit() {
     let _ = tauri::async_runtime::spawn_blocking(|| std::thread::sleep(Duration::from_millis(1200))).await;
 }
@@ -261,6 +308,8 @@ pub fn run() {
         .manage(HitArea(Mutex::new((130.0, 34.0))))
         .setup(|app| {
             let window = app.get_webview_window("main").expect("main window");
+            #[cfg(target_os = "macos")]
+            macos::float_above_menu_bar(&window);
             place_window(&window);
 
             let quit = MenuItem::with_id(app, "quit", "Quit Dynamic Island", true, None::<&str>)?;

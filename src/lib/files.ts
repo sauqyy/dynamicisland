@@ -79,14 +79,14 @@ export function useStoredList(key: string, seed: FileItem[]) {
   return { items, add, remove, clear, setItems }
 }
 
+export const IS_MAC = /Mac/i.test(navigator.userAgent)
+
 const SYSTEM = 'C:\\Windows\\System32\\'
 
 /** Apps pinned on first run. */
-export const DEFAULT_APPS = [
-  `${SYSTEM}notepad.exe`,
-  `${SYSTEM}calc.exe`,
-  `${SYSTEM}taskmgr.exe`,
-]
+export const DEFAULT_APPS = IS_MAC
+  ? ['/System/Applications/Notes.app', '/System/Applications/Calculator.app', '/System/Applications/Utilities/Activity Monitor.app']
+  : [`${SYSTEM}notepad.exe`, `${SYSTEM}calc.exe`, `${SYSTEM}taskmgr.exe`]
 
 export const DEMO_SHELF: FileItem[] = [
   { id: 'd1', path: 'beach.jpg', name: 'beach.jpg', size: 2.4 * 1024 ** 2, isDir: false },

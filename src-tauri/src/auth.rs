@@ -2,6 +2,7 @@
 //! one-shot server on localhost, which hands the authorization code back to the app.
 use std::io::{Read, Write};
 use std::net::TcpListener;
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::time::{Duration, Instant};
 
@@ -68,10 +69,19 @@ pub fn open_url(url: String) -> Result<(), String> {
     if !url.starts_with("https://") || url.contains(['"', '\'', '`', '\n', '\r', ' ']) {
         return Err("unsupported url".into());
     }
-    std::process::Command::new("rundll32")
-        .args(["url.dll,FileProtocolHandler", &url])
-        .creation_flags(0x0800_0000)
-        .spawn()
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = std::process::Command::new("rundll32");
+        c.args(["url.dll,FileProtocolHandler", &url]).creation_flags(0x0800_0000);
+        c
+    };
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("open");
+        c.arg(&url);
+        c
+    };
+    cmd.spawn()
         .map(|_| ())
         .map_err(|e| e.to_string())
 }

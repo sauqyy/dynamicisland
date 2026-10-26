@@ -10,6 +10,7 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -62,6 +63,9 @@
         "headerImage": "installer/header.bmp",
         "installerHooks": "installer/hooks.nsh"
       }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
     },
     "publisher": "Dynamic Island"
   }

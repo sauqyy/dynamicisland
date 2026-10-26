@@ -8,6 +8,7 @@ import { getVersion } from '@tauri-apps/api/app'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
+import { IS_MAC } from '../lib/files'
 import { PAGES } from '../types'
 
 interface Props {
@@ -120,7 +121,9 @@ export function SettingsWidget({ settings, update }: Props) {
       }
       if (!newer(rel.tag_name, version)) return setUpdate({ s: 'current' })
       // the silent updater needs the regular installer, not the friendly first-time Setup.exe
-      const asset = rel.assets.find((a) => /x64-setup\.exe$/i.test(a.name)) ?? rel.assets.find((a) => /\.exe$/i.test(a.name))
+      const asset = IS_MAC
+        ? rel.assets.find((a) => /\.dmg$/i.test(a.name))
+        : (rel.assets.find((a) => /x64-setup\.exe$/i.test(a.name)) ?? rel.assets.find((a) => /\.exe$/i.test(a.name)))
       if (!asset) throw new Error('No installer in release')
       setUpdate({ s: 'available', version: rel.tag_name.replace(/^v/, ''), url: asset.browser_download_url })
     } catch (e) {
@@ -153,7 +156,7 @@ export function SettingsWidget({ settings, update }: Props) {
   return (
     <div className="settings" onClick={(e) => e.stopPropagation()}>
       <div className="row">
-        <span>Start with Windows</span>
+        <span>{IS_MAC ? 'Start at login' : 'Start with Windows'}</span>
         <Toggle on={autostart} onChange={toggleAutostart} />
       </div>
       <div className="row">
