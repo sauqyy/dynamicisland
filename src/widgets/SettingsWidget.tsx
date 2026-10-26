@@ -4,6 +4,7 @@ import { getVersion } from '@tauri-apps/api/app'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, type Anim, type IdleDisplay, type Settings } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
+import { PAGES } from '../types'
 
 interface Props {
   settings: Settings
@@ -46,6 +47,14 @@ function Slider({
     </div>
   )
 }
+
+const CLEAR_OPTIONS: [number, string][] = [
+  [0, 'off'],
+  [1, '1m'],
+  [5, '5m'],
+  [15, '15m'],
+  [60, '1h'],
+]
 
 const RELEASES = 'https://api.github.com/repos/sauqyy/dynamicisland/releases/latest'
 
@@ -139,16 +148,84 @@ export function SettingsWidget({ settings, update }: Props) {
         <span>Hide in fullscreen apps</span>
         <Toggle on={settings.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
       </div>
+      <div className="group-title">Island</div>
       <div className="row">
-        <span>Idle display</span>
+        <span>Show in pill</span>
         <div className="segmented small">
-          {(['clock', 'lyrics'] as IdleDisplay[]).map((v) => (
+          {(['clock', 'lyrics', 'weather', 'notes'] as IdleDisplay[]).map((v) => (
             <button key={v} className={settings.idle === v ? 'active' : ''} onClick={() => update({ idle: v })}>
               {v}
             </button>
           ))}
         </div>
       </div>
+      <div className="row">
+        <span>Equalizer while playing</span>
+        <Toggle on={settings.idleBars} onChange={(v) => update({ idleBars: v })} />
+      </div>
+      <Slider
+        label="Text size"
+        value={settings.clockSize}
+        limits={SIZE_LIMITS.clockSize}
+        format={(v) => `${v}px`}
+        onChange={(clockSize) => update({ clockSize })}
+      />
+      <div className="row">
+        <span>Position (drag the pill)</span>
+        <button
+          className="chip"
+          disabled={!settings.posX && !settings.posY}
+          onClick={() => update({ posX: 0, posY: 0 })}
+        >
+          Reset
+        </button>
+      </div>
+      <div className="group-title">Pages</div>
+      <div className="page-toggles">
+        {PAGES.filter((p) => p.id !== 'settings').map((p) => {
+          const on = !settings.hiddenPages.includes(p.id)
+          return (
+            <button
+              key={p.id}
+              className={`chip ${on ? 'on' : ''}`}
+              aria-pressed={on}
+              onClick={() =>
+                update({ hiddenPages: on ? [...settings.hiddenPages, p.id] : settings.hiddenPages.filter((h) => h !== p.id) })
+              }
+            >
+              {p.title}
+            </button>
+          )
+        })}
+      </div>
+      <div className="group-title">Clipboard privacy</div>
+      <div className="row">
+        <span>Pause history</span>
+        <Toggle on={settings.clipPaused} onChange={(v) => update({ clipPaused: v })} />
+      </div>
+      <div className="row">
+        <span>Hide entries until hovered</span>
+        <Toggle on={settings.clipMask} onChange={(v) => update({ clipMask: v })} />
+      </div>
+      <div className="row">
+        <span>Skip passwords and tokens</span>
+        <Toggle on={settings.clipSkipSecrets} onChange={(v) => update({ clipSkipSecrets: v })} />
+      </div>
+      <div className="row">
+        <span>Auto-clear after</span>
+        <div className="segmented small">
+          {CLEAR_OPTIONS.map(([min, label]) => (
+            <button
+              key={min}
+              className={settings.clipAutoClear === min ? 'active' : ''}
+              onClick={() => update({ clipAutoClear: min })}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="group-title">General</div>
       <div className="row">
         <span>24-hour clock</span>
         <Toggle on={settings.clock24} onChange={(v) => update({ clock24: v })} />

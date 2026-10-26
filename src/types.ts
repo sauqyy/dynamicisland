@@ -11,6 +11,18 @@ export type Tab =
   | 'apps'
   | 'settings'
 
+export const PAGES: { id: Tab; title: string }[] = [
+  { id: 'media', title: 'Now Playing' },
+  { id: 'weather', title: 'Weather' },
+  { id: 'timer', title: 'Timer' },
+  { id: 'todo', title: 'To-do' },
+  { id: 'notes', title: 'Notes' },
+  { id: 'clipboard', title: 'Clipboard' },
+  { id: 'shelf', title: 'Shelf' },
+  { id: 'apps', title: 'Apps' },
+  { id: 'settings', title: 'Settings' },
+]
+
 export interface Track {
   id: string
   title: string

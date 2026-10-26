@@ -22,23 +22,12 @@ import {
   useStoredList,
   type FileItem,
 } from './lib/files'
-import { SPRINGS, useSettings } from './lib/settings'
+import { SPRINGS, STAGE, useSettings } from './lib/settings'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
-import type { IslandAlert, PomodoroState, PomoPhase, StopwatchState, Tab, TimerState, Todo } from './types'
+import { cachedWeather, describe as describeWeather } from './lib/weather'
+import { PAGES, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
-
-const PAGES: { id: Tab; title: string }[] = [
-  { id: 'media', title: 'Now Playing' },
-  { id: 'weather', title: 'Weather' },
-  { id: 'timer', title: 'Timer' },
-  { id: 'todo', title: 'To-do' },
-  { id: 'notes', title: 'Notes' },
-  { id: 'clipboard', title: 'Clipboard' },
-  { id: 'shelf', title: 'Shelf' },
-  { id: 'apps', title: 'Apps' },
-  { id: 'settings', title: 'Settings' },
-]
 
 const LOW_BATTERY = 20
 const POMO_MIN: Record<PomoPhase, number> = { focus: 25, break: 5, long: 15 }
@@ -57,6 +46,42 @@ function loadTodos(): Todo[] {
   }
 }
 
+const TAB_KEY = 'di.tab'
+
+/** The page that was open last time, so the card comes back where it was left. */
+function loadTab(): Tab {
+  try {
+    const t = localStorage.getItem(TAB_KEY)
+    if (PAGES.some((p) => p.id === t)) return t as Tab
+  } catch {
+    /* ignore */
+  }
+  return 'media'
+}
+
+function firstNoteLine(): string {
+  try {
+    return (localStorage.getItem('di.notes') ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/** Pill width that fits a line of text, up to what the stage can hold. */
+const textWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(300, text.length * 7.2 + 80))
+
+function stepPage(list: { id: Tab }[], from: Tab, dir: -1 | 1): Tab {
+  const i = list.findIndex((p) => p.id === from)
+  if (i < 0) {
+    // a page hidden from the carousel (or opened by a file drop): step to the next visible one in full order
+    const all = PAGES.findIndex((p) => p.id === from)
+    const after = PAGES.slice(all + 1).concat(PAGES.slice(0, all))
+    const ordered = dir > 0 ? after : [...after].reverse()
+    return (ordered.find((p) => list.some((l) => l.id === p.id)) ?? list[0]).id
+  }
+  return list[(i + dir + list.length) % list.length].id
+}
+
 function clockText(d: Date, clock24: boolean) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !clock24 })
 }
@@ -68,12 +93,20 @@ export default function App() {
   const [pomo, setPomo] = useState<PomodoroState | null>(null)
   const [dragging, setDragging] = useState(false)
   const [privacy, setPrivacy] = useState<{ mic: string | null; camera: string | null }>({ mic: null, camera: null })
-  const clipboard = useClipboard()
+  const clipboard = useClipboard({
+    paused: settings.clipPaused,
+    autoClearMin: settings.clipAutoClear,
+    skipSecrets: settings.clipSkipSecrets,
+  })
   const shelf = useStoredList('di.shelf', IS_TAURI ? [] : DEMO_SHELF)
   const apps = useStoredList('di.apps', IS_TAURI ? [] : DEMO_APPS)
   const [expanded, setExpanded] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const [tab, setTab] = useState<Tab>('media')
+  const [tab, setTab] = useState<Tab>(loadTab)
+  const [pos, setPos] = useState({ x: settings.posX, y: settings.posY })
+  const [moving, setMoving] = useState(false)
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; active: boolean } | null>(null)
+  const justDragged = useRef(false)
   const [clockMode, setClockMode] = useState<ClockMode>('timer')
   const [alert, setAlert] = useState<IslandAlert | null>(null)
   const [timer, setTimer] = useState<TimerState | null>(null)
@@ -84,6 +117,27 @@ export default function App() {
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
+  const pages = useMemo(
+    () => PAGES.filter((p) => p.id === 'settings' || !settings.hiddenPages.includes(p.id)),
+    [settings.hiddenPages],
+  )
+  const pagesRef = useRef(pages)
+  pagesRef.current = pages
+  const posRef = useRef(pos)
+  posRef.current = pos
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAB_KEY, tab)
+    } catch {
+      /* ignore */
+    }
+  }, [tab])
+
+  // keep the live position in step with the stored one (e.g. after Reset)
+  useEffect(() => {
+    if (!dragRef.current?.active) setPos({ x: settings.posX, y: settings.posY })
+  }, [settings.posX, settings.posY])
   const addShelf = shelf.add
   const addApps = apps.add
 
@@ -256,10 +310,7 @@ export default function App() {
       if (e.key === 'Escape') setExpanded(false)
       if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         const dir = e.key === 'ArrowRight' ? 1 : -1
-        setTab((t) => {
-          const i = PAGES.findIndex((p) => p.id === t)
-          return PAGES[(i + dir + PAGES.length) % PAGES.length].id
-        })
+        setTab((t) => stepPage(pagesRef.current, t, dir))
       }
     }
     window.addEventListener('keydown', onKey)
@@ -272,10 +323,27 @@ export default function App() {
   // idle pill shows the lyric line instead of the clock when asked to and one is available
   const idleLyric = settings.idle === 'lyrics' && showLyricPeek
 
+  // other things the pill can show; falls back to the clock when there is nothing to show yet.
+  // Re-read when the card closes, which is when the notes or city may have changed.
+  const idleExtra = useMemo(() => {
+    if (settings.idle === 'weather' && settings.city) {
+      const w = cachedWeather(settings.city, settings.fahrenheit)
+      return w ? `${describeWeather(w.code).icon} ${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` : ''
+    }
+    if (settings.idle === 'notes') return firstNoteLine()
+    return ''
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.idle, settings.city, settings.fahrenheit, expanded])
+  const idleText = idleLyric ? lyricText : idleExtra
+
   const mode = expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
 
   // every page uses the same card size so the navigation arrows never move
   const expandedHeight = settings.cardH
+
+  // grow the pill to fit the lyric line, up to what the stage can hold
+  const lyricW = textWidth(lyricText)
+  const idleW = idleLyric ? lyricW : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
 
   const shape: Shape = useMemo(() => {
     switch (mode) {
@@ -284,11 +352,11 @@ export default function App() {
       case 'alert':
         return { w: 320, h: 60, r: 26 }
       case 'peek':
-        return { w: showLyricPeek ? 300 : 230, h: 40, r: 16 }
+        return { w: showLyricPeek ? lyricW : 230, h: 40, r: 16 }
       default:
-        return { w: idleLyric ? 300 : 140, h: 34, r: 13 }
+        return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, expandedHeight, settings.cardW, showLyricPeek, idleLyric])
+  }, [mode, expandedHeight, settings.cardW, showLyricPeek, idleW, lyricW])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -310,11 +378,7 @@ export default function App() {
     }
   }, [hitW, shape.h, settings.scale])
 
-  const go = (dir: -1 | 1) =>
-    setTab((t) => {
-      const i = PAGES.findIndex((p) => p.id === t)
-      return PAGES[(i + dir + PAGES.length) % PAGES.length].id
-    })
+  const go = (dir: -1 | 1) => setTab((t) => stepPage(pages, t, dir))
 
   const startTimer = (minutes: number) => {
     setPomo(null)
@@ -335,6 +399,52 @@ export default function App() {
     if (!IS_TAURI) pushAlert({ icon: dir > 0 ? '⏭' : '⏮', text: dir > 0 ? 'Next track' : 'Previous track' })
   }
 
+  // Drag the island to move it. A few px of travel counts as a click instead.
+  const dragHandlers = IS_TAURI
+    ? {
+        onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+          if (e.button !== 0) return
+          const el = e.target as HTMLElement
+          if (el.closest('button, input, textarea, a, .scrub, [draggable="true"]')) return
+          // inside the open card only the header strip is a handle
+          if (mode === 'expanded' && !el.closest('.xhead')) return
+          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: pos.x, oy: pos.y, active: false }
+          e.currentTarget.setPointerCapture(e.pointerId)
+        },
+        onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+          const g = dragRef.current
+          if (!g) return
+          const dx = e.screenX - g.sx
+          const dy = e.screenY - g.sy
+          if (!g.active) {
+            if (Math.hypot(dx, dy) < 5) return
+            g.active = true
+            setMoving(true)
+            invoke('set_dragging', { on: true }).catch(() => {})
+          }
+          const maxX = window.screen.width / 2 - 80
+          const next = {
+            x: Math.round(Math.max(-maxX, Math.min(maxX, g.ox + dx))),
+            y: Math.round(Math.max(0, Math.min(window.screen.height - 120, g.oy + dy))),
+          }
+          // snap back onto the screen edge when dropped close to it
+          if (next.y < 12) next.y = 0
+          setPos(next)
+          invoke('set_offset', { x: next.x, y: next.y }).catch(() => {})
+        },
+        onPointerUp: () => {
+          const g = dragRef.current
+          dragRef.current = null
+          if (!g?.active) return
+          setMoving(false)
+          invoke('set_dragging', { on: false }).catch(() => {})
+          justDragged.current = true
+          setTimeout(() => (justDragged.current = false), 0)
+          update({ posX: posRef.current.x, posY: posRef.current.y })
+        },
+      }
+    : undefined
+
   const d = new Date(now)
   const clock = clockText(d, settings.clock24)
   let content: React.ReactNode
@@ -346,8 +456,16 @@ export default function App() {
     const action =
       tab === 'shelf' && shelf.items.length ? (
         <button className="chip" onClick={shelf.clear}>Clear</button>
-      ) : tab === 'clipboard' && clipboard.items.length ? (
-        <button className="chip" onClick={clipboard.clear}>Clear</button>
+      ) : tab === 'clipboard' ? (
+        <>
+          <button
+            className={`chip ${settings.clipPaused ? 'on' : ''}`}
+            onClick={() => update({ clipPaused: !settings.clipPaused })}
+          >
+            {settings.clipPaused ? 'Resume' : 'Pause'}
+          </button>
+          {clipboard.items.length > 0 && <button className="chip" onClick={clipboard.clear}>Clear</button>}
+        </>
       ) : null
     content = (
       <div className="expanded">
@@ -358,6 +476,8 @@ export default function App() {
           date={d}
           clock={clock}
           bars={playing && track ? track.hue : null}
+          onSettings={() => setTab('settings')}
+          settingsActive={tab === 'settings'}
         />
         <div className="expanded-body">
           {tab === 'media' && (
@@ -392,6 +512,9 @@ export default function App() {
           {tab === 'clipboard' && (
             <ClipboardWidget
               items={clipboard.items}
+              paused={settings.clipPaused}
+              mask={settings.clipMask}
+              onRemove={clipboard.remove}
               onCopy={(t) => {
                 clipboard.copy(t)
                 pushAlert({ icon: '📋', text: 'Copied' })
@@ -418,10 +541,11 @@ export default function App() {
           ›
         </button>
         <div className="dots" onClick={(e) => e.stopPropagation()}>
-          {PAGES.map((p) => (
+          {pages.map((p) => (
             <button
               key={p.id}
               aria-label={p.title}
+              title={p.title}
               className={p.id === tab ? 'active' : ''}
               onClick={() => setTab(p.id)}
             />
@@ -474,11 +598,11 @@ export default function App() {
         </div>
       )
   } else {
-    contentKey = idleLyric ? `idle-lyric-${lyricIdx}` : 'idle'
+    contentKey = idleLyric ? `idle-lyric-${lyricIdx}` : idleExtra ? 'idle-extra' : 'idle'
     content = (
-      <div className={`idle ${idleLyric ? 'lyric-idle' : ''}`}>
-        {playing && track && <Bars active hue={track.hue} />}
-        {idleLyric ? <span className="idle-lyric">{lyricText}</span> : <span>{clock}</span>}
+      <div className={`idle ${idleText ? 'lyric-idle' : ''}`}>
+        {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
+        {idleText ? <span className="idle-lyric">{idleText}</span> : <span>{clock}</span>}
         {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
         {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
       </div>
@@ -487,8 +611,12 @@ export default function App() {
 
   return (
     <div
-      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''}`}
-      style={{ ['--accent' as string]: settings.accent, ['--scale' as string]: settings.scale }}
+      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${moving ? 'dragging' : ''}`}
+      style={{
+        ['--accent' as string]: settings.accent,
+        ['--scale' as string]: settings.scale,
+        ['--clock-size' as string]: `${settings.clockSize}px`,
+      }}
       onClick={() => !IS_TAURI && setExpanded(false)}
       onDragOver={(e) => {
         if (IS_TAURI) return
@@ -507,8 +635,11 @@ export default function App() {
         shape={shape}
         contentKey={contentKey}
         bubble={bubble}
+        floating={pos.y > 2}
+        dragHandlers={dragHandlers}
         onClick={(e) => {
           e.stopPropagation()
+          if (justDragged.current) return
           setExpanded(true)
         }}
         onHover={(h) => !IS_TAURI && setHovered(h)}

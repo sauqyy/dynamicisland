@@ -27,6 +27,10 @@ struct HitArea(Mutex<(f64, f64)>);
 /// 0 = primary monitor, n = n-th entry of the monitor list.
 static MONITOR: AtomicUsize = AtomicUsize::new(0);
 static HIDE_ON_FULLSCREEN: AtomicBool = AtomicBool::new(true);
+/// True while the user drags the island, so the watcher doesn't turn click-through back on.
+static DRAGGING: AtomicBool = AtomicBool::new(false);
+/// How far the user moved the island from its default spot (centre top), in logical px.
+static OFFSET: Mutex<(f64, f64)> = Mutex::new((0.0, 0.0));
 
 #[tauri::command]
 fn set_hit_area(state: State<HitArea>, w: f64, h: f64) {
@@ -37,6 +41,17 @@ fn set_hit_area(state: State<HitArea>, w: f64, h: f64) {
 fn set_window_size(window: WebviewWindow, w: f64, h: f64) {
     *WIN_SIZE.lock().unwrap() = (w.clamp(300.0, 1400.0), h.clamp(120.0, 900.0));
     place_window(&window);
+}
+
+#[tauri::command]
+fn set_offset(window: WebviewWindow, x: f64, y: f64) {
+    *OFFSET.lock().unwrap() = (x, y);
+    place_window(&window);
+}
+
+#[tauri::command]
+fn set_dragging(on: bool) {
+    DRAGGING.store(on, Ordering::Relaxed);
 }
 
 #[tauri::command]
@@ -102,8 +117,14 @@ fn place_window(window: &WebviewWindow) {
     let scale = monitor.scale_factor();
     let (win_w, win_h) = *WIN_SIZE.lock().unwrap();
     let want = PhysicalSize::new((win_w * scale).round() as u32, (win_h * scale).round() as u32);
-    let x = monitor.position().x + (monitor.size().width as i32 - want.width as i32) / 2;
-    let y = monitor.position().y;
+    // keep the pill on this monitor, whatever offset was saved (e.g. from a bigger display)
+    let (off_x, off_y) = *OFFSET.lock().unwrap();
+    let mon_w = monitor.size().width as f64;
+    let mon_h = monitor.size().height as f64;
+    let off_x = (off_x * scale).clamp(-(mon_w / 2.0 - 80.0 * scale), mon_w / 2.0 - 80.0 * scale);
+    let off_y = (off_y * scale).clamp(0.0, (mon_h - 120.0 * scale).max(0.0));
+    let x = monitor.position().x + (monitor.size().width as i32 - want.width as i32) / 2 + off_x as i32;
+    let y = monitor.position().y + off_y as i32;
 
     let (Ok(size), Ok(pos)) = (window.outer_size(), window.outer_position()) else { return };
     if size != want {
@@ -152,10 +173,11 @@ fn spawn_watcher(window: WebviewWindow, app: AppHandle) {
             let left = pos.x as f64 + (size.width as f64 - w) / 2.0;
             let top = pos.y as f64 + (TOP - MARGIN) * scale;
             let now_inside = !hidden
-                && cursor.x >= left
-                && cursor.x <= left + w
-                && cursor.y >= top
-                && cursor.y <= top + h;
+                && (DRAGGING.load(Ordering::Relaxed)
+                    || (cursor.x >= left
+                        && cursor.x <= left + w
+                        && cursor.y >= top
+                        && cursor.y <= top + h));
             if now_inside != inside {
                 inside = now_inside;
                 let _ = window.set_ignore_cursor_events(!inside);
@@ -175,6 +197,8 @@ pub fn run() {
             set_hit_area,
             set_window_size,
             set_monitor,
+            set_offset,
+            set_dragging,
             set_hide_on_fullscreen,
             monitor_count,
             install_update,

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { IS_TAURI } from './useMedia'
+import type { Tab } from '../types'
 
 export type Anim = 'bouncy' | 'smooth' | 'snappy'
-export type IdleDisplay = 'clock' | 'lyrics'
+export type IdleDisplay = 'clock' | 'lyrics' | 'weather' | 'notes'
 
 export interface Settings {
   /** 0 = primary monitor, n = n-th monitor */
@@ -14,6 +15,21 @@ export interface Settings {
   accent: string
   /** what the small pill shows: the clock, or the current lyric line when there is one */
   idle: IdleDisplay
+  /** equalizer bars next to the idle text while music plays */
+  idleBars: boolean
+  /** font size of the idle pill text in px */
+  clockSize: number
+  /** pages left out of the carousel (Settings can never be hidden) */
+  hiddenPages: Tab[]
+  /** clipboard history: stop recording, hide entries until hovered, wipe after N minutes (0 = never) */
+  clipPaused: boolean
+  clipMask: boolean
+  clipAutoClear: number
+  /** skip things that look like passwords or tokens */
+  clipSkipSecrets: boolean
+  /** island offset from its default spot (centre top), in px */
+  posX: number
+  posY: number
   /** city for the weather page */
   city: string
   fahrenheit: boolean
@@ -39,6 +55,7 @@ export const SIZE_LIMITS = {
   scale: { min: 0.8, max: 1.4, step: 0.05 },
   cardW: { min: 400, max: 490, step: 10 },
   cardH: { min: 280, max: 330, step: 2 },
+  clockSize: { min: 12, max: 22, step: 1 },
 }
 
 export const SIZE_DEFAULTS = { scale: 1, cardW: 460, cardH: 308 }
@@ -49,7 +66,16 @@ const DEFAULTS: Settings = {
   anim: 'bouncy',
   clock24: true,
   accent: ACCENTS[0],
-  idle: 'clock',
+  idle: 'lyrics',
+  idleBars: true,
+  clockSize: 15,
+  hiddenPages: [],
+  clipPaused: false,
+  clipMask: false,
+  clipAutoClear: 5,
+  clipSkipSecrets: true,
+  posX: 0,
+  posY: 0,
   city: '',
   fahrenheit: false,
   ...SIZE_DEFAULTS,
@@ -86,6 +112,11 @@ export function useSettings() {
     invoke('set_monitor', { index: settings.monitor }).catch(() => {})
     invoke('set_hide_on_fullscreen', { enabled: settings.hideInFullscreen }).catch(() => {})
   }, [settings.monitor, settings.hideInFullscreen])
+
+  useEffect(() => {
+    if (!IS_TAURI) return
+    invoke('set_offset', { x: settings.posX, y: settings.posY }).catch(() => {})
+  }, [settings.posX, settings.posY])
 
   // the window has to grow and shrink with the island
   useEffect(() => {

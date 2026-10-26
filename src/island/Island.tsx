@@ -1,11 +1,11 @@
 import { useEffect, type ReactNode } from 'react'
-import { AnimatePresence, motion, useSpring, useTransform } from 'motion/react'
+import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
 
 /** Flat top (the island hangs from the screen edge), rounded bottom. */
-function radii(r: number) {
+function radii(r: number, floating = false) {
   return {
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    borderTopLeftRadius: floating ? r : 0,
+    borderTopRightRadius: floating ? r : 0,
     borderBottomLeftRadius: r,
     borderBottomRightRadius: r,
   }
@@ -27,6 +27,10 @@ interface Props {
   onClick: (e: React.MouseEvent) => void
   onHover: (hovering: boolean) => void
   spring: { stiffness: number; damping: number; mass: number }
+  /** moved away from the screen edge: drawn as a free-floating rounded pill */
+  floating?: boolean
+  /** pointer handlers used to drag the island around */
+  dragHandlers?: React.HTMLAttributes<HTMLDivElement>
 }
 
 const BUBBLE = 34
@@ -42,10 +46,24 @@ const STAGE_W = 520
  * The island outline as a crisp SVG path: concave ears at the top, straight sides,
  * rounded bottom corners. Drawn without the goo filter so the curves stay smooth.
  */
-function notchPath(w: number, h: number, r: number) {
+function notchPath(w: number, h: number, r: number, floating: boolean) {
   const x0 = STAGE_W / 2 - w / 2
   const x1 = STAGE_W / 2 + w / 2
   const rr = Math.max(0, Math.min(r, h / 2, w / 2))
+  if (floating) {
+    return [
+      `M ${x0 + rr} 0`,
+      `L ${x1 - rr} 0`,
+      `A ${rr} ${rr} 0 0 1 ${x1} ${rr}`,
+      `L ${x1} ${h - rr}`,
+      `A ${rr} ${rr} 0 0 1 ${x1 - rr} ${h}`,
+      `L ${x0 + rr} ${h}`,
+      `A ${rr} ${rr} 0 0 1 ${x0} ${h - rr}`,
+      `L ${x0} ${rr}`,
+      `A ${rr} ${rr} 0 0 1 ${x0 + rr} 0`,
+      'Z',
+    ].join(' ')
+  }
   const e = Math.min(EAR, Math.max(0, h - rr))
   const t = -HIDDEN_TOP
   return [
@@ -69,7 +87,7 @@ function notchPath(w: number, h: number, r: number) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -81,7 +99,9 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
     h.set(shape.h)
     r.set(shape.r)
   }, [shape.w, shape.h, shape.r, w, h, r])
-  const d = useTransform([w, h, r], ([wv, hv, rv]: number[]) => notchPath(wv, hv, rv))
+  const fl = useMotionValue(floating ? 1 : 0)
+  useEffect(() => fl.set(floating ? 1 : 0), [floating, fl])
+  const d = useTransform([w, h, r, fl], ([wv, hv, rv, fv]: number[]) => notchPath(wv, hv, rv, fv > 0.5))
 
   return (
     <div className="stage">
@@ -93,11 +113,11 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
             <motion.div
               className="blob"
               initial={false}
-              style={{ marginTop: -HIDDEN_TOP }}
+              style={{ marginTop: floating ? 0 : -HIDDEN_TOP }}
               animate={{
                 width: shape.w - 4,
-                height: shape.h - 2 + HIDDEN_TOP,
-                ...radii(Math.max(0, shape.r - 2)),
+                height: shape.h - 2 + (floating ? 0 : HIDDEN_TOP),
+                ...radii(Math.max(0, shape.r - 2), floating),
               }}
               transition={SPRING}
             />
@@ -119,11 +139,12 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
         <motion.div
           className="content-clip"
           initial={false}
-          animate={{ width: shape.w, height: shape.h, ...radii(shape.r) }}
+          animate={{ width: shape.w, height: shape.h, ...radii(shape.r, floating) }}
           transition={SPRING}
           onClick={onClick}
           onHoverStart={() => onHover(true)}
           onHoverEnd={() => onHover(false)}
+          {...(dragHandlers as object)}
         >
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -136,7 +157,7 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
                 scale: 1,
                 transition: { delay: 0.1, duration: 0.22 },
               }}
-              exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.1 } }}
+              exit={{ opacity: 0, filter: 'blur(6px)', pointerEvents: 'none', zIndex: 0, transition: { duration: 0.08 } }}
             >
               {children}
             </motion.div>

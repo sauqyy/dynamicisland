@@ -1187,3 +1187,122 @@
   opacity: 0.6;
   text-align: right;
 }
+
+/* ---------- clipboard privacy ---------- */
+.clip-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.clip-row .clip {
+  flex: 1;
+  min-width: 0;
+}
+.clip.masked {
+  filter: blur(6px);
+}
+.clip.masked:hover,
+.clip.masked:focus-visible {
+  filter: none;
+}
+.clip-note {
+  flex: none;
+  font-size: 11px;
+  opacity: 0.55;
+  text-align: center;
+}
+.chip.on {
+  background: var(--accent, #4ade80);
+  color: #000;
+}
+
+/* ---------- page dots with labels, custom timer input, settings groups ---------- */
+.dots button {
+  position: relative;
+}
+.dots button:hover::after {
+  content: attr(aria-label);
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #000;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.dots button.active:hover::after {
+  content: attr(aria-label);
+}
+.gear {
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.15s, transform 0.25s;
+}
+.gear:hover,
+.gear.active {
+  opacity: 1;
+}
+.gear:hover {
+  transform: rotate(40deg);
+}
+.timer-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.timer-custom input {
+  width: 48px;
+  padding: 6px 4px;
+  border: 0;
+  outline: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+}
+.timer-custom input::-webkit-inner-spin-button {
+  display: none;
+}
+.group-title {
+  flex: none;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+.page-toggles {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.page-toggles .chip {
+  opacity: 0.45;
+}
+.page-toggles .chip.on {
+  opacity: 1;
+}
+.idle {
+  font-size: var(--clock-size, 15px);
+}
+.root.dragging .content-clip {
+  cursor: grabbing;
+}
+
+.chip:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}

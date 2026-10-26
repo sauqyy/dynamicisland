@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { fmt } from './MediaWidget'
 import type { TimerState } from '../types'
 
@@ -6,6 +7,7 @@ const PRESETS = [1, 5, 10, 25]
 interface Props {
   timer: TimerState | null
   now: number
+  /** length in minutes (may be fractional) */
   onStart: (minutes: number) => void
   onCancel: () => void
 }
@@ -27,6 +29,38 @@ export function Ring({ fraction, size, stroke }: { fraction: number; size: numbe
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
     </svg>
+  )
+}
+
+function CustomTime({ onStart }: { onStart: (minutes: number) => void }) {
+  const [min, setMin] = useState('')
+  const [sec, setSec] = useState('')
+  const total = (Number(min) || 0) * 60 + (Number(sec) || 0)
+  const start = () => total > 0 && onStart(Math.min(total, 99 * 3600) / 60)
+  const field = (value: string, set: (v: string) => void, label: string, max: number) => (
+    <input
+      inputMode="numeric"
+      placeholder="0"
+      aria-label={label}
+      value={value}
+      onChange={(e) => set(e.target.value.replace(/\D/g, '').slice(0, 3))}
+      onBlur={() => Number(value) > max && set(String(max))}
+      onKeyDown={(e) => {
+        e.stopPropagation()
+        if (e.key === 'Enter') start()
+      }}
+    />
+  )
+  return (
+    <div className="timer-custom">
+      {field(min, setMin, 'Minutes', 999)}
+      <span>min</span>
+      {field(sec, setSec, 'Seconds', 59)}
+      <span>sec</span>
+      <button className="pill-btn" disabled={total <= 0} onClick={start}>
+        Start
+      </button>
+    </div>
   )
 }
 
@@ -54,6 +88,7 @@ export function TimerWidget({ timer, now, onStart, onCancel }: Props) {
               </button>
             ))}
           </div>
+          <CustomTime onStart={onStart} />
         </>
       )}
     </div>
