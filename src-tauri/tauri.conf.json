@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Dynamic Island",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "com.dynamicisland.app",
   "build": {
     "frontendDist": "../dist",
@@ -59,7 +59,8 @@
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico",
         "sidebarImage": "installer/sidebar.bmp",
-        "headerImage": "installer/header.bmp"
+        "headerImage": "installer/header.bmp",
+        "installerHooks": "installer/hooks.nsh"
       }
     },
     "publisher": "Dynamic Island"
