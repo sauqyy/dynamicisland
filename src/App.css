@@ -3343,3 +3343,23 @@ button.ao-text:hover {
     height: 28px;
   }
 }
+
+/* ---------- read receipts: one faint tick when sent, two strong ticks once read ---------- */
+.msg time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 1;
+}
+.msg time .t {
+  opacity: 0.55;
+}
+.ticks {
+  flex: none;
+  opacity: 0.55;
+  transition: color 0.25s, opacity 0.25s;
+}
+.ticks.read {
+  opacity: 1;
+  color: #0b3d91;
+}

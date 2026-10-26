@@ -32,7 +32,7 @@ let nextId = 100
 const seed = (): Record<string, Message[]> => ({
   a: [
     { id: 1, sender: 'a', recipient: 'me', kind: 'text', body: 'yo, did you see the new island update?', created_at: ago(42) },
-    { id: 2, sender: 'me', recipient: 'a', kind: 'text', body: 'yes!! the drag and snap feels so good', created_at: ago(40) },
+    { id: 2, sender: 'me', recipient: 'a', kind: 'text', body: 'yes!! the drag and snap feels so good', created_at: ago(40), read_at: ago(39) },
     { id: 3, sender: 'a', recipient: 'me', kind: 'activity', body: '🎵 Liquid Skies – Demo Artist', created_at: ago(12) },
     { id: 4, sender: 'a', recipient: 'me', kind: 'note', body: 'To buy: milk, eggs, coffee beans\nCall mom at 7', created_at: ago(5) },
   ],
@@ -69,7 +69,12 @@ export function useDemo(): { auth: Auth; social: Social; ping: () => { friend: F
     async (to: string, kind: MessageKind, body: string) => {
       const text = body.trim()
       if (!text) return null
-      push({ id: nextId++, sender: 'me', recipient: to, kind, body: text, created_at: new Date().toISOString() })
+      const id = nextId++
+      push({ id, sender: 'me', recipient: to, kind, body: text, created_at: new Date().toISOString(), read_at: null })
+      // the friend "opens the chat" a moment later: one tick becomes two blue ticks
+      setTimeout(() => {
+        setMessages((cur) => ({ ...cur, [to]: (cur[to] ?? []).map((m) => (m.id === id ? { ...m, read_at: new Date().toISOString() } : m)) }))
+      }, 1100)
       const replies: Record<MessageKind, string> = { text: 'haha nice 😄', activity: 'oh cool, nice taste!', note: 'thanks, saved it 📝' }
       setTimeout(() => {
         push({ id: nextId++, sender: to, recipient: 'me', kind: 'text', body: replies[kind], created_at: new Date().toISOString() })

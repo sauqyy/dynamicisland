@@ -38,4 +38,6 @@ export interface Message {
   kind: MessageKind
   body: string
   created_at: string
+  /** when the recipient opened the chat; null until then */
+  read_at?: string | null
 }

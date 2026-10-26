@@ -29,13 +29,26 @@ function noteText() {
   }
 }
 
+/** One tick when sent, two ticks once the friend has opened the chat. */
+function Ticks({ read }: { read: boolean }) {
+  return (
+    <svg className={`ticks ${read ? 'read' : ''}`} width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={read ? 'Read' : 'Sent'}>
+      <path d="m1 5.2 3 3L10 1.5" />
+      {read && <path d="m7 7.6.7.7L14 1.5" />}
+    </svg>
+  )
+}
+
 function Bubble({ m, mine }: { m: Message; mine: boolean }) {
   return (
     <div className={`msg ${mine ? 'mine' : ''} ${m.kind}`}>
       {m.kind === 'activity' && <small>Activity</small>}
       {m.kind === 'note' && <small>Note</small>}
       <span>{m.body}</span>
-      <time>{timeLabel(m.created_at)}</time>
+      <time>
+        <span className="t">{timeLabel(m.created_at)}</span>
+        {mine && <Ticks read={Boolean(m.read_at)} />}
+      </time>
     </div>
   )
 }
@@ -80,7 +93,9 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
         {!list ? (
           <div className="empty">Loading…</div>
         ) : list.length ? (
-          list.map((m) => <Bubble key={m.id} m={m} mine={m.sender === me} />)
+          list.map((m) => (
+            <Bubble key={m.id} m={m} mine={m.sender === me} />
+          ))
         ) : (
           <div className="empty">Say hi 👋</div>
         )}

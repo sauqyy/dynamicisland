@@ -35,7 +35,8 @@ create table if not exists public.messages (
   recipient uuid not null references public.profiles on delete cascade,
   kind text not null default 'text' check (kind in ('text', 'activity', 'note')),
   body text not null check (char_length(body) between 1 and 2000),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  read_at timestamptz
 );
 create index if not exists messages_pair_idx on public.messages (sender, recipient, created_at);
 create index if not exists messages_recipient_idx on public.messages (recipient, created_at);
@@ -86,7 +87,19 @@ create policy "message friends only" on public.messages
 create policy "delete own messages" on public.messages
   for delete to authenticated using (sender = auth.uid());
 
+-- the recipient marks a friend's messages as read; only read_at can change, and only through this function
+create or replace function public.mark_read(friend uuid) returns void
+language sql security definer set search_path = public as $$
+  update public.messages set read_at = now()
+  where recipient = auth.uid() and sender = friend and read_at is null;
+$$;
+grant execute on function public.mark_read(uuid) to authenticated;
+
 alter publication supabase_realtime add table public.messages, public.friendships, public.activity;
 
 -- already ran an older version of this file? run this line once to add the presence column:
 -- alter table public.profiles add column if not exists presence text not null default 'online' check (presence in ('online', 'idle', 'dnd', 'invisible'));
+
+-- already ran an older version of this file? run this once to add read receipts:
+-- alter table public.messages add column if not exists read_at timestamptz;
+-- (then also run the create function public.mark_read ... block above)

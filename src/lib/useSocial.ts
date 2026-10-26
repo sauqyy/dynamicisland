@@ -127,9 +127,20 @@ export function useSocial(me: string | null, onIncoming?: (m: Message, from: Fri
         )
         if (m.sender !== me) {
           incomingCb.current?.(m, friendsRef.current.find((f) => f.profile.id === friendId))
-          if (openChat.current === friendId) markSeen(friendId)
+          if (openChat.current === friendId) {
+            markSeen(friendId)
+            supabase.rpc('mark_read', { friend: friendId }).then(() => {})
+          }
           else setUnread((u) => ({ ...u, [friendId]: (u[friendId] ?? 0) + 1 }))
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        // the friend opened the chat: our messages to them get their double tick
+        const m = payload.new as Message
+        if (m.sender !== me) return
+        setMessages((cur) =>
+          cur[m.recipient] ? { ...cur, [m.recipient]: cur[m.recipient].map((x) => (x.id === m.id ? { ...x, read_at: m.read_at } : x)) } : cur,
+        )
       })
       .subscribe()
     return () => {
@@ -175,6 +186,7 @@ export function useSocial(me: string | null, onIncoming?: (m: Message, from: Fri
       openChat.current = friendId
       if (!friendId || !me) return
       markSeen(friendId)
+      supabase.rpc('mark_read', { friend: friendId }).then(() => {})
       const { data } = await supabase
         .from('messages')
         .select('*')
