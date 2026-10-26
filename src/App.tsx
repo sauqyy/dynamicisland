@@ -116,6 +116,7 @@ export default function App() {
   const auth = DEMO_SOCIAL ? demo.auth : realAuth
   const meId = !DEMO_SOCIAL && auth.user && auth.profile ? auth.user.id : null
   const [hovered, setHovered] = useState(false)
+  const [intro, setIntro] = useState(0) // bumped by the demo's Replay intro button
   const [tab, setTab] = useState<Tab>(loadTab)
   const [pos, setPos] = useState({ x: settings.posX, y: settings.posY })
   const [moving, setMoving] = useState(false)
@@ -897,6 +898,7 @@ export default function App() {
         }}
         onHover={(h) => !IS_TAURI && setHovered(h)}
         spring={SPRINGS[settings.anim]}
+        intro={intro}
       >
         {content}
       </Island>
@@ -908,16 +910,19 @@ export default function App() {
           <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 })}>Low battery</button>
           <button onClick={() => pushAlert({ icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
           <button onClick={() => startTimer(0.25)}>15 s timer</button>
-          {DEMO_SOCIAL && (
-            <button
-              onClick={() => {
+          <button
+            onClick={() => {
+              if (DEMO_SOCIAL) {
                 const { friend, body } = demo.ping()
                 pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
-              }}
-            >
-              Friend message
-            </button>
-          )}
+              } else {
+                pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
+              }
+            }}
+          >
+            Message
+          </button>
+          <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
           <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>
         </div>
       )}

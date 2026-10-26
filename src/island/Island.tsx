@@ -1,5 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
-import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { AnimatePresence, animate, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
 
 /** Flat top (the island hangs from the screen edge), rounded bottom. */
 function radii(r: number, floating = false) {
@@ -27,6 +27,8 @@ interface Props {
   onClick: (e: React.MouseEvent) => void
   onHover: (hovering: boolean) => void
   spring: { stiffness: number; damping: number; mass: number }
+  /** bump to replay the drop-in entrance (used by the browser demo) */
+  intro?: number
   /** moved away from the screen edge: drawn as a free-floating rounded pill */
   floating?: boolean
   /** pointer handlers used to drag the island around */
@@ -41,6 +43,8 @@ const HIDDEN_TOP = 40
 const EAR = 14
 /** Must match .stage width in App.css. */
 const STAGE_W = 520
+/** How far above its resting place the island starts when the app opens. */
+const ENTER_FROM = 220
 
 /**
  * The island outline as a crisp SVG path: concave ears at the top, straight sides,
@@ -87,7 +91,7 @@ function notchPath(w: number, h: number, r: number, floating: boolean) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0 }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -103,8 +107,20 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
   useEffect(() => fl.set(floating ? 1 : 0), [floating, fl])
   const d = useTransform([w, h, r, fl], ([wv, hv, rv, fv]: number[]) => notchPath(wv, hv, rv, fv > 0.5))
 
+  // when the app opens the island drops in from above the screen, using the Animation setting's spring
+  // (`translate` is its own CSS property, so it composes with the stage's centring/scale transform)
+  const enterY = useMotionValue(-ENTER_FROM)
+  const springRef = useRef(spring)
+  springRef.current = spring
+  useEffect(() => {
+    enterY.jump(-ENTER_FROM)
+    const c = animate(enterY, 0, { type: 'spring', ...springRef.current })
+    return () => c.stop()
+  }, [enterY, intro])
+  const enterT = useTransform(enterY, (v) => `0 ${v}px`)
+
   return (
-    <div className="stage">
+    <motion.div className="stage" style={{ translate: enterT }}>
       <div className="goo-layer">
         {/* Only needed to melt the timer bubble into the pill. Inset a little so the crisp
             outline above is the only thing that defines the visible edge. */}
@@ -208,7 +224,7 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
           </motion.div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
