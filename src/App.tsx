@@ -13,10 +13,10 @@ import { SettingsWidget } from './widgets/SettingsWidget'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
+import { Dock } from './widgets/Dock'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
-import { GroupIcon } from './widgets/GroupIcon'
 import { FriendsWidget } from './widgets/FriendsWidget'
 import { useAuth } from './lib/useAuth'
 import { useSocial } from './lib/useSocial'
@@ -643,7 +643,10 @@ export default function App() {
           <div className="subtabs" onClick={(e) => e.stopPropagation()}>
             {group.pages.map((id) => (
               <button key={id} className={id === tab ? 'active' : ''} onClick={() => setTab(id)}>
-                {SHORT[id]}
+                {id === tab && (
+                  <motion.span layoutId="subtab-ind" className="subtab-ind" style={{ borderRadius: 999 }} transition={{ type: 'spring', stiffness: 380, damping: 38 }} />
+                )}
+                <span className="subtab-label">{SHORT[id]}</span>
               </button>
             ))}
           </div>
@@ -756,22 +759,14 @@ export default function App() {
             </svg>
           </button>
         </div>
-        <div className="dock" onClick={(e) => e.stopPropagation()}>
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              aria-label={g.title}
-              title={g.title}
-              className={g.id === group?.id ? 'active' : ''}
-              onClick={() => setTab(g.pages.includes(lastInGroup.current[g.id]) ? lastInGroup.current[g.id] : g.pages[0])}
-            >
-              <span className="dock-icon">
-                <GroupIcon id={g.id} />
-              </span>
-              <span className="dock-label">{g.title}</span>
-            </button>
-          ))}
-        </div>
+        <Dock
+          groups={groups}
+          activeId={group?.id}
+          onSelect={(id) => {
+            const g = groups.find((x) => x.id === id)!
+            setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
+          }}
+        />
         {dragging && (
           <div className="drop-overlay">
             {tab === 'apps' ? 'Release to pin' : 'Release to add to Shelf'}

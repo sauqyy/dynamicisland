@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { PAGE_VARIANTS } from '../lib/pageAnim'
+import { ColorPicker } from './ColorPicker'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
@@ -84,6 +86,10 @@ export function SettingsWidget({ settings, update }: Props) {
   const [update_, setUpdate] = useState<UpdateState>({ s: 'idle' })
   // page-animation preview: two sample cards that swap, replayed on every click
   const [swap, setSwap] = useState({ n: 0, dir: 1 as 1 | -1 })
+  const [customOpen, setCustomOpen] = useState(false)
+  const customBtn = useRef<HTMLButtonElement>(null)
+  // the popup lives on the whole expanded island, so it isn't clipped by the scrolling settings list
+  const host = customBtn.current?.closest('.expanded') ?? null
   const flip = () => setSwap((s) => ({ n: s.n + 1, dir: s.dir === 1 ? -1 : 1 }))
 
   useEffect(() => {
@@ -380,15 +386,30 @@ export function SettingsWidget({ settings, update }: Props) {
               onClick={() => update({ accent: c, accentFromMusic: false })}
             />
           ))}
-          <label className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'active'}`} title="Custom colour">
-            <input
-              type="color"
-              value={settings.accent}
-              onChange={(e) => update({ accent: e.target.value, accentFromMusic: false })}
-            />
-          </label>
+          <button
+            ref={customBtn}
+            className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'filled active'} ${customOpen ? 'open' : ''}`}
+            title="Custom colour"
+            aria-label="Custom colour"
+            style={ACCENTS.includes(settings.accent) ? undefined : ({ '--swatch': settings.accent } as React.CSSProperties)}
+            onClick={() => setCustomOpen((o) => !o)}
+          />
         </div>
       </div>
+      {customOpen &&
+        host &&
+        createPortal(
+          <div className="cp-pop" onClick={(e) => { e.stopPropagation(); setCustomOpen(false) }}>
+            <ColorPicker
+              value={settings.accent}
+              onAdd={(c) => {
+                update({ accent: c, accentFromMusic: false })
+                setCustomOpen(false)
+              }}
+            />
+          </div>,
+          host,
+        )}
       <div className="row">
         <span>Match accent to music</span>
         <Toggle on={settings.accentFromMusic} onChange={(v) => update({ accentFromMusic: v })} />

@@ -110,6 +110,7 @@ function SignIn({ auth }: { auth: Auth }) {
     setBusy(false)
   }
   const ready = email.includes('@') && password.length >= 6
+  const tooShort = password.length > 0 && password.length < 6
 
   return (
     <div className="profile-auth">
@@ -142,6 +143,7 @@ function SignIn({ auth }: { auth: Auth }) {
           if (e.key === 'Enter' && ready) run(() => auth.signIn(email, password))
         }}
       />
+      {tooShort && <div className="form-warn">Password must be at least 6 characters ({password.length}/6)</div>}
       <div className="presets">
         <button className="pill-btn" disabled={!ready || busy} onClick={() => run(() => auth.signIn(email, password))}>
           Sign in
