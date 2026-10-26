@@ -7,6 +7,7 @@ create table if not exists public.profiles (
   avatar_emoji text not null default '🙂' check (char_length(avatar_emoji) <= 8),
   avatar_color text not null default '#60a5fa' check (avatar_color ~ '^#[0-9a-fA-F]{6}$'),
   status text not null default '' check (char_length(status) <= 80),
+  presence text not null default 'online' check (presence in ('online', 'idle', 'dnd', 'invisible')),
   avatar_url text check (avatar_url is null or char_length(avatar_url) <= 40000),
   created_at timestamptz not null default now()
 );
@@ -86,3 +87,6 @@ create policy "delete own messages" on public.messages
   for delete to authenticated using (sender = auth.uid());
 
 alter publication supabase_realtime add table public.messages, public.friendships, public.activity;
+
+-- already ran an older version of this file? run this line once to add the presence column:
+-- alter table public.profiles add column if not exists presence text not null default 'online' check (presence in ('online', 'idle', 'dnd', 'invisible'));

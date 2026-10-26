@@ -25,6 +25,8 @@ export interface Profile {
   /** small square JPEG as a data: URL, null = use the emoji */
   avatar_url: string | null
   status: string
+  /** Discord-style availability; missing on rows from before it existed */
+  presence?: 'online' | 'idle' | 'dnd' | 'invisible'
 }
 
 export type MessageKind = 'text' | 'activity' | 'note'

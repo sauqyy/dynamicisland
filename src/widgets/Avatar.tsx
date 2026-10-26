@@ -1,14 +1,23 @@
 import type { Profile } from '../lib/supabase'
+import { SHOWN_LABEL, type Shown } from '../lib/presence'
 
 type Look = Pick<Profile, 'avatar_emoji' | 'avatar_color'> & { avatar_url?: string | null }
 
-export function Avatar({ profile, size = 36 }: { profile: Look; size?: number }) {
-  return (
+/** `presence` adds the Discord-style status dot in the bottom-right corner. */
+export function Avatar({ profile, size = 36, presence }: { profile: Look; size?: number; presence?: Shown }) {
+  const face = (
     <span
       className="avatar"
       style={{ width: size, height: size, fontSize: size * 0.55, background: profile.avatar_color }}
     >
       {profile.avatar_url ? <img src={profile.avatar_url} alt="" draggable={false} /> : profile.avatar_emoji}
+    </span>
+  )
+  if (!presence) return face
+  return (
+    <span className="avatar-wrap" style={{ ['--dot' as string]: `${Math.min(18, Math.max(8, Math.round(size * 0.36)))}px` }}>
+      {face}
+      <i className={`presence-dot ${presence}`} title={SHOWN_LABEL[presence]} />
     </span>
   )
 }

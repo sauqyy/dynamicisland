@@ -15,12 +15,14 @@ const ME: Profile = {
   avatar_color: '#60a5fa',
   avatar_url: null,
   status: '📚 Studying',
+  presence: 'online',
 }
 
 const people: Profile[] = [
-  { id: 'a', username: 'zhillan', display_name: 'Zhillan', avatar_emoji: '🦊', avatar_color: '#fb923c', avatar_url: null, status: '💻 Working' },
-  { id: 'b', username: 'mira_k', display_name: 'Mira', avatar_emoji: '🐼', avatar_color: '#f472b6', avatar_url: null, status: '' },
-  { id: 'c', username: 'dev_ardi', display_name: 'Ardi', avatar_emoji: '🎧', avatar_color: '#c084fc', avatar_url: null, status: '🎮 Gaming' },
+  { id: 'a', username: 'zhillan', display_name: 'Zhillan', avatar_emoji: '🦊', avatar_color: '#fb923c', avatar_url: null, status: '💻 Working', presence: 'online' },
+  { id: 'b', username: 'mira_k', display_name: 'Mira', avatar_emoji: '🐼', avatar_color: '#f472b6', avatar_url: null, status: '', presence: 'idle' },
+  { id: 'c', username: 'dev_ardi', display_name: 'Ardi', avatar_emoji: '🎧', avatar_color: '#c084fc', avatar_url: null, status: '🎮 Gaming', presence: 'dnd' },
+  { id: 'e', username: 'kaito', display_name: 'Kaito', avatar_emoji: '🐙', avatar_color: '#60a5fa', avatar_url: null, status: '', presence: 'invisible' },
 ]
 const requester: Profile = { id: 'd', username: 'nadia', display_name: 'Nadia', avatar_emoji: '🌙', avatar_color: '#2dd4bf', avatar_url: null, status: '' }
 

@@ -3,6 +3,8 @@ import { ACCENTS, type Settings } from '../lib/settings'
 import { BACKEND_READY } from '../lib/supabase'
 import { USERNAME_RE, type Auth } from '../lib/useAuth'
 import { squarePhoto } from '../lib/photo'
+import { presenceOf } from '../lib/presence'
+import { DEMO_SOCIAL } from '../lib/useDemo'
 import { Avatar } from './Avatar'
 
 const EMOJIS = ['🙂', '😎', '🤖', '🦊', '🐼', '🐸', '🦄', '🐙', '🌵', '🚀', '🎧', '🔥', '🌙', '🍕', '👾', '🐱']
@@ -209,7 +211,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
     <div className="profile-edit">
       <div className="profile-card">
         <div className="avatar-edit">
-          <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={92} />
+          <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={92} presence={p ? presenceOf(p) : undefined} />
           <div className="avatar-overlay">
             <button className="ao-text" onClick={openPicker}>
               Choose photo
@@ -327,7 +329,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
 export function ProfileWidget(props: Props) {
   const { auth } = props
   let body
-  if (!BACKEND_READY) {
+  if (!(BACKEND_READY || DEMO_SOCIAL)) {
     body = (
       <div className="empty-block">
         <b>Accounts aren't set up yet</b>

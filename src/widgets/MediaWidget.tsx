@@ -71,7 +71,7 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   return (
     <div className="media" onClick={(e) => e.stopPropagation()}>
       <div className="media-head">
-        <Art track={track} size={52} />
+        <Art track={track} size={44} />
         <div className="media-meta">
           <div className="title">{track.title}</div>
           <div className="artist">{track.artist}</div>

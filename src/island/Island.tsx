@@ -117,7 +117,8 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
     const c = animate(enterY, 0, { type: 'spring', ...springRef.current })
     return () => c.stop()
   }, [enterY, intro])
-  const enterT = useTransform(enterY, (v) => `0 ${v}px`)
+  // whole pixels only: the glass filters redraw jagged on fractional offsets while the island is moving
+  const enterT = useTransform(enterY, (v) => `0 ${Math.round(v)}px`)
 
   return (
     <motion.div className="stage" style={{ translate: enterT }}>

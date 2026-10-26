@@ -1628,6 +1628,23 @@
   display: flex;
   gap: 8px;
 }
+/* an open chat needs the height: the Friends/Profile switcher hides until Back */
+.expanded:has(.chat) .subtabs {
+  display: none;
+}
+.chat-plus {
+  flex: none;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.chat-plus.on {
+  transform: rotate(45deg);
+}
 .chat-compose .todo-input {
   flex: 1;
   min-width: 0;
@@ -1950,6 +1967,13 @@
 }
 .empty {
   pointer-events: none;
+}
+
+/* inside a chat the message fills just the message list, not the whole body */
+.chat-list .empty {
+  position: static;
+  flex: 1;
+  padding: 0;
 }
 
 /* the shelf box starts below the body's top padding; pull its message back up to the common centre */
@@ -2631,7 +2655,13 @@
   margin-top: 8px;
 }
 .lyrics {
-  height: 56px;
+  height: 76px;
+  margin: 2px 0;
+  /* fade only the outer edges so the previous and next lines stay readable */
+  mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
+}
+.lyric-stack {
+  gap: 4px;
 }
 .media {
   padding-bottom: 6px;
@@ -3130,4 +3160,186 @@ button.ao-text:hover {
 .root.glass.tint-light .cp-add {
   background: #16181f;
   color: #fff;
+}
+
+/* ---------- presence: online / idle / do not disturb / invisible ---------- */
+.avatar-wrap {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  line-height: 0;
+}
+.presence-dot {
+  --ring: var(--island-solid, #14161d);
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  box-sizing: border-box;
+  width: var(--dot, 10px);
+  height: var(--dot, 10px);
+  border-radius: 50%;
+  background: #23a55a;
+  box-shadow: 0 0 0 max(1.5px, calc(var(--dot, 10px) * 0.2)) var(--ring);
+  pointer-events: none;
+}
+.root.light .presence-dot,
+.root.glass.tint-light .presence-dot {
+  --ring: #f6f6f8;
+}
+.presence-dot.idle {
+  background: #f0b232;
+  /* the crescent moon: a dark bite out of the top-left */
+  -webkit-mask: radial-gradient(circle at 28% 28%, transparent 36%, #000 38%);
+  mask: radial-gradient(circle at 28% 28%, transparent 36%, #000 38%);
+  box-shadow: none;
+}
+.presence-dot.dnd {
+  background: linear-gradient(var(--ring), var(--ring)) center / 60% 22% no-repeat, #f23f43;
+  box-shadow: none;
+}
+.presence-dot.invisible,
+.presence-dot.offline {
+  background: #80848e;
+  -webkit-mask: radial-gradient(circle, transparent 28%, #000 30%);
+  mask: radial-gradient(circle, transparent 28%, #000 30%);
+  box-shadow: none;
+}
+.presence-dot.inline {
+  position: static;
+  flex: none;
+  --dot: 12px;
+  box-shadow: none;
+}
+.presence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.presence-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.presence-list button:hover {
+  background: rgb(var(--fg-rgb) / 0.08);
+}
+.presence-list button.active {
+  background: rgb(var(--fg-rgb) / 0.14);
+  font-weight: 600;
+}
+.presence-list small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+/* ---------- avatar menu: availability + Edit profile ---------- */
+.profile-menu-wrap {
+  position: relative;
+  display: flex;
+}
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -34px;
+  z-index: 30;
+  width: 210px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 14px;
+  background: var(--island-solid, #17181f);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px rgb(var(--fg-rgb) / 0.12), 0 10px 30px rgb(0 0 0 / 0.45);
+}
+.root.light .profile-menu {
+  --island-solid: #fff;
+}
+.pm-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid rgb(var(--fg-rgb) / 0.1);
+}
+.pm-who span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+}
+.pm-who small {
+  opacity: 0.6;
+  font-size: 11px;
+}
+.pm-edit {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(var(--fg-rgb) / 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pm-edit:hover {
+  background: rgb(var(--fg-rgb) / 0.18);
+}
+
+/* Now Playing: the lyric box takes whatever the other rows leave, enough for the previous, current and next line */
+.media {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-bottom: 0;
+  container: media / size;
+}
+.media > * {
+  flex: none;
+}
+.media > .lyrics {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 26px;
+  container-type: size;
+}
+/* a shorter card (Card height setting) has no room for three lines: keep only the current one */
+@container (max-height: 58px) {
+  .lyric.prev,
+  .lyric.next {
+    display: none;
+  }
+}
+.expanded-body:has(.media) {
+  padding-top: 10px;
+}
+
+/* keep the island on its own GPU layer so the glass filters aren't re-rasterised while it drops in */
+.stage {
+  will-change: translate, transform;
+  backface-visibility: hidden;
+}
+
+/* a short card: shrink the art and the buttons so the current lyric still fits above the dock */
+@container media (max-height: 140px) {
+  .media-head .art {
+    width: 34px !important;
+    height: 34px !important;
+  }
+  .controls {
+    margin-top: 0;
+  }
+  .controls button {
+    height: 28px;
+  }
 }

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { BACKEND_READY, type Message } from '../lib/supabase'
 import type { Auth } from '../lib/useAuth'
 import type { Friend, Social } from '../lib/useSocial'
+import { DEMO_SOCIAL } from '../lib/useDemo'
+import { shownPresence } from '../lib/presence'
 import { Avatar } from './Avatar'
 
 interface Props {
@@ -41,6 +43,7 @@ function Bubble({ m, mine }: { m: Message; mine: boolean }) {
 function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me: string; social: Social; activityText: string; onBack: () => void }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
   const end = useRef<HTMLDivElement>(null)
   const list = social.messages[friend.profile.id]
   const { open } = social
@@ -58,6 +61,7 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
 
   const send = async (kind: 'text' | 'activity' | 'note', body: string) => {
     setErr(await social.send(friend.profile.id, kind, body))
+    setSharing(false)
   }
   const note = noteText()
 
@@ -67,7 +71,7 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
         <button className="chip" onClick={onBack}>
           ‹ Back
         </button>
-        <Avatar profile={friend.profile} size={22} />
+        <Avatar profile={friend.profile} size={22} presence={shownPresence(friend.profile)} />
         <b>{friend.profile.display_name || `@${friend.profile.username}`}</b>
         {friend.profile.display_name && <small className="handle">@{friend.profile.username}</small>}
         {friend.activity && <small className="chat-activity">{friend.activity}</small>}
@@ -83,6 +87,7 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
         <div ref={end} />
       </div>
       {err && <div className="form-msg">{err}</div>}
+      {sharing && (
       <div className="chat-share">
         <button className="chip" disabled={!activityText} title={activityText || 'Nothing to share right now'} onClick={() => send('activity', activityText)}>
           Share activity
@@ -91,6 +96,7 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
           Share note
         </button>
       </div>
+      )}
       <form
         className="chat-compose"
         onSubmit={(e) => {
@@ -100,6 +106,9 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
           setDraft('')
         }}
       >
+        <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" onClick={() => setSharing((v) => !v)}>
+          +
+        </button>
         <input
           className="todo-input"
           placeholder="Message…"
@@ -129,7 +138,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
     }
   }, [openChatId, social.friends, onChatOpened])
 
-  if (!BACKEND_READY || !auth.user || !auth.profile) {
+  if (!(BACKEND_READY || DEMO_SOCIAL) || !auth.user || !auth.profile) {
     return (
       <div className="scroll-panel" onClick={(e) => e.stopPropagation()}>
         <div className="empty-block">
@@ -200,7 +209,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
 
       {social.friends.map((f) => (
         <div key={f.friendshipId} className="friend-row" onClick={() => setChatWith(f.profile.id)}>
-          <Avatar profile={f.profile} size={30} />
+          <Avatar profile={f.profile} size={30} presence={shownPresence(f.profile)} />
           <div className="friend-meta">
             <b>{f.profile.display_name || `@${f.profile.username}`}</b>
             <small>

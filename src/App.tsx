@@ -196,6 +196,7 @@ export default function App() {
   }, [])
 
   const realSocial = useSocial(meId, (m, from) => {
+    if (auth.profile?.presence === 'dnd') return
     pushAlert({
       icon: '💬',
       text: from?.profile.display_name || from?.profile.username || 'New message',
@@ -636,6 +637,7 @@ export default function App() {
           bars={playing && track ? track.hue : null}
           profile={auth.profile}
           onProfile={() => setTab('profile')}
+          onPresence={(v) => auth.saveProfile({ presence: v })}
           profileActive={tab === 'profile'}
           onSettings={() => setTab('settings')}
           settingsActive={tab === 'settings'}
@@ -914,7 +916,9 @@ export default function App() {
             onClick={() => {
               if (DEMO_SOCIAL) {
                 const { friend, body } = demo.ping()
-                pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+                if (auth.profile?.presence !== 'dnd') {
+                  pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+                }
               } else {
                 pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
               }
