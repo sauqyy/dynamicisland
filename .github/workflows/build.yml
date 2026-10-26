@@ -5,6 +5,9 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: write
+
 jobs:
   macos:
     runs-on: macos-latest
@@ -26,3 +29,8 @@ jobs:
         with:
           name: dynamic-island-macos
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg --clobber
