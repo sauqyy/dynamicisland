@@ -2316,3 +2316,216 @@
 .idle.idle-grid .dot.unread-dot {
   margin-left: 4px;
 }
+
+/* a page inside the open card (animated when switching) */
+.page {
+  height: 100%;
+  transform-origin: 50% 50%;
+}
+
+.page {
+  position: relative;
+}
+
+/* ---------- page animation preview in Settings ---------- */
+.anim-preview {
+  flex: none;
+  position: relative;
+  height: 78px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgb(var(--fg-rgb) / 0.07);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.anim-preview > .chip {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  z-index: 3;
+}
+.anim-card {
+  position: relative;
+  width: 150px;
+  height: 54px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  background: linear-gradient(135deg, var(--accent, #4ade80), color-mix(in srgb, var(--accent, #4ade80) 45%, #7c3aed));
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.3);
+}
+.anim-card.b {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #4ade80) 45%, #7c3aed), var(--accent, #4ade80));
+}
+.ac-title,
+.ac-line {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.85);
+}
+.ac-title {
+  width: 52%;
+  height: 9px;
+}
+.ac-line {
+  width: 86%;
+  opacity: 0.55;
+}
+.ac-line.short {
+  width: 58%;
+}
+
+/* ---------- grouped navigation: dock at the bottom, tabs inside a group ---------- */
+.subtabs {
+  flex: none;
+  align-self: center;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  margin-top: 4px;
+  border-radius: 14px;
+  background: rgb(var(--fg-rgb) / 0.1);
+}
+.subtabs button {
+  padding: 3px 14px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.55;
+  transition: opacity 0.2s, background 0.2s;
+}
+.subtabs button:hover {
+  opacity: 0.85;
+}
+.subtabs button.active {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent, #4ade80) 38%, transparent);
+}
+.expanded-body.has-subtabs {
+  padding-top: 8px;
+}
+.dock {
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  margin: 2px 0 12px;
+  border-radius: 999px;
+  background: rgb(var(--fg-rgb) / 0.1);
+}
+.dock button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.25s, padding 0.25s;
+}
+.dock-icon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.dock-label {
+  display: none;
+  white-space: nowrap;
+}
+.dock button:hover .dock-icon {
+  opacity: 1;
+}
+.dock button.active {
+  padding: 0 12px 0 10px;
+  background: color-mix(in srgb, var(--accent, #4ade80) 40%, transparent);
+}
+.dock button.active .dock-icon {
+  opacity: 1;
+}
+.dock button.active .dock-label {
+  display: inline;
+}
+
+/* custom line icons in the dock */
+.dock-icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 0;
+}
+.dock button.active .dock-icon {
+  color: var(--accent, #4ade80);
+}
+.dock button.active {
+  color: var(--fg);
+}
+
+/* the arrow is a drawn chevron now, so it is centred exactly (a text glyph sat off-centre) */
+.nav-arrow {
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+.nav-arrow svg {
+  display: block;
+}
+.nav-arrow.left svg {
+  margin-right: 1px;
+}
+.nav-arrow.right svg {
+  margin-left: 1px;
+}
+
+/* ---------- page arrows: round glass buttons with an accent chevron ---------- */
+.nav-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--fg);
+  background: linear-gradient(160deg, rgb(var(--fg-rgb) / 0.2), rgb(var(--fg-rgb) / 0.07));
+  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.2), inset 0 1px 0 rgb(var(--fg-rgb) / 0.28), 0 4px 12px rgb(0 0 0 / 0.28);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.nav-arrow svg {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.nav-arrow:hover {
+  color: var(--on-accent, #000);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent, #4ade80) 100%, #fff 18%), var(--accent, #4ade80));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 6px 18px color-mix(in srgb, var(--accent, #4ade80) 45%, transparent);
+}
+.nav-arrow.left:hover svg {
+  transform: translateX(-2px);
+}
+.nav-arrow.right:hover svg {
+  transform: translateX(2px);
+}
+.nav-arrow:active {
+  transform: translateY(-50%) scale(0.88);
+}
+.root.glass .nav-arrow {
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.1));
+  color: #fff;
+}
+.root.glass .nav-arrow:hover {
+  color: var(--on-accent, #000);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent, #4ade80) 100%, #fff 18%), var(--accent, #4ade80));
+}
+.root.glass.tint-light .nav-arrow {
+  color: #16181f;
+  background: linear-gradient(160deg, rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.4));
+}
+.root.glass.tint-light .nav-arrow:hover {
+  color: var(--on-accent, #000);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent, #4ade80) 100%, #fff 18%), var(--accent, #4ade80));
+}

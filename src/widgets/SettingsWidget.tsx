@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { PAGE_VARIANTS } from '../lib/pageAnim'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
+import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { PAGES } from '../types'
 
@@ -80,6 +82,9 @@ export function SettingsWidget({ settings, update }: Props) {
   const [monitors, setMonitors] = useState(1)
   const [version, setVersion] = useState('')
   const [update_, setUpdate] = useState<UpdateState>({ s: 'idle' })
+  // page-animation preview: two sample cards that swap, replayed on every click
+  const [swap, setSwap] = useState({ n: 0, dir: 1 as 1 | -1 })
+  const flip = () => setSwap((s) => ({ n: s.n + 1, dir: s.dir === 1 ? -1 : 1 }))
 
   useEffect(() => {
     if (!IS_TAURI) return
@@ -244,6 +249,43 @@ export function SettingsWidget({ settings, update }: Props) {
             </button>
           ))}
         </div>
+      </div>
+      <div className="group-title">Page animation</div>
+      <div className="page-toggles">
+        {TAB_ANIMS.map((a) => (
+          <button
+            key={a}
+            className={`chip ${settings.tabAnim === a ? 'on' : ''}`}
+            style={{ opacity: settings.tabAnim === a ? 1 : 0.6, textTransform: 'capitalize' }}
+            onClick={() => {
+              update({ tabAnim: a })
+              flip()
+            }}
+          >
+            {a}
+          </button>
+        ))}
+      </div>
+      <div className="anim-preview" aria-hidden>
+        <AnimatePresence mode="popLayout" initial={false} custom={swap.dir}>
+          <motion.div
+            key={swap.n}
+            className={`anim-card ${swap.n % 2 ? 'b' : 'a'}`}
+            custom={swap.dir}
+            variants={PAGE_VARIANTS[settings.tabAnim]}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            style={{ transformPerspective: 900 }}
+          >
+            <span className="ac-title" />
+            <span className="ac-line" />
+            <span className="ac-line short" />
+          </motion.div>
+        </AnimatePresence>
+        <button className="chip" onClick={flip}>
+          Replay
+        </button>
       </div>
       <div className="row">
         <span>Animation</span>

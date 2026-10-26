@@ -5,6 +5,9 @@ import type { Tab } from '../types'
 
 export type Anim = 'bouncy' | 'smooth' | 'snappy'
 export type GlassTint = 'dark' | 'light' | 'gradient'
+export type TabAnim = 'fade' | 'slide' | 'liquid' | 'zoom' | 'stack' | 'flip' | 'blur' | 'rise' | 'morph' | 'elastic'
+
+export const TAB_ANIMS: TabAnim[] = ['fade', 'slide', 'liquid', 'zoom', 'stack', 'flip', 'blur', 'rise', 'morph', 'elastic']
 export type Theme = 'dark' | 'light' | 'glass' | 'auto'
 export type IdleDisplay = 'clock' | 'lyrics' | 'weather' | 'notes'
 
@@ -18,6 +21,8 @@ export interface Settings {
   /** tint the UI with the colour of the track that is playing instead of `accent` */
   accentFromMusic: boolean
   theme: Theme
+  /** how pages change inside the open card */
+  tabAnim: TabAnim
   /** colour of the glass: only used by the glass theme */
   glassTint: GlassTint
   /** share what you are doing with friends (listening, timer) */
@@ -61,16 +66,16 @@ export const SPRINGS: Record<Anim, { stiffness: number; damping: number; mass: n
 }
 
 /** Design-space size of the stage the island is drawn in (must match .stage in App.css). */
-export const STAGE = { w: 520, h: 340 }
+export const STAGE = { w: 520, h: 364 }
 
 export const SIZE_LIMITS = {
   scale: { min: 0.8, max: 1.4, step: 0.05 },
   cardW: { min: 400, max: 490, step: 10 },
-  cardH: { min: 280, max: 330, step: 2 },
+  cardH: { min: 300, max: 352, step: 2 },
   clockSize: { min: 12, max: 22, step: 1 },
 }
 
-export const SIZE_DEFAULTS = { scale: 1, cardW: 460, cardH: 308 }
+export const SIZE_DEFAULTS = { scale: 1, cardW: 460, cardH: 330 }
 
 const DEFAULTS: Settings = {
   monitor: 0,
@@ -80,6 +85,7 @@ const DEFAULTS: Settings = {
   accent: ACCENTS[0],
   accentFromMusic: false,
   theme: 'dark',
+  tabAnim: 'slide',
   glassTint: 'dark',
   shareActivity: false,
   idle: 'lyrics',
@@ -103,7 +109,10 @@ const KEY = 'di.settings'
 
 function load(): Settings {
   try {
-    return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>) }
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
+    // the old default card height was too short for the new tabs and dock
+    if (saved.cardH === 308) saved.cardH = SIZE_DEFAULTS.cardH
+    return { ...DEFAULTS, ...saved }
   } catch {
     return DEFAULTS
   }

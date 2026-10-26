@@ -27,6 +27,30 @@ export const PAGES: { id: Tab; title: string }[] = [
   { id: 'settings', title: 'Settings' },
 ]
 
+/** Pages are grouped so the card has 5 places to go instead of 11 pages in a row. */
+export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[] = [
+  { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
+  { id: 'tools', title: 'Tools', icon: '🛠️', pages: ['todo', 'notes', 'clipboard'] },
+  { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps'] },
+  { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'profile'] },
+  { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
+]
+
+/** Short names for the tabs inside a group. */
+export const SHORT: Record<Tab, string> = {
+  media: 'Playing',
+  weather: 'Weather',
+  timer: 'Timer',
+  todo: 'To-do',
+  notes: 'Notes',
+  clipboard: 'Clipboard',
+  shelf: 'Shelf',
+  apps: 'Apps',
+  friends: 'Friends',
+  profile: 'Profile',
+  settings: 'Settings',
+}
+
 export interface Track {
   id: string
   title: string

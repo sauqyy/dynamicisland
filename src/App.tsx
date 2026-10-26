@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { listen } from '@tauri-apps/api/event'
+import { AnimatePresence, motion, useDragControls } from 'motion/react'
+import { PAGE_VARIANTS } from './lib/pageAnim'
 import { GooFilter, Island, type Shape } from './island/Island'
 import { Art, Bars, MediaWidget } from './widgets/MediaWidget'
 import { Ring } from './widgets/TimerWidget'
@@ -14,6 +16,7 @@ import { WeatherWidget } from './widgets/WeatherWidget'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
+import { GroupIcon } from './widgets/GroupIcon'
 import { FriendsWidget } from './widgets/FriendsWidget'
 import { useAuth } from './lib/useAuth'
 import { useSocial } from './lib/useSocial'
@@ -33,7 +36,7 @@ import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
 import { cachedWeather, describe as describeWeather } from './lib/weather'
-import { PAGES, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
+import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
 const LOW_BATTERY = 20
@@ -145,6 +148,14 @@ export default function App() {
     () => PAGES.filter((p) => p.id === 'settings' || !settings.hiddenPages.includes(p.id)),
     [settings.hiddenPages],
   )
+  // the groups that still have a visible page, and which one the current page is in
+  const groups = useMemo(
+    () => GROUPS.map((g) => ({ ...g, pages: g.pages.filter((p) => pages.some((x) => x.id === p)) })).filter((g) => g.pages.length),
+    [pages],
+  )
+  const group = groups.find((g) => g.pages.includes(tab)) ?? groups[0]
+  // each group remembers the page you were last on, so tapping it again returns there
+  const lastInGroup = useRef<Record<string, Tab>>({})
   const pagesRef = useRef(pages)
   pagesRef.current = pages
   const posRef = useRef(pos)
@@ -453,7 +464,23 @@ export default function App() {
     }
   }, [hitW, shape.h, settings.scale])
 
+  useEffect(() => {
+    if (group) lastInGroup.current[group.id] = tab
+  }, [group, tab])
+
   const go = (dir: -1 | 1) => setTab((t) => stepPage(pages, t, dir))
+
+  // which way the page change goes: 1 = towards the next page, -1 = back (shortest way round)
+  const pageDrag = useDragControls()
+  const pageIdx = Math.max(0, pages.findIndex((p) => p.id === tab))
+  const prevIdx = useRef(pageIdx)
+  const dirRef = useRef<1 | -1>(1)
+  if (prevIdx.current !== pageIdx) {
+    let diff = pageIdx - prevIdx.current
+    if (Math.abs(diff) > pages.length / 2) diff = -diff
+    dirRef.current = diff >= 0 ? 1 : -1
+    prevIdx.current = pageIdx
+  }
 
   const startTimer = (minutes: number) => {
     setPomo(null)
@@ -582,7 +609,7 @@ export default function App() {
   let contentKey: string
 
   if (mode === 'expanded') {
-    contentKey = `expanded-${tab}-${clockMode}`
+    contentKey = 'expanded'
     const page = PAGES.find((p) => p.id === tab)!
     const action =
       tab === 'shelf' && shelf.items.length ? (
@@ -612,88 +639,136 @@ export default function App() {
           onSettings={() => setTab('settings')}
           settingsActive={tab === 'settings'}
         />
-        <div className={`expanded-body ${action ? 'with-actions' : ''}`}>
+        {group && group.pages.length > 1 && (
+          <div className="subtabs" onClick={(e) => e.stopPropagation()}>
+            {group.pages.map((id) => (
+              <button key={id} className={id === tab ? 'active' : ''} onClick={() => setTab(id)}>
+                {SHORT[id]}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`expanded-body ${action ? 'with-actions' : ''} ${group && group.pages.length > 1 ? 'has-subtabs' : ''}`}>
           {action && <div className="body-actions">{action}</div>}
-          {tab === 'media' && (
-            <MediaWidget
-              track={track}
-              position={position}
-              playing={playing}
-              onToggle={toggle}
-              onSeek={seek}
-              onSkip={onSkip}
-            />
-          )}
-          {tab === 'timer' && (
-            <TimerTab
-              mode={clockMode}
-              setMode={setClockMode}
-              timer={timer}
-              now={now}
-              onStart={startTimer}
-              onCancel={stopTimer}
-              sw={sw}
-              setSw={setSw}
-              pomo={pomo}
-              onPomoStart={startPomo}
-              onPomoStop={stopTimer}
-              onPomoSkip={skipPomo}
-            />
-          )}
-          {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
-          {tab === 'notes' && <NotesWidget />}
-          {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
-          {tab === 'clipboard' && (
-            <ClipboardWidget
-              items={clipboard.items}
-              paused={settings.clipPaused}
-              mask={settings.clipMask}
-              onRemove={clipboard.remove}
-              onCopy={(t) => {
-                clipboard.copy(t)
-                pushAlert({ icon: '📋', text: 'Copied' })
-              }}
-            />
-          )}
-          {tab === 'shelf' && (
-            <ShelfWidget items={shelf.items} onRemove={shelf.remove} emptyHint="Drag files here to keep them handy" />
-          )}
-          {tab === 'apps' && (
-            <ShelfWidget
-              apps
-              items={apps.items}
-              onRemove={apps.remove}
-              emptyHint="Drop an app or shortcut here to pin it"
-            />
-          )}
-          {tab === 'friends' && (
-            <FriendsWidget
-              auth={auth}
-              social={social}
-              activityText={activityText}
-              onGoProfile={() => setTab('profile')}
-              openChatId={pendingChat}
-              onChatOpened={() => setPendingChat(null)}
-            />
-          )}
-          {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
-          {tab === 'settings' && <SettingsWidget settings={settings} update={update} />}
+          <AnimatePresence mode="popLayout" initial={false} custom={dirRef.current}>
+            <motion.div
+              key={tab}
+              className="page"
+              custom={dirRef.current}
+              variants={PAGE_VARIANTS[settings.tabAnim]}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              style={{ transformPerspective: 900 }}
+              {...(settings.tabAnim === 'elastic'
+                ? {
+                    drag: 'x' as const,
+                    dragControls: pageDrag,
+                    dragListener: false,
+                    dragConstraints: { left: 0, right: 0 },
+                    dragElastic: 0.45,
+                    onPointerDown: (e: React.PointerEvent) => {
+                      // let inputs, sliders and buttons keep their own dragging
+                      if (!(e.target as HTMLElement).closest('input, textarea, button, a, .scrub, [draggable="true"], .todo-item')) pageDrag.start(e)
+                    },
+                    onDragEnd: (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+                      if (info.offset.x < -70 || info.velocity.x < -450) go(1)
+                      else if (info.offset.x > 70 || info.velocity.x > 450) go(-1)
+                    },
+                  }
+                : {})}
+            >
+            {tab === 'media' && (
+              <MediaWidget
+                track={track}
+                position={position}
+                playing={playing}
+                onToggle={toggle}
+                onSeek={seek}
+                onSkip={onSkip}
+              />
+            )}
+            {tab === 'timer' && (
+              <TimerTab
+                mode={clockMode}
+                setMode={setClockMode}
+                timer={timer}
+                now={now}
+                onStart={startTimer}
+                onCancel={stopTimer}
+                sw={sw}
+                setSw={setSw}
+                pomo={pomo}
+                onPomoStart={startPomo}
+                onPomoStop={stopTimer}
+                onPomoSkip={skipPomo}
+              />
+            )}
+            {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
+            {tab === 'notes' && <NotesWidget />}
+            {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
+            {tab === 'clipboard' && (
+              <ClipboardWidget
+                items={clipboard.items}
+                paused={settings.clipPaused}
+                mask={settings.clipMask}
+                onRemove={clipboard.remove}
+                onCopy={(t) => {
+                  clipboard.copy(t)
+                  pushAlert({ icon: '📋', text: 'Copied' })
+                }}
+              />
+            )}
+            {tab === 'shelf' && (
+              <ShelfWidget items={shelf.items} onRemove={shelf.remove} emptyHint="Drag files here to keep them handy" />
+            )}
+            {tab === 'apps' && (
+              <ShelfWidget
+                apps
+                items={apps.items}
+                onRemove={apps.remove}
+                emptyHint="Drop an app or shortcut here to pin it"
+              />
+            )}
+            {tab === 'friends' && (
+              <FriendsWidget
+                auth={auth}
+                social={social}
+                activityText={activityText}
+                onGoProfile={() => setTab('profile')}
+                openChatId={pendingChat}
+                onChatOpened={() => setPendingChat(null)}
+              />
+            )}
+            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
+            {tab === 'settings' && <SettingsWidget settings={settings} update={update} />}
+            </motion.div>
+          </AnimatePresence>
           <button className="nav-arrow left" aria-label="Previous page" onClick={(e) => { e.stopPropagation(); go(-1) }}>
-            ‹
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M14.5 6 8.5 12l6 6" />
+            </svg>
           </button>
           <button className="nav-arrow right" aria-label="Next page" onClick={(e) => { e.stopPropagation(); go(1) }}>
-            ›
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9.5 6l6 6-6 6" />
+            </svg>
           </button>
         </div>
-        <div className="dots" onClick={(e) => e.stopPropagation()}>
-          {pages.map((p) => (
+        <div className="dock" onClick={(e) => e.stopPropagation()}>
+          {groups.map((g) => (
             <button
-              key={p.id}
-              aria-label={p.title}
-              title={p.title}
-              className={p.id === tab ? 'active' : ''}
-              onClick={() => setTab(p.id)}
-            />
+              key={g.id}
+              aria-label={g.title}
+              title={g.title}
+              className={g.id === group?.id ? 'active' : ''}
+              onClick={() => setTab(g.pages.includes(lastInGroup.current[g.id]) ? lastInGroup.current[g.id] : g.pages[0])}
+            >
+              <span className="dock-icon">
+                <GroupIcon id={g.id} />
+              </span>
+              <span className="dock-label">{g.title}</span>
+            </button>
           ))}
         </div>
         {dragging && (
