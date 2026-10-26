@@ -427,10 +427,18 @@ export default function App() {
             x: Math.round(Math.max(-maxX, Math.min(maxX, g.ox + dx))),
             y: Math.round(Math.max(0, Math.min(window.screen.height - 120, g.oy + dy))),
           }
-          // snap back onto the screen edge when dropped close to it
+          // magnets: snap onto the screen edge and the centre line when close
           if (next.y < 12) next.y = 0
+          if (Math.abs(next.x) < 24) next.x = 0
           setPos(next)
           invoke('set_offset', { x: next.x, y: next.y }).catch(() => {})
+        },
+        // double-click the pill to send it back to the centre top
+        onDoubleClick: () => {
+          if (mode === 'expanded' || (!pos.x && !pos.y)) return
+          setExpanded(false)
+          setPos({ x: 0, y: 0 })
+          update({ posX: 0, posY: 0 })
         },
         onPointerUp: () => {
           const g = dragRef.current
