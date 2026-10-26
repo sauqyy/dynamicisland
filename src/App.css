@@ -3162,7 +3162,7 @@ button.ao-text:hover {
   color: #fff;
 }
 
-/* ---------- presence: online / idle / do not disturb / invisible ---------- */
+/* ---------- presence: available / away / focus / hidden ---------- */
 .avatar-wrap {
   position: relative;
   flex: none;
@@ -3171,6 +3171,7 @@ button.ao-text:hover {
 }
 .presence-dot {
   --ring: var(--island-solid, #14161d);
+  --c: #34d399;
   position: absolute;
   right: -1px;
   bottom: -1px;
@@ -3178,7 +3179,7 @@ button.ao-text:hover {
   width: var(--dot, 10px);
   height: var(--dot, 10px);
   border-radius: 50%;
-  background: #23a55a;
+  background: var(--c);
   box-shadow: 0 0 0 max(1.5px, calc(var(--dot, 10px) * 0.2)) var(--ring);
   pointer-events: none;
 }
@@ -3186,63 +3187,38 @@ button.ao-text:hover {
 .root.glass.tint-light .presence-dot {
   --ring: #f6f6f8;
 }
+/* away: a ring that is only half filled */
 .presence-dot.idle {
-  background: #f0b232;
-  /* the crescent moon: a dark bite out of the top-left */
-  -webkit-mask: radial-gradient(circle at 28% 28%, transparent 36%, #000 38%);
-  mask: radial-gradient(circle at 28% 28%, transparent 36%, #000 38%);
-  box-shadow: none;
+  --c: #fbbf24;
+  background: linear-gradient(90deg, var(--c) 50%, transparent 50%);
+  box-shadow: inset 0 0 0 max(1.5px, calc(var(--dot, 10px) * 0.16)) var(--c), 0 0 0 max(1.5px, calc(var(--dot, 10px) * 0.2)) var(--ring);
 }
+/* focus: a rounded square, so it never looks like the others at a glance */
 .presence-dot.dnd {
-  background: linear-gradient(var(--ring), var(--ring)) center / 60% 22% no-repeat, #f23f43;
-  box-shadow: none;
+  --c: #fb7185;
+  border-radius: 32%;
 }
+/* hidden / offline: an empty dashed ring */
 .presence-dot.invisible,
 .presence-dot.offline {
-  background: #80848e;
-  -webkit-mask: radial-gradient(circle, transparent 28%, #000 30%);
-  mask: radial-gradient(circle, transparent 28%, #000 30%);
-  box-shadow: none;
+  --c: #9ca3af;
+  background: var(--ring);
+  box-shadow: inset 0 0 0 max(1.5px, calc(var(--dot, 10px) * 0.16)) var(--c);
+}
+.presence-dot.online {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c) 70%, transparent));
 }
 .presence-dot.inline {
   position: static;
   flex: none;
   --dot: 12px;
+  --ring: transparent;
+}
+.presence-dot.inline.online {
   box-shadow: none;
 }
-.presence-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.presence-list button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  text-align: left;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.presence-list button:hover {
-  background: rgb(var(--fg-rgb) / 0.08);
-}
-.presence-list button.active {
-  background: rgb(var(--fg-rgb) / 0.14);
-  font-weight: 600;
-}
-.presence-list small {
-  display: block;
-  font-size: 11px;
-  font-weight: 400;
-  opacity: 0.6;
-}
 
-/* ---------- avatar menu: availability + Edit profile ---------- */
+/* ---------- avatar menu: pick an availability, then Edit profile ---------- */
 .profile-menu-wrap {
   position: relative;
   display: flex;
@@ -3252,15 +3228,20 @@ button.ao-text:hover {
   top: calc(100% + 8px);
   right: -34px;
   z-index: 30;
-  width: 210px;
-  padding: 8px;
+  width: 224px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  border-radius: 14px;
+  gap: 8px;
+  border-radius: 18px;
   background: var(--island-solid, #17181f);
   color: var(--fg);
-  box-shadow: 0 0 0 1px rgb(var(--fg-rgb) / 0.12), 0 10px 30px rgb(0 0 0 / 0.45);
+  box-shadow: 0 0 0 1px rgb(var(--fg-rgb) / 0.12), 0 12px 32px rgb(0 0 0 / 0.5);
+  animation: menu-in 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
+  transform-origin: top right;
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.92) translateY(-4px); }
 }
 .root.light .profile-menu {
   --island-solid: #fff;
@@ -3269,8 +3250,7 @@ button.ao-text:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 6px 8px;
-  border-bottom: 1px solid rgb(var(--fg-rgb) / 0.1);
+  padding: 2px 2px 0;
 }
 .pm-who span {
   display: flex;
@@ -3282,18 +3262,63 @@ button.ao-text:hover {
   opacity: 0.6;
   font-size: 11px;
 }
-.pm-edit {
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgb(var(--fg-rgb) / 0.1);
+.presence-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.presence-grid button {
+  --c: #34d399;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: rgb(var(--fg-rgb) / 0.07);
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.presence-grid button[data-p='idle'] { --c: #fbbf24; }
+.presence-grid button[data-p='dnd'] { --c: #fb7185; }
+.presence-grid button[data-p='invisible'] { --c: #9ca3af; }
+.presence-grid button:hover {
+  background: rgb(var(--fg-rgb) / 0.13);
+}
+.presence-grid button:active {
+  transform: scale(0.96);
+}
+.presence-grid button.active {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--c);
+  font-weight: 600;
+}
+.pm-hint {
+  min-height: 14px;
+  padding: 0 2px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+.pm-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.22);
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s;
 }
 .pm-edit:hover {
-  background: rgb(var(--fg-rgb) / 0.18);
+  background: rgb(var(--fg-rgb) / 0.1);
 }
 
 /* Now Playing: the lyric box takes whatever the other rows leave, enough for the previous, current and next line */

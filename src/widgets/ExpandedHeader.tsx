@@ -29,6 +29,7 @@ interface Props {
 function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Profile | null; active: boolean; onProfile: () => void; onPresence: (v: Presence) => Promise<string | null> }) {
   const [open, setOpen] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [hint, setHint] = useState<string | null>(null)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -64,13 +65,16 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
               <small>@{profile.username}</small>
             </span>
           </div>
-          <div className="presence-list" role="radiogroup">
+          <div className="presence-grid" role="radiogroup">
             {PRESENCES.map((o) => (
               <button
                 key={o.id}
                 role="radio"
+                data-p={o.id}
                 aria-checked={o.id === current}
                 className={o.id === current ? 'active' : ''}
+                onMouseEnter={() => setHint(o.hint)}
+                onMouseLeave={() => setHint(null)}
                 onClick={async () => {
                   const e = await onPresence(o.id)
                   setErr(e)
@@ -78,13 +82,11 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
                 }}
               >
                 <i className={`presence-dot inline ${o.id}`} />
-                <span>
-                  {o.label}
-                  {o.hint && <small>{o.hint}</small>}
-                </span>
+                {o.label}
               </button>
             ))}
           </div>
+          <div className="pm-hint">{hint ?? PRESENCES.find((o) => o.id === current)?.hint}</div>
           {err && <div className="form-msg">{err}</div>}
           <button
             className="pm-edit"
@@ -93,6 +95,9 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
               onProfile()
             }}
           >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+            </svg>
             Edit profile
           </button>
         </div>

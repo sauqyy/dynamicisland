@@ -6,10 +6,10 @@ export type Presence = 'online' | 'idle' | 'dnd' | 'invisible'
 export type Shown = Presence | 'offline'
 
 export const PRESENCES: { id: Presence; label: string; hint: string }[] = [
-  { id: 'online', label: 'Online', hint: '' },
-  { id: 'idle', label: 'Idle', hint: '' },
-  { id: 'dnd', label: 'Do Not Disturb', hint: 'You will not get message alerts' },
-  { id: 'invisible', label: 'Invisible', hint: 'You will appear offline' },
+  { id: 'online', label: 'Available', hint: 'Friends see you are around' },
+  { id: 'idle', label: 'Away', hint: 'Switches on by itself after 5 minutes' },
+  { id: 'dnd', label: 'Focus', hint: 'Message alerts are muted' },
+  { id: 'invisible', label: 'Hidden', hint: 'Friends see you as offline' },
 ]
 
 export const presenceOf = (p: Pick<Profile, 'presence'>): Presence => p.presence ?? 'online'
@@ -19,4 +19,4 @@ export const shownPresence = (p: Pick<Profile, 'presence'>): Shown => {
   return v === 'invisible' ? 'offline' : v
 }
 
-export const SHOWN_LABEL: Record<Shown, string> = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', invisible: 'Invisible', offline: 'Offline' }
+export const SHOWN_LABEL: Record<Shown, string> = { online: 'Available', idle: 'Away', dnd: 'Focus', invisible: 'Hidden', offline: 'Offline' }
