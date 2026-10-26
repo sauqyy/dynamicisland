@@ -95,7 +95,7 @@ language sql security definer set search_path = public as $$
 $$;
 grant execute on function public.mark_read(uuid) to authenticated;
 
-alter publication supabase_realtime add table public.messages, public.friendships, public.activity;
+alter publication supabase_realtime add table public.messages, public.friendships, public.activity, public.profiles;
 
 -- already ran an older version of this file? run this line once to add the presence column:
 -- alter table public.profiles add column if not exists presence text not null default 'online' check (presence in ('online', 'idle', 'dnd', 'invisible'));
@@ -103,3 +103,4 @@ alter publication supabase_realtime add table public.messages, public.friendship
 -- already ran an older version of this file? run this once to add read receipts:
 -- alter table public.messages add column if not exists read_at timestamptz;
 -- (then also run the create function public.mark_read ... block above)
+-- friends see status changes live: alter publication supabase_realtime add table public.profiles;

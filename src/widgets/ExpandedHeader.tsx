@@ -19,15 +19,16 @@ interface Props {
   profile: Profile | null
   /** edit profile / sign in */
   onProfile: () => void
-  onPresence: (v: Presence) => void
+  onPresence: (v: Presence) => Promise<string | null>
   profileActive: boolean
   onSettings: () => void
   settingsActive: boolean
 }
 
 /** The avatar button: opens a Discord-style menu to set availability, with Edit profile at the bottom. */
-function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Profile | null; active: boolean; onProfile: () => void; onPresence: (v: Presence) => void }) {
+function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Profile | null; active: boolean; onProfile: () => void; onPresence: (v: Presence) => Promise<string | null> }) {
   const [open, setOpen] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -70,9 +71,10 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
                 role="radio"
                 aria-checked={o.id === current}
                 className={o.id === current ? 'active' : ''}
-                onClick={() => {
-                  onPresence(o.id)
-                  setOpen(false)
+                onClick={async () => {
+                  const e = await onPresence(o.id)
+                  setErr(e)
+                  if (!e) setOpen(false)
                 }}
               >
                 <i className={`presence-dot inline ${o.id}`} />
@@ -83,6 +85,7 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
               </button>
             ))}
           </div>
+          {err && <div className="form-msg">{err}</div>}
           <button
             className="pm-edit"
             onClick={() => {

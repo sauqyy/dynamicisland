@@ -80,17 +80,21 @@ export function useAuth() {
   const saveProfile = useCallback(
     async (patch: Partial<Omit<Profile, 'id'>>) => {
       if (!user) return 'Not signed in'
-      const row = { id: user.id, ...patch }
-      const { data, error } = await supabase
-        .from('profiles')
-        .upsert(row, { onConflict: 'id' })
-        .select()
-        .single()
-      if (error) return error.code === '23505' ? 'That username is taken' : error.message
+      // a partial change (like the availability) must be an update: an upsert would insert a row without a username first and fail
+      const q = profile
+        ? supabase.from('profiles').update(patch).eq('id', user.id)
+        : supabase.from('profiles').upsert({ id: user.id, ...patch }, { onConflict: 'id' })
+      const { data, error } = await q.select().single()
+      if (error) {
+        if (error.code === '23505') return 'That username is taken'
+        // the presence column is missing until supabase/schema.sql has been updated
+        if (error.message.includes('presence')) return 'Run the presence update in supabase/schema.sql first'
+        return error.message
+      }
       setProfile(data as Profile)
       return null
     },
-    [user],
+    [user, profile],
   )
 
   return { user, profile, loading, signIn, signUp, signInWithGoogle, signOut, saveProfile }

@@ -51,6 +51,38 @@ static DRAGGING: AtomicBool = AtomicBool::new(false);
 /// How far the user moved the island from its default spot (centre top), in logical px.
 static OFFSET: Mutex<(f64, f64)> = Mutex::new((0.0, 0.0));
 
+/// Seconds since the last keyboard or mouse input anywhere on the computer (drives the automatic Idle status).
+#[tauri::command]
+fn idle_seconds() -> u64 {
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::SystemInformation::GetTickCount;
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        let mut info = LASTINPUTINFO {
+            cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+            dwTime: 0,
+        };
+        if unsafe { GetLastInputInfo(&mut info) }.as_bool() {
+            return (unsafe { GetTickCount() }.wrapping_sub(info.dwTime) / 1000) as u64;
+        }
+        0
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // HIDIdleTime is in nanoseconds
+        let out = std::process::Command::new("ioreg").args(["-c", "IOHIDSystem", "-d", "4"]).output();
+        if let Ok(o) = out {
+            let text = String::from_utf8_lossy(&o.stdout);
+            if let Some(line) = text.lines().find(|l| l.contains("HIDIdleTime")) {
+                if let Some(n) = line.rsplit('=').next().and_then(|v| v.trim().parse::<u64>().ok()) {
+                    return n / 1_000_000_000;
+                }
+            }
+        }
+        0
+    }
+}
+
 #[tauri::command]
 fn set_hit_area(state: State<HitArea>, w: f64, h: f64) {
     *state.0.lock().unwrap() = (w, h);
@@ -287,6 +319,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .invoke_handler(tauri::generate_handler![
             set_hit_area,
+            idle_seconds,
             set_window_size,
             set_monitor,
             set_offset,

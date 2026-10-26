@@ -35,6 +35,7 @@ import { SPRINGS, STAGE, useSettings } from './lib/settings'
 import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
+import { useAutoIdle } from './lib/useAutoIdle'
 import { cachedWeather, describe as describeWeather } from './lib/weather'
 import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
@@ -384,6 +385,8 @@ export default function App() {
   // what friends can see: the song or timer that is running
   const activityText = playing && track ? `🎵 ${track.title} – ${track.artist}` : timer ? (pomo ? '🍅 Focusing' : '⏳ Timer running') : ''
   const social = DEMO_SOCIAL ? demo.social : realSocial
+  const { saveProfile } = auth
+  useAutoIdle(auth.profile?.presence ?? (auth.profile ? 'online' : undefined), (v) => void saveProfile({ presence: v }), Boolean(auth.profile))
   const unreadCount = Object.values(social.unread).reduce((a, b) => a + b, 0)
   const { publishActivity } = social
   useEffect(() => {
