@@ -65,3 +65,24 @@ export function GroupIcon({ id, size = 18 }: { id: string; size?: number }) {
       )
   }
 }
+
+/** The settings button in the card header: a cog that turns and lights up on hover (see .gear in App.css). */
+export function SettingsCog({ size = 18 }: { size?: number }) {
+  return (
+    <svg
+      className="cog"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M9.87 5.02 L10.37 1.73 L13.63 1.73 L14.13 5.02 L15.43 5.55 L18.11 3.59 L20.41 5.89 L18.45 8.57 L18.98 9.87 L22.27 10.37 L22.27 13.63 L18.98 14.13 L18.45 15.43 L20.41 18.11 L18.11 20.41 L15.43 18.45 L14.13 18.98 L13.63 22.27 L10.37 22.27 L9.87 18.98 L8.57 18.45 L5.89 20.41 L3.59 18.11 L5.55 15.43 L5.02 14.13 L1.73 13.63 L1.73 10.37 L5.02 9.87 L5.55 8.57 L3.59 5.89 L5.89 3.59 L8.57 5.55 Z" />
+      <circle cx="12" cy="12" r="3.1" />
+    </svg>
+  )
+}

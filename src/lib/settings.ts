@@ -33,6 +33,8 @@ export interface Settings {
   idleBars: boolean
   /** font size of the idle pill text in px */
   clockSize: number
+  /** seconds the lyrics run ahead of the player; the fade-in and Windows' position lag make them feel late */
+  lyricOffset: number
   /** pages left out of the carousel (Settings can never be hidden) */
   hiddenPages: Tab[]
   /** clipboard history: stop recording, hide entries until hovered, wipe after N minutes (0 = never) */
@@ -73,9 +75,10 @@ export const SIZE_LIMITS = {
   cardW: { min: 400, max: 490, step: 10 },
   cardH: { min: 300, max: 352, step: 2 },
   clockSize: { min: 12, max: 22, step: 1 },
+  lyricOffset: { min: -1.5, max: 1.5, step: 0.05 },
 }
 
-export const SIZE_DEFAULTS = { scale: 1, cardW: 460, cardH: 330 }
+export const SIZE_DEFAULTS = { scale: 1, cardW: 460, cardH: 344 }
 
 const DEFAULTS: Settings = {
   monitor: 0,
@@ -91,6 +94,7 @@ const DEFAULTS: Settings = {
   idle: 'lyrics',
   idleBars: true,
   clockSize: 15,
+  lyricOffset: 0.35,
   hiddenPages: [],
   clipPaused: false,
   clipMask: false,
@@ -111,7 +115,7 @@ function load(): Settings {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
     // the old default card height was too short for the new tabs and dock
-    if (saved.cardH === 308) saved.cardH = SIZE_DEFAULTS.cardH
+    if (saved.cardH === 308 || saved.cardH === 330) saved.cardH = SIZE_DEFAULTS.cardH
     return { ...DEFAULTS, ...saved }
   } catch {
     return DEFAULTS

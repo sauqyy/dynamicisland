@@ -58,19 +58,28 @@ export async function fetchLyrics(
   const params = new URLSearchParams({ track_name: title, artist_name: artist })
   if (duration) params.set('duration', String(Math.round(duration)))
 
+  // ask for the exact match and the search at the same time instead of one after the other:
+  // when the exact match misses (a slightly different track length is enough) the lyrics
+  // used to arrive a whole round trip later
+  const getJson = async (url: string) => {
+    const res = await fetch(url, { signal })
+    return res.ok ? ((await res.json()) as unknown) : null
+  }
   let result: LrclibResult | null = null
   try {
-    const res = await fetch(`https://lrclib.net/api/get?${params}`, { signal })
-    if (res.ok) result = (await res.json()) as LrclibResult
-    else if (res.status === 404) {
-      const search = await fetch(
-        `https://lrclib.net/api/search?${new URLSearchParams({ q: `${artist} ${title}` })}`,
-        { signal },
-      )
-      if (search.ok) {
-        const list = (await search.json()) as LrclibResult[]
-        result = list.find((r) => r.syncedLyrics) ?? null
-      }
+    const exact = getJson(`https://lrclib.net/api/get?${params}`).catch((e) => {
+      if (signal?.aborted) throw e
+      return null
+    })
+    const search = getJson(`https://lrclib.net/api/search?${new URLSearchParams({ q: `${artist} ${title}` })}`).catch((e) => {
+      if (signal?.aborted) throw e
+      return null
+    })
+    const hit = (await exact) as LrclibResult | null
+    if (hit?.syncedLyrics) result = hit
+    else {
+      const list = ((await search) as LrclibResult[] | null) ?? []
+      result = list.find((r) => r.syncedLyrics) ?? null
     }
   } catch {
     return null // offline or aborted: don't cache

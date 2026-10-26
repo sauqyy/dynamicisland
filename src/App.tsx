@@ -403,7 +403,7 @@ export default function App() {
   const accent = settings.accentFromMusic && playing && track ? `hsl(${track.hue} 78% 62%)` : settings.accent
   const onAcc = settings.accentFromMusic && playing && track ? '#000' : onAccent(settings.accent)
 
-  const lyricIdx = track?.lyrics ? currentLineIndex(track.lyrics, position) : -1
+  const lyricIdx = track?.lyrics ? currentLineIndex(track.lyrics, position + settings.lyricOffset) : -1
   const lyricText = lyricIdx >= 0 ? track!.lyrics![lyricIdx].text : ''
   const showLyricPeek = playing && !!lyricText
   // idle pill shows the lyric line instead of the clock when asked to and one is available
@@ -682,6 +682,7 @@ export default function App() {
               <MediaWidget
                 track={track}
                 position={position}
+                lyricOffset={settings.lyricOffset}
                 playing={playing}
                 onToggle={toggle}
                 onSeek={seek}

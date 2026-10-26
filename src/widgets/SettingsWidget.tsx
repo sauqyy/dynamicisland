@@ -176,6 +176,13 @@ export function SettingsWidget({ settings, update }: Props) {
         format={(v) => `${v}px`}
         onChange={(clockSize) => update({ clockSize })}
       />
+      <Slider
+        label="Lyrics timing"
+        value={settings.lyricOffset}
+        limits={SIZE_LIMITS.lyricOffset}
+        format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}s`}
+        onChange={(lyricOffset) => update({ lyricOffset })}
+      />
       <div className="row">
         <span>Position (drag the pill)</span>
         <button

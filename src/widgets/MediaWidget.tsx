@@ -36,13 +36,15 @@ export function Art({ track, size }: { track: Track; size: number }) {
 interface Props {
   track: Track | null
   position: number
+  /** seconds to run the lyrics ahead (negative = later) */
+  lyricOffset?: number
   playing: boolean
   onToggle: () => void
   onSeek: (t: number) => void
   onSkip: (dir: -1 | 1) => void
 }
 
-export function MediaWidget({ track, position, playing, onToggle, onSeek, onSkip }: Props) {
+export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggle, onSeek, onSkip }: Props) {
   const barRef = useRef<HTMLDivElement>(null)
 
   if (!track) {
@@ -56,7 +58,7 @@ export function MediaWidget({ track, position, playing, onToggle, onSeek, onSkip
   }
 
   const lines = track.lyrics
-  const idx = lines ? currentLineIndex(lines, position) : -1
+  const idx = lines ? currentLineIndex(lines, position + lyricOffset) : -1
   const canSeek = track.duration > 0
 
   const seekFromEvent = (clientX: number) => {

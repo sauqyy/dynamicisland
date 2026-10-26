@@ -101,7 +101,7 @@ export function useMedia() {
         }
       }
       setPosition(p)
-    }, 100)
+    }, 50)
     return () => clearInterval(id)
   }, [duration, resync])
 

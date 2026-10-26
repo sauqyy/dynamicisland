@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Ring } from './TimerWidget'
 import { Bars } from './MediaWidget'
 import { Avatar } from './Avatar'
+import { SettingsCog } from './GroupIcon'
 import type { Profile } from '../lib/supabase'
 
 interface Props {
@@ -45,7 +46,7 @@ export function ExpandedHeader({ title, action, timer, date, clock, bars, profil
           {profile ? <Avatar profile={profile} size={22} /> : <span className="avatar ghost">👤</span>}
         </button>
         <button className={`gear ${settingsActive ? 'active' : ''}`} aria-label="Settings" title="Settings" onClick={onSettings}>
-          ⚙
+          <SettingsCog size={18} />
         </button>
       </div>
     </div>

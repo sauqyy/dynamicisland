@@ -206,7 +206,37 @@ function Editor({ auth, settings, update, onHold }: Props) {
   return (
     <div className="profile-edit">
       <div className="profile-card">
-        <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={64} />
+        <div className="avatar-edit">
+          <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={92} />
+          <div className="avatar-overlay">
+            <button className="ao-text" onClick={openPicker}>
+              Choose photo
+            </button>
+            <button className="ao-pen" aria-label="Choose photo" onClick={openPicker}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                <path d="m14.5 5.5 3 3" />
+              </svg>
+            </button>
+            {photo ? (
+              <button className="ao-text" onClick={() => setPhoto(null)}>
+                Remove photo
+              </button>
+            ) : (
+              <span className="ao-text ghost" aria-hidden />
+            )}
+          </div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              pickPhoto(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
+        </div>
         <div className="profile-id">
           <b>{name.trim() || (uname ? `@${uname}` : 'New profile')}</b>
           {uname && <span className="profile-handle">@{uname}</span>}
@@ -224,27 +254,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
 
       <div className="field">
         <label>Avatar</label>
-        <div className="photo-row">
-          <button className="pill-btn" onClick={openPicker}>
-            {photo ? 'Change photo' : 'Upload photo'}
-          </button>
-          {photo && (
-            <button className="chip" onClick={() => setPhoto(null)}>
-              Remove photo
-            </button>
-          )}
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              pickPhoto(e.target.files?.[0])
-              e.target.value = ''
-            }}
-          />
-        </div>
-        <small>{photo ? 'Your photo is shown instead of the emoji.' : 'Or pick an emoji and a colour:'}</small>
+        <small>{photo ? 'Hover your picture to change or remove the photo. It replaces the emoji.' : 'Hover your picture to add a photo, or pick an emoji and a colour:'}</small>
         <div className="emoji-grid">
           {EMOJIS.map((e) => (
             <button key={e} className={e === emoji ? 'active' : ''} onClick={() => setEmoji(e)}>
