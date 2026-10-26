@@ -4,6 +4,8 @@ import { IS_TAURI } from './useMedia'
 import type { Tab } from '../types'
 
 export type Anim = 'bouncy' | 'smooth' | 'snappy'
+export type GlassTint = 'dark' | 'light' | 'gradient'
+export type Theme = 'dark' | 'light' | 'glass' | 'auto'
 export type IdleDisplay = 'clock' | 'lyrics' | 'weather' | 'notes'
 
 export interface Settings {
@@ -13,6 +15,13 @@ export interface Settings {
   anim: Anim
   clock24: boolean
   accent: string
+  /** tint the UI with the colour of the track that is playing instead of `accent` */
+  accentFromMusic: boolean
+  theme: Theme
+  /** colour of the glass: only used by the glass theme */
+  glassTint: GlassTint
+  /** share what you are doing with friends (listening, timer) */
+  shareActivity: boolean
   /** what the small pill shows: the clock, or the current lyric line when there is one */
   idle: IdleDisplay
   /** equalizer bars next to the idle text while music plays */
@@ -32,6 +41,9 @@ export interface Settings {
   posY: number
   /** city for the weather page */
   city: string
+  /** exact spot picked from the search suggestions */
+  cityLat: number | null
+  cityLon: number | null
   fahrenheit: boolean
   /** overall size of the island, 1 = default */
   scale: number
@@ -40,7 +52,7 @@ export interface Settings {
   cardH: number
 }
 
-export const ACCENTS = ['#4ade80', '#60a5fa', '#c084fc', '#f472b6', '#fb923c']
+export const ACCENTS = ['#4ade80', '#60a5fa', '#c084fc', '#f472b6', '#fb923c', '#facc15', '#f87171', '#2dd4bf']
 
 export const SPRINGS: Record<Anim, { stiffness: number; damping: number; mass: number }> = {
   bouncy: { stiffness: 380, damping: 28, mass: 0.9 },
@@ -66,6 +78,10 @@ const DEFAULTS: Settings = {
   anim: 'bouncy',
   clock24: true,
   accent: ACCENTS[0],
+  accentFromMusic: false,
+  theme: 'dark',
+  glassTint: 'dark',
+  shareActivity: false,
   idle: 'lyrics',
   idleBars: true,
   clockSize: 15,
@@ -77,6 +93,8 @@ const DEFAULTS: Settings = {
   posX: 0,
   posY: 0,
   city: '',
+  cityLat: null,
+  cityLon: null,
   fahrenheit: false,
   ...SIZE_DEFAULTS,
 }

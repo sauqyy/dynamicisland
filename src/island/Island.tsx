@@ -132,7 +132,39 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
       </div>
 
       <svg className="outline-layer" aria-hidden>
-        <motion.path d={d} fill="#000" />
+        <defs>
+          <linearGradient id="glass-tint" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" style={{ stopColor: 'var(--glass-a)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--glass-b)' }} />
+          </linearGradient>
+          <linearGradient id="glass-rim" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#fff" stopOpacity="0.95" />
+            <stop offset="0.22" stopColor="#bfe9ff" stopOpacity="0.55" />
+            <stop offset="0.5" stopColor="#fff" stopOpacity="0.12" />
+            <stop offset="0.78" stopColor="#ffc2ea" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0.85" />
+          </linearGradient>
+          <filter id="glass-soft" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
+          <clipPath id="glass-clip">
+            <motion.path d={d} />
+          </clipPath>
+          <linearGradient id="glass-sheen" x1="0" y1="0" x2="0.35" y2="1">
+            <stop offset="0" stopColor="#fff" stopOpacity="0.34" />
+            <stop offset="0.35" stopColor="#fff" stopOpacity="0.06" />
+            <stop offset="0.7" stopColor="#fff" stopOpacity="0.02" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0.16" />
+          </linearGradient>
+        </defs>
+        <motion.path d={d} style={{ fill: 'var(--island-bg)' }} />
+        <motion.path className="glass-tint" d={d} fill="url(#glass-tint)" />
+        <motion.path className="glass-sheen" d={d} fill="url(#glass-sheen)" />
+        <g className="glass-fx" clipPath="url(#glass-clip)">
+          {/* light caught along the inside of the edge, like the thick rim of a lens */}
+          <motion.path d={d} fill="none" stroke="#fff" strokeWidth="12" strokeOpacity="0.34" filter="url(#glass-soft)" />
+        </g>
+        <motion.path className="glass-fx glass-rim" d={d} fill="none" stroke="url(#glass-rim)" strokeWidth="1.5" />
       </svg>
 
       <div className="content-layer">

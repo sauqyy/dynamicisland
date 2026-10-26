@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, type Anim, type IdleDisplay, type Settings } from '../lib/settings'
+import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { PAGES } from '../types'
 
@@ -108,7 +108,8 @@ export function SettingsWidget({ settings, update }: Props) {
         assets: { name: string; browser_download_url: string }[]
       }
       if (!newer(rel.tag_name, version)) return setUpdate({ s: 'current' })
-      const asset = rel.assets.find((a) => /\.exe$/i.test(a.name))
+      // the silent updater needs the regular installer, not the friendly first-time Setup.exe
+      const asset = rel.assets.find((a) => /x64-setup\.exe$/i.test(a.name)) ?? rel.assets.find((a) => /\.exe$/i.test(a.name))
       if (!asset) throw new Error('No installer in release')
       setUpdate({ s: 'available', version: rel.tag_name.replace(/^v/, ''), url: asset.browser_download_url })
     } catch (e) {
@@ -133,7 +134,7 @@ export function SettingsWidget({ settings, update }: Props) {
         : update_.s === 'available'
           ? `v${update_.version} available`
           : update_.s === 'downloading'
-            ? 'Downloading…'
+            ? 'Updating…'
             : update_.s === 'error'
               ? update_.msg
               : version && `v${version}`
@@ -288,7 +289,7 @@ export function SettingsWidget({ settings, update }: Props) {
         <span className="update-status">{status}</span>
         {update_.s === 'available' ? (
           <button className="chip" onClick={() => downloadUpdate(update_.url)}>
-            Download
+            Update
           </button>
         ) : (
           <button className="chip" disabled={update_.s === 'checking' || update_.s === 'downloading'} onClick={checkUpdate}>
@@ -297,18 +298,51 @@ export function SettingsWidget({ settings, update }: Props) {
         )}
       </div>
       <div className="row">
+        <span>Theme</span>
+        <div className="segmented small">
+          {(['dark', 'light', 'glass', 'auto'] as Theme[]).map((t) => (
+            <button key={t} className={settings.theme === t ? 'active' : ''} onClick={() => update({ theme: t })}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+      {settings.theme === 'glass' && (
+        <div className="row">
+          <span>Glass style</span>
+          <div className="segmented small">
+            {(['dark', 'light', 'gradient'] as GlassTint[]).map((t) => (
+              <button key={t} className={settings.glassTint === t ? 'active' : ''} onClick={() => update({ glassTint: t })}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="row">
         <span>Accent</span>
         <div className="swatches">
           {ACCENTS.map((c) => (
             <button
               key={c}
               aria-label={c}
-              className={settings.accent === c ? 'active' : ''}
+              className={!settings.accentFromMusic && settings.accent === c ? 'active' : ''}
               style={{ background: c }}
-              onClick={() => update({ accent: c })}
+              onClick={() => update({ accent: c, accentFromMusic: false })}
             />
           ))}
+          <label className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'active'}`} title="Custom colour">
+            <input
+              type="color"
+              value={settings.accent}
+              onChange={(e) => update({ accent: e.target.value, accentFromMusic: false })}
+            />
+          </label>
         </div>
+      </div>
+      <div className="row">
+        <span>Match accent to music</span>
+        <Toggle on={settings.accentFromMusic} onChange={(v) => update({ accentFromMusic: v })} />
       </div>
     </div>
   )

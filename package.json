@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@crabnebula/tauri-plugin-drag": "^2.1.0",
+    "@supabase/supabase-js": "^2.118.0",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-autostart": "^2.7.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.5.0",

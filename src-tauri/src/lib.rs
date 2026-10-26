@@ -1,3 +1,4 @@
+mod auth;
 mod files;
 mod media;
 mod screen;
@@ -64,7 +65,42 @@ fn set_hide_on_fullscreen(enabled: bool) {
     HIDE_ON_FULLSCREEN.store(enabled, Ordering::Relaxed);
 }
 
-/// Downloads the installer from a GitHub release of this project, runs it and quits.
+#[derive(Clone, serde::Serialize)]
+struct UpdateProgress {
+    /// "downloading", "installing" or "failed"
+    stage: &'static str,
+    percent: u32,
+}
+
+fn download_installer(app: &AppHandle, url: &str, dest: &std::path::Path) -> Result<(), String> {
+    use std::io::{Read, Write};
+    let resp = ureq::get(url).call().map_err(|e| e.to_string())?;
+    let total: u64 = resp.header("Content-Length").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let mut reader = resp.into_reader();
+    let mut file = std::fs::File::create(dest).map_err(|e| e.to_string())?;
+    let mut buf = [0u8; 64 * 1024];
+    let (mut done, mut last) = (0u64, u32::MAX);
+    loop {
+        let n = reader.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        done += n as u64;
+        let percent = if total > 0 { (done * 100 / total).min(100) as u32 } else { 0 };
+        if percent != last {
+            last = percent;
+            let _ = app.emit("update-progress", UpdateProgress { stage: "downloading", percent });
+        }
+    }
+    if done == 0 || (total > 0 && done != total) {
+        return Err("download incomplete".into());
+    }
+    Ok(())
+}
+
+/// Downloads the installer from a GitHub release of this project (reporting progress to the
+/// island), then runs it silently as an in-place upgrade; the new version starts by itself.
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
@@ -72,25 +108,34 @@ async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
         return Err("unexpected update url".into());
     }
     let dest = std::env::temp_dir().join("dynamic-island-update.exe");
-    let script = format!(
-        "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri '{url}' -OutFile '{}'",
-        dest.display()
-    );
-    let status = tauri::async_runtime::spawn_blocking(move || {
-        std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .creation_flags(0x0800_0000)
-            .status()
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| e.to_string())?;
-    if !status.success() || !dest.exists() {
-        return Err("download failed".into());
+    let _ = app.emit("update-progress", UpdateProgress { stage: "downloading", percent: 0 });
+    let (app2, dest2) = (app.clone(), dest.clone());
+    let result = tauri::async_runtime::spawn_blocking(move || download_installer(&app2, &url, &dest2))
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|r| r);
+    if let Err(e) = result {
+        let _ = app.emit("update-progress", UpdateProgress { stage: "failed", percent: 0 });
+        return Err(e);
     }
-    std::process::Command::new(&dest).spawn().map_err(|e| e.to_string())?;
+    let _ = app.emit("update-progress", UpdateProgress { stage: "installing", percent: 100 });
+    // /S = no windows, /UPDATE = upgrade in place and relaunch the app afterwards
+    // (DETACHED_PROCESS | CREATE_NO_WINDOW so the installer outlives this process)
+    if let Err(e) = std::process::Command::new(&dest)
+        .args(["/S", "/UPDATE"])
+        .creation_flags(0x0000_0008 | 0x0800_0000)
+        .spawn()
+    {
+        let _ = app.emit("update-progress", UpdateProgress { stage: "failed", percent: 0 });
+        return Err(e.to_string());
+    }
+    pause_before_exit().await;
     app.exit(0);
     Ok(())
+}
+
+async fn pause_before_exit() {
+    let _ = tauri::async_runtime::spawn_blocking(|| std::thread::sleep(Duration::from_millis(1200))).await;
 }
 
 #[tauri::command]
@@ -199,6 +244,8 @@ pub fn run() {
             set_monitor,
             set_offset,
             set_dragging,
+            auth::oauth_wait,
+            auth::open_url,
             set_hide_on_fullscreen,
             monitor_count,
             install_update,

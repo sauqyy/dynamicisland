@@ -9,6 +9,8 @@ export type Tab =
   | 'clipboard'
   | 'shelf'
   | 'apps'
+  | 'friends'
+  | 'profile'
   | 'settings'
 
 export const PAGES: { id: Tab; title: string }[] = [
@@ -20,6 +22,8 @@ export const PAGES: { id: Tab; title: string }[] = [
   { id: 'clipboard', title: 'Clipboard' },
   { id: 'shelf', title: 'Shelf' },
   { id: 'apps', title: 'Apps' },
+  { id: 'friends', title: 'Friends' },
+  { id: 'profile', title: 'Profile' },
   { id: 'settings', title: 'Settings' },
 ]
 
@@ -43,6 +47,10 @@ export interface IslandAlert {
   sub?: string
   /** 0–100, renders a liquid bar */
   value?: number
+  /** shown instead of the icon, e.g. the friend who wrote */
+  avatar?: { avatar_emoji: string; avatar_color: string; avatar_url?: string | null }
+  /** clicking the alert opens the chat with this friend */
+  chatWith?: string
 }
 
 export interface TimerState {

@@ -41,6 +41,24 @@ export function cachedWeather(city: string, fahrenheit: boolean): Weather | null
 
 export const isFresh = (w: Weather) => Date.now() - w.fetchedAt < MAX_AGE
 
+export interface CityHit {
+  name: string
+  admin1?: string
+  country?: string
+  latitude: number
+  longitude: number
+}
+
+/** City suggestions for the search box. */
+export async function searchCities(query: string, signal?: AbortSignal): Promise<CityHit[]> {
+  const res = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?${new URLSearchParams({ name: query, count: '6', language: 'en' })}`,
+    { signal },
+  )
+  if (!res.ok) throw new Error('Search unavailable')
+  return ((await res.json()) as { results?: CityHit[] }).results ?? []
+}
+
 interface GeoResult {
   results?: { name: string; latitude: number; longitude: number }[]
 }
@@ -58,13 +76,17 @@ interface ForecastResult {
 }
 
 /** Open-Meteo: free, no API key. */
-export async function fetchWeather(city: string, fahrenheit: boolean): Promise<Weather> {
-  const geo = (await (
+export async function fetchWeather(
+  city: string,
+  fahrenheit: boolean,
+  coords?: { lat: number; lon: number } | null,
+): Promise<Weather> {
+  const geo = coords ? {} as GeoResult : (await (
     await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?${new URLSearchParams({ name: city, count: '1' })}`,
     )
   ).json()) as GeoResult
-  const place = geo.results?.[0]
+  const place = coords ? { name: city, latitude: coords.lat, longitude: coords.lon } : geo.results?.[0]
   if (!place) throw new Error('City not found')
 
   const params = new URLSearchParams({

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Ring } from './TimerWidget'
 import { Bars } from './MediaWidget'
+import { Avatar } from './Avatar'
+import type { Profile } from '../lib/supabase'
 
 interface Props {
   title: string
@@ -11,14 +13,18 @@ interface Props {
   clock: string
   /** hue for the music bars, null when nothing is playing */
   bars: number | null
+  /** signed-in profile, null when signed out */
+  profile: Profile | null
+  onProfile: () => void
+  profileActive: boolean
   onSettings: () => void
   settingsActive: boolean
 }
 
 /** Title on the left, status (timer ring, date, time, music bars) on the right. */
-export function ExpandedHeader({ title, action, timer, date, clock, bars, onSettings, settingsActive }: Props) {
+export function ExpandedHeader({ title, action, timer, date, clock, bars, profile, onProfile, profileActive, onSettings, settingsActive }: Props) {
   return (
-    <div className="xhead" onClick={(e) => e.stopPropagation()}>
+    <div className={`xhead ${action ? 'has-action' : ''}`} onClick={(e) => e.stopPropagation()}>
       <div className="xhead-left">
         <span className="xhead-title">{title}</span>
         {action}
@@ -26,10 +32,18 @@ export function ExpandedHeader({ title, action, timer, date, clock, bars, onSett
       <div className="xhead-right">
         {timer !== null && <Ring fraction={timer} size={18} stroke={3} />}
         <span className="xhead-date">
-          {date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          {date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}
         </span>
         <b className="xhead-time">{clock}</b>
         {bars !== null && <Bars active hue={bars} />}
+        <button
+          className={`head-avatar ${profileActive ? 'active' : ''}`}
+          aria-label="Profile"
+          title={profile ? `@${profile.username}` : 'Sign in'}
+          onClick={onProfile}
+        >
+          {profile ? <Avatar profile={profile} size={22} /> : <span className="avatar ghost">👤</span>}
+        </button>
         <button className={`gear ${settingsActive ? 'active' : ''}`} aria-label="Settings" title="Settings" onClick={onSettings}>
           ⚙
         </button>

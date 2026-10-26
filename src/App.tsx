@@ -12,6 +12,12 @@ import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
+import { ProfileWidget } from './widgets/ProfileWidget'
+import { Avatar } from './widgets/Avatar'
+import { FriendsWidget } from './widgets/FriendsWidget'
+import { useAuth } from './lib/useAuth'
+import { useSocial } from './lib/useSocial'
+import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { useClipboard } from './lib/useClipboard'
 import { ExpandedHeader } from './widgets/ExpandedHeader'
 import {
@@ -23,6 +29,7 @@ import {
   type FileItem,
 } from './lib/files'
 import { SPRINGS, STAGE, useSettings } from './lib/settings'
+import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
 import { cachedWeather, describe as describeWeather } from './lib/weather'
@@ -101,14 +108,31 @@ export default function App() {
   const shelf = useStoredList('di.shelf', IS_TAURI ? [] : DEMO_SHELF)
   const apps = useStoredList('di.apps', IS_TAURI ? [] : DEMO_APPS)
   const [expanded, setExpanded] = useState(false)
+  const realAuth = useAuth()
+  const demo = useDemo()
+  const auth = DEMO_SOCIAL ? demo.auth : realAuth
+  const meId = !DEMO_SOCIAL && auth.user && auth.profile ? auth.user.id : null
   const [hovered, setHovered] = useState(false)
   const [tab, setTab] = useState<Tab>(loadTab)
   const [pos, setPos] = useState({ x: settings.posX, y: settings.posY })
   const [moving, setMoving] = useState(false)
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; active: boolean } | null>(null)
+  const motionRef = useRef({
+    pos: { x: 0, y: 0 },
+    vel: { x: 0, y: 0 },
+    target: { x: 0, y: 0 },
+    last: 0,
+    raf: 0,
+    held: false,
+    magX: false,
+    magY: false,
+  })
   const justDragged = useRef(false)
   const [clockMode, setClockMode] = useState<ClockMode>('timer')
   const [alert, setAlert] = useState<IslandAlert | null>(null)
+  const [holdOpen, setHoldOpen] = useState(false)
+  const [pendingChat, setPendingChat] = useState<string | null>(null)
+  const [updating, setUpdating] = useState<{ stage: string; percent: number } | null>(null)
   const [timer, setTimer] = useState<TimerState | null>(null)
   const [sw, setSw] = useState<StopwatchState>({ running: false, startedAt: 0, base: 0, laps: [] })
   const [now, setNow] = useState(() => Date.now())
@@ -136,7 +160,7 @@ export default function App() {
 
   // keep the live position in step with the stored one (e.g. after Reset)
   useEffect(() => {
-    if (!dragRef.current?.active) setPos({ x: settings.posX, y: settings.posY })
+    if (!dragRef.current?.active && !motionRef.current.raf) setPos({ x: settings.posX, y: settings.posY })
   }, [settings.posX, settings.posY])
   const addShelf = shelf.add
   const addApps = apps.add
@@ -158,6 +182,16 @@ export default function App() {
   const pushAlert = useCallback((a: Omit<IslandAlert, 'id'>) => {
     setAlert({ ...a, id: ++alertId.current })
   }, [])
+
+  const realSocial = useSocial(meId, (m, from) => {
+    pushAlert({
+      icon: '💬',
+      text: from?.profile.display_name || from?.profile.username || 'New message',
+      sub: (m.kind === 'activity' ? '🎵 shared an activity' : m.kind === 'note' ? '📝 shared a note' : m.body).slice(0, 42),
+      avatar: from?.profile,
+      chatWith: from?.profile.id,
+    })
+  })
 
   useEffect(() => {
     if (!alert) return
@@ -241,6 +275,23 @@ export default function App() {
     return () => offs.forEach((o) => o.then((f) => f()))
   }, [pushAlert])
 
+  // in-place update: progress shows in the island itself
+  useEffect(() => {
+    if (!IS_TAURI) return
+    const off = listen<{ stage: string; percent: number }>('update-progress', (e) => {
+      if (e.payload.stage === 'failed') {
+        setUpdating(null)
+        pushAlert({ icon: '⚠️', text: 'Update failed', sub: 'Try again from Settings' })
+      } else {
+        setExpanded(false)
+        setUpdating(e.payload)
+      }
+    })
+    return () => {
+      off.then((f) => f())
+    }
+  }, [pushAlert])
+
   // In the native app the webview is click-through, so Rust reports hover.
   useEffect(() => {
     if (!IS_TAURI) return
@@ -300,10 +351,10 @@ export default function App() {
 
   // Clicking outside can't be detected when click-through, so collapse when the cursor leaves.
   useEffect(() => {
-    if (!IS_TAURI || !expanded || hovered) return
+    if (!IS_TAURI || !expanded || hovered || holdOpen) return
     const id = setTimeout(() => setExpanded(false), 700)
     return () => clearTimeout(id)
-  }, [expanded, hovered])
+  }, [expanded, hovered, holdOpen])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -316,6 +367,30 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // what friends can see: the song or timer that is running
+  const activityText = playing && track ? `🎵 ${track.title} – ${track.artist}` : timer ? (pomo ? '🍅 Focusing' : '⏳ Timer running') : ''
+  const social = DEMO_SOCIAL ? demo.social : realSocial
+  const unreadCount = Object.values(social.unread).reduce((a, b) => a + b, 0)
+  const { publishActivity } = social
+  useEffect(() => {
+    if (!meId) return
+    if (!settings.shareActivity) {
+      publishActivity(null)
+      return
+    }
+    const send = () => publishActivity(activityText || null)
+    const id = setTimeout(send, 1200)
+    const beat = setInterval(send, 4 * 60_000)
+    return () => {
+      clearTimeout(id)
+      clearInterval(beat)
+    }
+  }, [meId, settings.shareActivity, activityText, publishActivity])
+
+  const theme = useResolvedTheme(settings.theme)
+  const accent = settings.accentFromMusic && playing && track ? `hsl(${track.hue} 78% 62%)` : settings.accent
+  const onAcc = settings.accentFromMusic && playing && track ? '#000' : onAccent(settings.accent)
 
   const lyricIdx = track?.lyrics ? currentLineIndex(track.lyrics, position) : -1
   const lyricText = lyricIdx >= 0 ? track!.lyrics![lyricIdx].text : ''
@@ -336,7 +411,7 @@ export default function App() {
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
   const idleText = idleLyric ? lyricText : idleExtra
 
-  const mode = expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
+  const mode = updating ? 'alert' : expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
 
   // every page uses the same card size so the navigation arrows never move
   const expandedHeight = settings.cardH
@@ -399,7 +474,55 @@ export default function App() {
     if (!IS_TAURI) pushAlert({ icon: dir > 0 ? '⏭' : '⏮', text: dir > 0 ? 'Next track' : 'Previous track' })
   }
 
-  // Drag the island to move it. A few px of travel counts as a click instead.
+  // Drag the island to move it. The pill follows the cursor on a spring and sticks to the
+  // centre line / top edge like a magnet: it gets pulled in with a little overshoot.
+  const stepSpring = useCallback(() => {
+    const m = motionRef.current
+    const now = performance.now()
+    const dt = Math.min(0.032, (now - m.last) / 1000)
+    m.last = now
+    // soft and bouncy while stuck to a magnet, tight when following the cursor
+    const stuck = m.magX || m.magY
+    const k = stuck ? 520 : 1100
+    const c = stuck ? 17 : 62
+    let moving = false
+    for (const axis of ['x', 'y'] as const) {
+      const err = m.target[axis] - m.pos[axis]
+      m.vel[axis] += (k * err - c * m.vel[axis]) * dt
+      m.pos[axis] += m.vel[axis] * dt
+      if (Math.abs(err) > 0.4 || Math.abs(m.vel[axis]) > 4) moving = true
+    }
+    if (!moving && !m.held) {
+      m.pos = { ...m.target }
+      m.vel = { x: 0, y: 0 }
+    }
+    const next = { x: Math.round(m.pos.x), y: Math.max(0, Math.round(m.pos.y)) }
+    if (next.x !== posRef.current.x || next.y !== posRef.current.y) {
+      setPos(next)
+      invoke('set_offset', { x: next.x, y: next.y }).catch(() => {})
+    }
+    if (moving || m.held) {
+      m.raf = requestAnimationFrame(stepSpring)
+    } else {
+      m.raf = 0
+      update({ posX: next.x, posY: next.y })
+    }
+  }, [update])
+
+  const glideTo = useCallback(
+    (x: number, y: number, held: boolean) => {
+      const m = motionRef.current
+      m.target = { x, y }
+      m.held = held
+      if (!m.raf) {
+        m.pos = { x: posRef.current.x, y: posRef.current.y }
+        m.last = performance.now()
+        m.raf = requestAnimationFrame(stepSpring)
+      }
+    },
+    [stepSpring],
+  )
+
   const dragHandlers = IS_TAURI
     ? {
         onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
@@ -408,7 +531,7 @@ export default function App() {
           if (el.closest('button, input, textarea, a, .scrub, [draggable="true"]')) return
           // inside the open card only the header strip is a handle
           if (mode === 'expanded' && !el.closest('.xhead')) return
-          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: pos.x, oy: pos.y, active: false }
+          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy: posRef.current.y, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
         onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
@@ -423,22 +546,13 @@ export default function App() {
             invoke('set_dragging', { on: true }).catch(() => {})
           }
           const maxX = window.screen.width / 2 - 80
-          const next = {
-            x: Math.round(Math.max(-maxX, Math.min(maxX, g.ox + dx))),
-            y: Math.round(Math.max(0, Math.min(window.screen.height - 120, g.oy + dy))),
-          }
-          // magnets: snap onto the screen edge and the centre line when close
-          if (next.y < 12) next.y = 0
-          if (Math.abs(next.x) < 24) next.x = 0
-          setPos(next)
-          invoke('set_offset', { x: next.x, y: next.y }).catch(() => {})
-        },
-        // double-click the pill to send it back to the centre top
-        onDoubleClick: () => {
-          if (mode === 'expanded' || (!pos.x && !pos.y)) return
-          setExpanded(false)
-          setPos({ x: 0, y: 0 })
-          update({ posX: 0, posY: 0 })
+          const rawX = Math.max(-maxX, Math.min(maxX, g.ox + dx))
+          const rawY = Math.max(0, Math.min(window.screen.height - 120, g.oy + dy))
+          const m = motionRef.current
+          // magnets grab at 24px and let go at 44px, so they feel sticky
+          m.magX = Math.abs(rawX) < (m.magX ? 44 : 24)
+          m.magY = rawY < (m.magY ? 30 : 14)
+          glideTo(m.magX ? 0 : Math.round(rawX), m.magY ? 0 : Math.round(rawY), true)
         },
         onPointerUp: () => {
           const g = dragRef.current
@@ -448,7 +562,16 @@ export default function App() {
           invoke('set_dragging', { on: false }).catch(() => {})
           justDragged.current = true
           setTimeout(() => (justDragged.current = false), 0)
-          update({ posX: posRef.current.x, posY: posRef.current.y })
+          const m = motionRef.current
+          glideTo(m.target.x, m.target.y, false)
+        },
+        // double-click the pill to send it back to the centre top
+        onDoubleClick: () => {
+          if (mode === 'expanded' || (!posRef.current.x && !posRef.current.y)) return
+          setExpanded(false)
+          const m = motionRef.current
+          m.magX = m.magY = true
+          glideTo(0, 0, false)
         },
       }
     : undefined
@@ -479,15 +602,18 @@ export default function App() {
       <div className="expanded">
         <ExpandedHeader
           title={page.title}
-          action={action}
           timer={timer ? remaining / (timer.total / 1000) : null}
           date={d}
           clock={clock}
           bars={playing && track ? track.hue : null}
+          profile={auth.profile}
+          onProfile={() => setTab('profile')}
+          profileActive={tab === 'profile'}
           onSettings={() => setTab('settings')}
           settingsActive={tab === 'settings'}
         />
-        <div className="expanded-body">
+        <div className={`expanded-body ${action ? 'with-actions' : ''}`}>
+          {action && <div className="body-actions">{action}</div>}
           {tab === 'media' && (
             <MediaWidget
               track={track}
@@ -540,14 +666,25 @@ export default function App() {
               emptyHint="Drop an app or shortcut here to pin it"
             />
           )}
+          {tab === 'friends' && (
+            <FriendsWidget
+              auth={auth}
+              social={social}
+              activityText={activityText}
+              onGoProfile={() => setTab('profile')}
+              openChatId={pendingChat}
+              onChatOpened={() => setPendingChat(null)}
+            />
+          )}
+          {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
           {tab === 'settings' && <SettingsWidget settings={settings} update={update} />}
+          <button className="nav-arrow left" aria-label="Previous page" onClick={(e) => { e.stopPropagation(); go(-1) }}>
+            ‹
+          </button>
+          <button className="nav-arrow right" aria-label="Next page" onClick={(e) => { e.stopPropagation(); go(1) }}>
+            ›
+          </button>
         </div>
-        <button className="nav-arrow left" aria-label="Previous page" onClick={(e) => { e.stopPropagation(); go(-1) }}>
-          ‹
-        </button>
-        <button className="nav-arrow right" aria-label="Next page" onClick={(e) => { e.stopPropagation(); go(1) }}>
-          ›
-        </button>
         <div className="dots" onClick={(e) => e.stopPropagation()}>
           {pages.map((p) => (
             <button
@@ -566,11 +703,26 @@ export default function App() {
         )}
       </div>
     )
+  } else if (mode === 'alert' && updating) {
+    contentKey = 'updating'
+    const installing = updating.stage === 'installing'
+    content = (
+      <div className="alert">
+        <span className="alert-icon">⬇️</span>
+        <div className="alert-text">
+          <span>{installing ? 'Installing' : 'Updating'}</span>
+          <small>{installing ? 'Restarting…' : `${updating.percent}%`}</small>
+        </div>
+        <div className="liquid-bar">
+          <div className="liquid-fill" style={{ width: `${updating.percent}%` }} />
+        </div>
+      </div>
+    )
   } else if (mode === 'alert' && alert) {
     contentKey = `alert-${alert.id}`
     content = (
       <div className="alert">
-        <span className="alert-icon">{alert.icon}</span>
+        {alert.avatar ? <Avatar profile={alert.avatar} size={34} /> : <span className="alert-icon">{alert.icon}</span>}
         <div className="alert-text">
           <span>{alert.text}</span>
           {alert.sub && <small>{alert.sub}</small>}
@@ -608,20 +760,37 @@ export default function App() {
   } else {
     contentKey = idleLyric ? `idle-lyric-${lyricIdx}` : idleExtra ? 'idle-extra' : 'idle'
     content = (
-      <div className={`idle ${idleText ? 'lyric-idle' : ''}`}>
-        {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
-        {idleText ? <span className="idle-lyric">{idleText}</span> : <span>{clock}</span>}
-        {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
-        {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
+      <div className={`idle ${idleText ? 'lyric-idle' : 'idle-grid'}`}>
+        {idleText ? (
+          <>
+            {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
+            <span className="idle-lyric">{idleText}</span>
+            {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
+            {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
+            {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
+          </>
+        ) : (
+          <>
+            {/* the clock stays in the exact middle; bars hang off its left, dots off its right */}
+            <span className="idle-side left">{playing && track && settings.idleBars && <Bars active hue={track.hue} />}</span>
+            <span>{clock}</span>
+            <span className="idle-side right">
+              {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
+              {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
+              {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
+            </span>
+          </>
+        )}
       </div>
     )
   }
 
   return (
     <div
-      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${moving ? 'dragging' : ''}`}
+      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''}`}
       style={{
-        ['--accent' as string]: settings.accent,
+        ['--accent' as string]: accent,
+        ['--on-accent' as string]: onAcc,
         ['--scale' as string]: settings.scale,
         ['--clock-size' as string]: `${settings.clockSize}px`,
       }}
@@ -648,6 +817,11 @@ export default function App() {
         onClick={(e) => {
           e.stopPropagation()
           if (justDragged.current) return
+          if (mode === 'alert' && alert?.chatWith) {
+            setPendingChat(alert.chatWith)
+            setTab('friends')
+            setAlert(null)
+          }
           setExpanded(true)
         }}
         onHover={(h) => !IS_TAURI && setHovered(h)}
@@ -663,6 +837,16 @@ export default function App() {
           <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 })}>Low battery</button>
           <button onClick={() => pushAlert({ icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
           <button onClick={() => startTimer(0.25)}>15 s timer</button>
+          {DEMO_SOCIAL && (
+            <button
+              onClick={() => {
+                const { friend, body } = demo.ping()
+                pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+              }}
+            >
+              Friend message
+            </button>
+          )}
           <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>
         </div>
       )}

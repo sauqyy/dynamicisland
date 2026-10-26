@@ -10,7 +10,7 @@ body,
   background: transparent;
   overflow: hidden;
   font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
-  color: #fff;
+  color: inherit;
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
