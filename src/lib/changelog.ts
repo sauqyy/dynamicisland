@@ -7,6 +7,16 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.4.0',
+    title: 'Group chats, voice calls',
+    items: [
+      'Create group chats with your friends from the new Groups page.',
+      'Call a friend with the button next to Send in their chat. Audio goes straight between your apps.',
+      'Sound volume slider and a keyboard sounds switch in Settings.',
+      'Opening the app a second time no longer starts a second island.',
+    ],
+  },
+  {
     version: '0.3.12',
     title: 'Sound effects',
     items: [
