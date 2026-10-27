@@ -11,7 +11,7 @@ import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
 import { PAGES } from '../types'
 import { play } from 'cuelume'
-import { disclosureCue, soundTheme, soundTurnedOn } from '../lib/sound'
+import { disclosureCue, previewPack } from '../lib/sound'
 
 interface Props {
   settings: Settings
@@ -136,35 +136,32 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />
       </div>
       <div className="row">
-        <span>Interface sounds</span>
-        <Toggle
-          on={settings.uiSounds}
-          onChange={(v) => {
-            update({ uiSounds: v })
-            if (v) soundTurnedOn()
-          }}
-        />
-      </div>
-      {settings.uiSounds && (
-        <div className="row">
-          <span>Sound pack</span>
-          <div className="segmented small">
-            {SOUND_PACKS.map((p) => (
-              <button
-                key={p}
-                className={settings.soundPack === p ? 'active' : ''}
-                // a preview in the pack just picked, rather than the binding's cue in the old one
-                onClick={() => {
-                  update({ soundPack: p })
-                  play('select', { theme: soundTheme(p) })
-                }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+        <span>Sound effects</span>
+        {/* these play their own cue: a preview in the pack just picked, or a last one on the way to mute */}
+        <div className="segmented small">
+          <button
+            className={settings.uiSounds ? '' : 'active'}
+            onClick={() => {
+              if (settings.uiSounds) play('close', { emphasis: 'subtle' })
+              update({ uiSounds: false })
+            }}
+          >
+            mute
+          </button>
+          {SOUND_PACKS.map((p) => (
+            <button
+              key={p}
+              className={settings.uiSounds && settings.soundPack === p ? 'active' : ''}
+              onClick={() => {
+                update({ uiSounds: true, soundPack: p })
+                previewPack(p)
+              }}
+            >
+              {p}
+            </button>
+          ))}
         </div>
-      )}
+      </div>
       <Slider
         label="Text size"
         value={settings.clockSize}

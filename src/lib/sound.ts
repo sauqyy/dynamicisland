@@ -19,13 +19,13 @@ export function useSoundSetup(enabled: boolean, pack: SoundPack) {
 }
 
 /**
- * Turning sound off is heard through the switch's own binding (it plays before the setting changes);
- * turning it on was silent there, so it sounds here, from the click that may need to start audio.
+ * Picking a pack: sounds come on at once (this may be the click that unmutes, and the one that has to
+ * start audio), with a preview in the new pack rather than the old one the setting still holds.
  */
-export function soundTurnedOn() {
+export function previewPack(pack: SoundPack) {
   setEnabled(true)
   void unlock()
-  play('toggle')
+  play('select', { theme: soundTheme(pack) })
 }
 
 /** The cue for a control that opens and closes something: open while it is closed, close while open. */
