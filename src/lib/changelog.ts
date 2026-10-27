@@ -7,7 +7,7 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
-    version: '0.5.0',
+    version: '0.6.0',
     title: 'A new look',
     items: [
       'The pages now sit in one bar at the bottom of the card. Tap a group to open it, then pick a page.',
@@ -16,6 +16,25 @@ export const CHANGELOG: Release[] = [
       'A new song shows a Now playing alert with its cover. Click it to open Playing.',
       'Charging, battery and downloads show their progress along the bottom edge of the island.',
       'Playing, Weather and Timer are redesigned, Settings is grouped into sections, and the icons are cleaner.',
+    ],
+  },
+  {
+    version: '0.5.0',
+    title: 'Group voice chat',
+    items: [
+      'Join a group voice chat from the group chat (up to 6 people per group).',
+      'Hover the island while a call rings to see who is calling, with Answer and Decline.',
+      'During a call the island becomes a pill with the timer, mute, deafen and end call.',
+    ],
+  },
+  {
+    version: '0.4.2',
+    title: 'Groups and calls',
+    items: [
+      'Pick an icon and colour for a group, and rename it from Info.',
+      'Groups have fullscreen chat, with your groups listed under your friends.',
+      'Deafen button in calls, new mute and hang-up icons, and the island glows while someone is calling.',
+      'The page arrows are gone to give pages more room.',
     ],
   },
   {

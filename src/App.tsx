@@ -19,11 +19,15 @@ import { WeatherWidget } from './widgets/WeatherWidget'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
+import { IncomingCall } from './widgets/IncomingCall'
+import { InCallPill } from './widgets/InCallPill'
+import { Timer } from './widgets/CallBar'
 import { FriendsWidget, type OpenChat } from './widgets/FriendsWidget'
 import { useAuth } from './lib/useAuth'
 import { useSocial } from './lib/useSocial'
 import { useGroups } from './lib/useGroups'
 import { useCall } from './lib/useCall'
+import { useGroupVoice } from './lib/useGroupVoice'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { useClipboard } from './lib/useClipboard'
 import { Rail } from './island/Rail'
@@ -53,6 +57,12 @@ import './App.css'
 const messageAudio = new Audio('/message.mp3')
 messageAudio.preload = 'auto'
 messageAudio.volume = 0.3
+
+// rings on a loop while a voice call is incoming
+const ringAudio = new Audio('/ringtone.mp3')
+ringAudio.preload = 'auto'
+ringAudio.loop = true
+ringAudio.volume = 0.5
 
 const LOW_BATTERY = 20
 const POMO_MIN: Record<PomoPhase, number> = { focus: 25, break: 5, long: 15 }
@@ -325,6 +335,21 @@ export default function App() {
     )
   })
 
+  const activeCall = DEMO_SOCIAL ? demo.call : call
+  const incomingCall = activeCall.state.phase === 'incoming'
+  const ringing = incomingCall && auth.profile?.presence !== 'dnd'
+  // the ringtone follows the sound volume slider in Settings
+  useEffect(() => {
+    ringAudio.volume = Math.min(1, Math.max(0, settings.soundVolume))
+  }, [settings.soundVolume])
+  useEffect(() => {
+    if (ringing) {
+      ringAudio.currentTime = 0
+      ringAudio.play().catch(() => {})
+    } else ringAudio.pause()
+    return () => ringAudio.pause()
+  }, [ringing])
+
   const groupChats = useGroups(meId, (m, group, from) => {
     if (auth.profile?.presence === 'dnd') return
     playMessageSound()
@@ -334,6 +359,8 @@ export default function App() {
       sub: `${from?.display_name || from?.username || 'Someone'}: ${m.kind === 'activity' ? '🎵 shared an activity' : m.kind === 'note' ? '📝 shared a note' : m.body}`.slice(0, 42),
     })
   })
+
+  const voice = useGroupVoice(meId, groupChats.groups)
 
   useEffect(() => {
     if (!alert) return
@@ -621,7 +648,30 @@ export default function App() {
   const live = playing && track ? idleText || clock : ''
   const peekText = playing && track ? lyricText || `${track.title} · ${track.artist}` : ''
 
-  const mode = updating ? 'alert' : expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
+  // hovering the island while a call rings shows who is calling, with answer and decline
+  const caller = ringing ? social.friends.find((f) => f.profile.id === activeCall.state.peer) : undefined
+  // while you are in a call the collapsed island becomes the call: a friend, or a group's voice chat
+  const activeVoice = DEMO_SOCIAL ? demo.voice : voice
+  const callPhase = activeCall.state.phase
+  const friendInCall = callPhase === 'calling' || callPhase === 'connecting' || callPhase === 'active' ? social.friends.find((f) => f.profile.id === activeCall.state.peer) : undefined
+  const voiceGroup =
+    activeVoice.state.groupId && (activeVoice.state.joining || activeVoice.state.members.length > 0)
+      ? (DEMO_SOCIAL ? demo.groups : groupChats).groups.find((g) => g.id === activeVoice.state.groupId)
+      : undefined
+  const inCall = Boolean(friendInCall || voiceGroup)
+  const mode = updating
+    ? 'alert'
+    : expanded
+      ? 'expanded'
+      : caller && hovered
+        ? 'call'
+        : alert
+          ? 'alert'
+          : inCall
+            ? 'incall'
+            : hovered
+              ? 'peek'
+              : 'idle'
 
   // the card fits the page it shows; a page taller than the card scrolls inside it
   const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
@@ -646,6 +696,10 @@ export default function App() {
         if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
         if (!updating && alert?.nowPlaying) return { w: 360, h: 56, r: 24 }
         return { w: 340, h: 48, r: 22 }
+      case 'call':
+        return { w: 340, h: 64, r: 28 }
+      case 'incall':
+        return { w: 250, h: 42, r: 18 }
       case 'peek':
         return { w: peekW, h: 40, r: 16 }
       default:
@@ -974,6 +1028,7 @@ export default function App() {
                 auth={auth}
                 social={social}
                 call={DEMO_SOCIAL ? demo.call : call}
+                voice={DEMO_SOCIAL ? demo.voice : voice}
                 groups={DEMO_SOCIAL ? demo.groups : groupChats}
                 activityText={activityText}
                 onGoProfile={() => setTab('profile')}
@@ -1073,6 +1128,35 @@ export default function App() {
         </span>
         {settings.idleBars && <Bars active={playing} hue={track.hue} />}
       </div>
+    )
+  } else if (mode === 'call' && caller) {
+    contentKey = 'incoming-call'
+    content = (
+      <IncomingCall
+        profile={caller.profile}
+        name={caller.profile.display_name || `@${caller.profile.username}`}
+        sub="Incoming voice call"
+        onDecline={activeCall.decline}
+        onAnswer={activeCall.accept}
+      />
+    )
+  } else if (mode === 'incall' && (friendInCall || voiceGroup)) {
+    contentKey = 'in-call'
+    const live = friendInCall ? callPhase === 'active' : !activeVoice.state.joining
+    const since = friendInCall ? activeCall.state.since : activeVoice.state.since
+    const st = friendInCall ? activeCall.state : activeVoice.state
+    content = (
+      <InCallPill
+        profile={friendInCall?.profile}
+        group={voiceGroup}
+        label={live && since ? <Timer since={since} /> : friendInCall && callPhase === 'calling' ? 'Calling…' : friendInCall ? 'Connecting…' : 'Joining…'}
+        controls={live}
+        muted={st.muted}
+        deafened={st.deafened}
+        onMute={friendInCall ? activeCall.toggleMute : activeVoice.toggleMute}
+        onDeafen={friendInCall ? activeCall.toggleDeafen : activeVoice.toggleDeafen}
+        onEnd={friendInCall ? activeCall.hangUp : activeVoice.leave}
+      />
     )
   } else if (mode === 'alert' && alert) {
     contentKey = `alert-${alert.id}`
@@ -1213,6 +1297,7 @@ export default function App() {
         onHover={(h) => !IS_TAURI && setHovered(h)}
         spring={SPRINGS[settings.anim]}
         intro={intro}
+        ringing={incomingCall}
       >
         {content}
       </Island>
@@ -1323,19 +1408,8 @@ export default function App() {
             >
               Group message
             </button>
-            <button
-              onClick={() => {
-                const f = DEMO_SOCIAL ? demo.social.friends[0] : null
-                pushAlert(
-                  f
-                    ? { icon: '📞', text: f.profile.display_name || f.profile.username, sub: 'Incoming voice call', avatar: f.profile, chatWith: f.profile.id }
-                    : { icon: '📞', text: 'Rina', sub: 'Incoming voice call' },
-                  'attention',
-                )
-              }}
-            >
-              Incoming call
-            </button>
+            {/* rings like a real call: the island glows, and hovering it shows the caller with answer and decline */}
+            {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
           </div>
           <div className="demo-row">
             <span>App</span>

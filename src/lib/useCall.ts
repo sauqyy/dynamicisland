@@ -10,19 +10,21 @@ export interface CallState {
   /** the friend on the other end */
   peer: string | null
   muted: boolean
+  /** you can't hear them (and, like Discord, they can't hear you either) */
+  deafened: boolean
   /** when audio started flowing, for the call timer */
   since: number | null
   /** why the last call ended badly; clears by itself */
   error: string | null
 }
 
-const IDLE: CallState = { phase: 'idle', peer: null, muted: false, since: null, error: null }
+const IDLE: CallState = { phase: 'idle', peer: null, muted: false, deafened: false, since: null, error: null }
 const RING_MS = 30_000
 const ERROR_MS = 4_000
 
 const TURN_URL = import.meta.env.VITE_TURN_URL as string | undefined
 // STUN only gets most connections through; set VITE_TURN_* (see supabase/README.md) for the strict-NAT rest
-const ICE: RTCConfiguration = {
+export const ICE: RTCConfiguration = {
   iceServers: [
     { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
     ...(TURN_URL
@@ -130,6 +132,7 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
       conn.ontrack = (e) => {
         audio.current ??= new Audio()
         audio.current.srcObject = e.streams[0]
+        audio.current.muted = stateRef.current.deafened
         audio.current.play().catch(() => {})
       }
       conn.onconnectionstatechange = () => {
@@ -274,15 +277,29 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
     finish()
   }, [send, finish])
 
+  const applyAudio = (muted: boolean, deafened: boolean) => {
+    // deafening also silences your microphone; undeafening gives it back unless you muted it yourself
+    mic.current?.getAudioTracks().forEach((t) => (t.enabled = !muted && !deafened))
+    if (audio.current) audio.current.muted = deafened
+  }
+
   const toggleMute = useCallback(() => {
-    const muted = !stateRef.current.muted
-    mic.current?.getAudioTracks().forEach((t) => (t.enabled = !muted))
-    set({ ...stateRef.current, muted })
+    const { muted, deafened } = stateRef.current
+    // muting while deafened is not possible; unmuting while deafened also lifts the deafen
+    const next = !muted
+    applyAudio(next, next ? deafened : false)
+    set({ ...stateRef.current, muted: next, deafened: next ? deafened : false })
+  }, [set])
+
+  const toggleDeafen = useCallback(() => {
+    const { muted, deafened } = stateRef.current
+    applyAudio(muted, !deafened)
+    set({ ...stateRef.current, deafened: !deafened })
   }, [set])
 
   const hangUp = useCallback(() => end(), [end])
 
-  return { state, start, accept, decline, hangUp, toggleMute }
+  return { state, start, accept, decline, hangUp, toggleMute, toggleDeafen }
 }
 
 export type Call = ReturnType<typeof useCall>

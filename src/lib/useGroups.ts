@@ -195,7 +195,7 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
   const invite = useCallback(async (groupId: string, username: string): Promise<string | null> => {
     const name = username.trim().replace(/^@/, '').toLowerCase()
     if (!name) return 'Enter a username'
-    const { error } = await supabase.rpc('invite_to_group', { gid: groupId, username: name })
+    const { error } = await supabase.rpc('invite_to_group', { gid: groupId, uname: name })
     return error ? error.message : null
   }, [])
 
@@ -220,6 +220,19 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
     async (groupId: string) => {
       await supabase.from('groups').delete().eq('id', groupId)
       await refresh()
+    },
+    [refresh],
+  )
+
+  /** The owner renames the group. */
+  const rename = useCallback(
+    async (groupId: string, name: string): Promise<string | null> => {
+      const n = name.trim().slice(0, 40)
+      if (!n) return 'Give the group a name'
+      const { error } = await supabase.from('groups').update({ name: n }).eq('id', groupId)
+      if (error) return error.message
+      await refresh()
+      return null
     },
     [refresh],
   )
@@ -275,7 +288,7 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
     [me],
   )
 
-  return { groups, invites, messages, unread, create, join, invite, respond, removeMember, deleteGroup, setIcon, resetCode, open, send }
+  return { groups, invites, messages, unread, create, join, invite, respond, removeMember, deleteGroup, rename, setIcon, resetCode, open, send }
 }
 
 export type Groups = ReturnType<typeof useGroups>

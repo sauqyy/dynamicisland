@@ -31,3 +31,10 @@ VITE_TURN_URL=turn:your-relay:443?transport=tcp
 VITE_TURN_USER=…
 VITE_TURN_PASS=…
 ```
+
+### Group voice chat
+
+Inside a group chat, the headphones button next to Send joins that group's voice chat. At most **6 people**
+can be in one group's voice chat at a time. Everyone connects directly to everyone else (no media server),
+so audio quality drops past about 4-6 people and that is why the cap is 6. The cap is checked by the apps
+themselves through Supabase Realtime presence (`voice-<group id>`); it needs no extra SQL.
