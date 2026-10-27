@@ -124,9 +124,25 @@ const isRain = (code: number) => (code >= 51 && code <= 67) || (code >= 80 && co
 /** Today's hours as a temperature curve with rainy hours shaded, scrolled so the current hour is first. */
 function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
   const strip = useRef<HTMLDivElement>(null)
-  useEffect(() => {
+  // which day the strip starts on, and whether the current hour is in view
+  const [view, setView] = useState({ tomorrow: false, nowInView: true })
+  const colPx = () => (strip.current ? strip.current.scrollWidth / hours.length : VISIBLE_COL)
+  const onScroll = () => {
     const el = strip.current
-    if (el) el.scrollLeft = (now * el.scrollWidth) / hours.length
+    if (!el) return
+    const c = colPx()
+    const first = el.scrollLeft / c + 0.5
+    const nowInView = (now + 1) * c > el.scrollLeft + c * 0.4 && now * c < el.scrollLeft + el.clientWidth - c * 0.4
+    setView((v) => (v.tomorrow === first >= 24 && v.nowInView === nowInView ? v : { tomorrow: first >= 24, nowInView }))
+  }
+  // the current hour opens second from the left, with the hour before it still in view
+  const toNow = (smooth: boolean) => {
+    const el = strip.current
+    if (el) el.scrollTo({ left: Math.max(0, now - 1) * colPx(), behavior: smooth ? 'smooth' : 'auto' })
+  }
+  useEffect(() => {
+    toNow(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, hours.length])
   // drag the strip sideways with the mouse, like a touch screen
   const drag = useRef<{ x: number; left: number } | null>(null)
@@ -158,59 +174,80 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
     d += ` C${mx} ${pts[i - 1][1]} ${mx} ${pts[i][1]} ${pts[i][0]} ${pts[i][1]}`
   }
   const tomorrow = new Date(Date.now() + 86_400_000).toLocaleDateString([], { weekday: 'short' })
+  const today = new Date().toLocaleDateString([], { weekday: 'short' })
   return (
-    <div
-      className="wx-chart"
-      ref={strip}
-      onPointerDown={(e) => {
-        // keep the island and the page swipe from taking this drag
-        e.stopPropagation()
-        if (e.button !== 0) return
-        drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft }
-        e.currentTarget.setPointerCapture(e.pointerId)
-        e.currentTarget.classList.add('dragging')
-      }}
-      onPointerMove={(e) => {
-        if (drag.current) e.currentTarget.scrollLeft = drag.current.left - (e.clientX - drag.current.x)
-      }}
-      onPointerUp={(e) => {
-        drag.current = null
-        e.currentTarget.classList.remove('dragging')
-      }}
-      onPointerCancel={(e) => {
-        drag.current = null
-        e.currentTarget.classList.remove('dragging')
-      }}
-    >
-      <div className="wx-strip" style={{ width: (W * VISIBLE_COL) / COL }}>
-        <svg viewBox={`0 0 ${W} ${H}`} aria-label="Temperature through the day">
-          <defs>
-            <linearGradient id="wx-area" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="var(--accent)" stopOpacity="0.28" />
-              <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {hours.map((h, i) =>
-            isRain(h.code) ? <rect key={i} x={x(i) - COL / 2 + 3} y={0} width={COL - 6} height={H} rx={9} className="wx-rain-col" /> : null,
-          )}
-          <path d={`${d} L${pts[pts.length - 1][0]} ${H} L${pts[0][0]} ${H}Z`} fill="url(#wx-area)" />
-          <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
-          {pts.map(([px, py], i) => (
-            <g key={i}>
-              <circle cx={px} cy={py} r={i === now ? 3.5 : 2.2} className={i === now ? 'wx-pt now' : 'wx-pt'} />
-              <text x={px} y={py - 9} textAnchor="middle" className="wx-label">
-                {hours[i].temp}°
-              </text>
-            </g>
-          ))}
-        </svg>
-        <div className="wx-cols" style={{ gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` }}>
-          {hours.map((h, i) => (
-            <div key={i} className={isRain(h.code) ? 'rain' : ''}>
-              <WeatherIcon code={h.code} night={isNight(Number(h.hour))} size={16} />
-              <small>{i === now ? 'Now' : i >= 24 && h.hour === '00' ? tomorrow : h.hour}</small>
-            </div>
-          ))}
+    <div className="wx-hours">
+      <div className="wx-hours-head">
+        <span className="wx-day">{view.tomorrow ? `Tomorrow · ${tomorrow}` : `Today · ${today}`}</span>
+        {!view.nowInView && (
+          <button
+            className="chip wx-to-now"
+            data-cuelume-navigate
+            data-cuelume-emphasis="subtle"
+            onClick={() => toNow(true)}
+          >
+            Back to now
+          </button>
+        )}
+      </div>
+      <div
+        className="wx-chart"
+        ref={strip}
+        onScroll={onScroll}
+        onPointerDown={(e) => {
+          // keep the island and the page swipe from taking this drag
+          e.stopPropagation()
+          if (e.button !== 0) return
+          drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft }
+          e.currentTarget.setPointerCapture(e.pointerId)
+          e.currentTarget.classList.add('dragging')
+        }}
+        onPointerMove={(e) => {
+          if (drag.current) e.currentTarget.scrollLeft = drag.current.left - (e.clientX - drag.current.x)
+        }}
+        onPointerUp={(e) => {
+          drag.current = null
+          e.currentTarget.classList.remove('dragging')
+        }}
+        onPointerCancel={(e) => {
+          drag.current = null
+          e.currentTarget.classList.remove('dragging')
+        }}
+      >
+        <div className="wx-strip" style={{ width: (W * VISIBLE_COL) / COL }}>
+          <svg viewBox={`0 0 ${W} ${H}`} aria-label="Temperature for today and tomorrow">
+            <defs>
+              <linearGradient id="wx-area" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="var(--accent)" stopOpacity="0.28" />
+                <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {hours.map((h, i) =>
+              isRain(h.code) ? <rect key={i} x={x(i) - COL / 2 + 3} y={0} width={COL - 6} height={H} rx={9} className="wx-rain-col" /> : null,
+            )}
+            {/* the hours already gone today are dimmed; a line marks now, another marks midnight */}
+            <rect x={0} y={0} width={now * COL} height={H} className="wx-past" />
+            {hours.length > 24 && <line x1={24 * COL} x2={24 * COL} y1={0} y2={H} className="wx-midnight" />}
+            <line x1={x(now)} x2={x(now)} y1={0} y2={H} className="wx-now-line" />
+            <path d={`${d} L${pts[pts.length - 1][0]} ${H} L${pts[0][0]} ${H}Z`} fill="url(#wx-area)" />
+            <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
+            {pts.map(([px, py], i) => (
+              <g key={i} className={i < now ? 'past' : ''}>
+                <circle cx={px} cy={py} r={i === now ? 3.5 : 2.2} className={i === now ? 'wx-pt now' : 'wx-pt'} />
+                <text x={px} y={py - 9} textAnchor="middle" className="wx-label">
+                  {hours[i].temp}°
+                </text>
+              </g>
+            ))}
+          </svg>
+          <div className="wx-cols" style={{ gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` }}>
+            {hours.map((h, i) => (
+              <div key={i} className={[isRain(h.code) && 'rain', i === now && 'now', i < now && 'past', i === 24 && 'midnight'].filter(Boolean).join(' ')}>
+                <WeatherIcon code={h.code} night={isNight(Number(h.hour))} size={16} />
+                <small>{i === now ? 'Now' : i === 24 ? tomorrow : `${h.hour}:00`}</small>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

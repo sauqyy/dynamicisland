@@ -3651,3 +3651,57 @@ button.ao-text:hover {
   min-height: 110px;
   padding: 18px 16px 8px;
 }
+
+/* hourly strip: which day is showing, where now is, and a way back to it */
+.wx-hours {
+  margin-top: 12px;
+}
+.wx-hours .wx-chart {
+  margin-top: 4px;
+}
+.wx-hours-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+.wx-day {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.wx-past {
+  fill: var(--island-bg);
+  opacity: 0.45;
+}
+.wx-strip g.past {
+  opacity: 0.5;
+}
+.wx-now-line {
+  stroke: var(--text-1);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.55;
+}
+.wx-midnight {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.wx-cols div {
+  border-radius: 10px;
+}
+.wx-cols div.past {
+  opacity: 0.45;
+}
+.wx-cols div.now {
+  background: var(--raised);
+  color: var(--text-1);
+}
+.wx-cols div.now small {
+  color: var(--accent);
+  font-weight: 600;
+}
+.wx-cols div.midnight small {
+  color: var(--text-1);
+  font-weight: 600;
+}
