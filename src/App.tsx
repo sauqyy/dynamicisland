@@ -598,7 +598,8 @@ export default function App() {
   const soundState = useRef({ expanded, tab })
   useEffect(() => {
     const was = soundState.current
-    if (expanded !== was.expanded) play(expanded ? 'open' : 'close', { emphasis: expanded ? 'normal' : 'subtle' })
+    // opening is a press on the island, so it taps; closing lets the card fall shut
+    if (expanded !== was.expanded) play(expanded ? 'tap' : 'close', { emphasis: expanded ? 'normal' : 'subtle' })
     else if (expanded && tab !== was.tab) play('navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
     soundState.current = { expanded, tab }
   }, [expanded, tab])
