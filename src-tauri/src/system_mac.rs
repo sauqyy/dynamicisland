@@ -79,6 +79,9 @@ pub fn spawn_volume(app: AppHandle) {
     });
 }
 
+/// Brightness changes aren't observable without private APIs; not supported.
+pub fn spawn_brightness(_app: AppHandle) {}
+
 /// Reading Caps Lock needs the Input Monitoring permission on macOS; not supported.
 pub fn spawn_lock_keys(_app: AppHandle) {}
 

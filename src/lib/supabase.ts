@@ -27,6 +27,8 @@ export interface Profile {
   status: string
   /** Discord-style availability; missing on rows from before it existed */
   presence?: 'online' | 'idle' | 'dnd' | 'invisible'
+  /** last heartbeat from the app; a stale one means the app is closed */
+  last_seen?: string | null
 }
 
 export type MessageKind = 'text' | 'activity' | 'note'

@@ -119,7 +119,13 @@ export function useSocial(me: string | null, onIncoming?: (m: Message, from: Fri
       .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => refresh())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity' }, () => refresh())
       // a friend changed their availability
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => refresh())
+      // (heartbeats arrive here too, so a known friend is patched in place instead of reloading everything)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+        const p = payload.new as Profile
+        if (friendsRef.current.some((f) => f.profile.id === p.id)) {
+          setFriends((cur) => cur.map((f) => (f.profile.id === p.id ? { ...f, profile: p } : f)))
+        } else refresh()
+      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const m = payload.new as Message
         if (m.sender !== me && m.recipient !== me) return

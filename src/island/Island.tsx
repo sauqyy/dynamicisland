@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { AnimatePresence, animate, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
 
 /** Flat top (the island hangs from the screen edge), rounded bottom. */
@@ -33,9 +33,10 @@ interface Props {
   floating?: boolean
   /** pointer handlers used to drag the island around */
   dragHandlers?: React.HTMLAttributes<HTMLDivElement>
-  /** where the island is drawn relative to the window's centre-top; springs there, and `shiftJump` bumps to jump instead */
-  shift?: { x: number; y: number }
-  shiftJump?: number
+  /** how far the island has been dragged from the top centre (the window itself never moves) */
+  offset?: { x: number; y: number }
+  /** fullscreen: the offset eases away so the island grows from where it was to fill the screen */
+  centered?: boolean
 }
 
 const BUBBLE = 34
@@ -94,7 +95,7 @@ function notchPath(w: number, h: number, r: number, floating: boolean) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, shift = { x: 0, y: 0 }, shiftJump = 0 }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -120,26 +121,20 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
     const c = animate(enterY, 0, { type: 'spring', ...springRef.current })
     return () => c.stop()
   }, [enterY, intro])
+  // the drag offset follows the pointer directly; going fullscreen eases it to zero on the Animation spring
+  const offX = useMotionValue(offset.x)
+  const offY = useMotionValue(offset.y)
+  useLayoutEffect(() => {
+    offX.set(offset.x)
+    offY.set(offset.y)
+  }, [offset.x, offset.y, offX, offY])
+  const away = useSpring(centered ? 1 : 0, spring)
+  useEffect(() => away.set(centered ? 1 : 0), [centered, away])
   // whole pixels only: the glass filters redraw jagged on fractional offsets while the island is moving
-  // the window moves to the screen corner for fullscreen, so the island is shifted to stay where it was and then glides in
-  const shiftX = useMotionValue(shift.x)
-  const shiftY = useMotionValue(shift.y)
-  const springForShift = useRef(spring)
-  springForShift.current = spring
-  useEffect(() => {
-    shiftX.jump(shift.x)
-    shiftY.jump(shift.y)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shiftJump])
-  useEffect(() => {
-    const a = animate(shiftX, shift.x, { type: 'spring', ...springForShift.current })
-    const b = animate(shiftY, shift.y, { type: 'spring', ...springForShift.current })
-    return () => {
-      a.stop()
-      b.stop()
-    }
-  }, [shift.x, shift.y, shiftX, shiftY])
-  const enterT = useTransform([enterY, shiftX, shiftY], ([ey, sx, sy]: number[]) => `${Math.round(sx)}px ${Math.round(ey + sy)}px`)
+  const enterT = useTransform(
+    [enterY, offX, offY, away],
+    ([ey, ox, oy, aw]: number[]) => `${Math.round(ox * (1 - aw))}px ${Math.round(ey + oy * (1 - aw))}px`,
+  )
 
   return (
     <motion.div className="stage" style={{ translate: enterT }}>

@@ -31,6 +31,8 @@ let nextId = 100
 
 const seed = (): Record<string, Message[]> => ({
   a: [
+    { id: 6, sender: 'a', recipient: 'me', kind: 'text', body: 'long time no see!', created_at: ago(60 * 24 * 4) },
+    { id: 7, sender: 'me', recipient: 'a', kind: 'text', body: 'haha yeah, been busy', created_at: ago(60 * 30), read_at: ago(60 * 29) },
     { id: 1, sender: 'a', recipient: 'me', kind: 'text', body: 'yo, did you see the new island update?', created_at: ago(42) },
     { id: 2, sender: 'me', recipient: 'a', kind: 'text', body: 'yes!! the drag and snap feels so good', created_at: ago(40), read_at: ago(39) },
     { id: 3, sender: 'a', recipient: 'me', kind: 'activity', body: '🎵 Liquid Skies – Demo Artist', created_at: ago(12) },

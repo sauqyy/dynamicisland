@@ -14,9 +14,17 @@ export const PRESENCES: { id: Presence; label: string; hint: string }[] = [
 
 export const presenceOf = (p: Pick<Profile, 'presence'>): Presence => p.presence ?? 'online'
 
-export const shownPresence = (p: Pick<Profile, 'presence'>): Shown => {
+/** The app reports in this often (ms)... */
+export const HEARTBEAT_EVERY = 60_000
+/** ...and someone silent for this long (ms) has closed it. */
+export const OFFLINE_AFTER = 3 * 60_000
+
+export const shownPresence = (p: Pick<Profile, 'presence' | 'last_seen'>): Shown => {
   const v = presenceOf(p)
-  return v === 'invisible' ? 'offline' : v
+  if (v === 'invisible') return 'offline'
+  // rows from before last_seen existed have no heartbeat to judge by
+  if (p.last_seen && Date.now() - Date.parse(p.last_seen) > OFFLINE_AFTER) return 'offline'
+  return v
 }
 
 export const SHOWN_LABEL: Record<Shown, string> = { online: 'Available', idle: 'Away', dnd: 'Focus', invisible: 'Hidden', offline: 'Offline' }

@@ -39,6 +39,7 @@ import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
 import { useAutoIdle } from './lib/useAutoIdle'
+import { useHeartbeat } from './lib/useHeartbeat'
 import { cachedWeather, describe as describeWeather } from './lib/weather'
 import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
@@ -116,7 +117,6 @@ export default function App() {
   // fullscreen chat: the window first grows to the monitor, then the island springs out to fill it
   const [fs, setFs] = useState<{ w: number; h: number } | null>(null)
   const [fsWin, setFsWin] = useState(false) // the window is covering the monitor
-  const [fsJump, setFsJump] = useState(0)
   const fsTimer = useRef(0)
   const [notes, setNotes] = useState<Release | null>(null) // "What's new" card after an update
   // the browser demo's button panel can be dragged out of the way by its title
@@ -183,10 +183,8 @@ export default function App() {
     clearTimeout(fsTimer.current)
     const [w, h] = await invoke<[number, number]>('set_fullscreen', { on: true }).catch(() => [0, 0] as [number, number])
     if (!w) return
-    // the window just moved to the screen corner: hold the island where it was, then let it grow from there
     setFsWin(true)
-    setFsJump((n) => n + 1)
-    fsTimer.current = window.setTimeout(() => setFs({ w, h }), 40)
+    setFs({ w, h })
   }, [])
   const exitFullscreen = useCallback(() => {
     setFs(null)
@@ -196,7 +194,6 @@ export default function App() {
     fsTimer.current = window.setTimeout(() => {
       invoke('set_fullscreen', { on: false }).catch(() => {})
       setFsWin(false)
-      setFsJump((n) => n + 1)
     }, 750)
   }, [])
   const toggleFullscreen = (on: boolean) => (on ? void enterFullscreen() : exitFullscreen())
@@ -342,10 +339,21 @@ export default function App() {
       listen<{ level: number; muted: boolean }>('volume', (e) => {
         const { level, muted } = e.payload
         pushAlert({
+          kind: 'volume',
           icon: muted || level === 0 ? '🔇' : level < 50 ? '🔉' : '🔊',
           text: muted ? 'Muted' : 'Volume',
           sub: `${level}%`,
           value: muted ? 0 : level,
+        })
+      }),
+      listen<{ level: number }>('brightness', (e) => {
+        const { level } = e.payload
+        pushAlert({
+          kind: 'brightness',
+          icon: level < 50 ? '🔅' : '🔆',
+          text: 'Brightness',
+          sub: `${level}%`,
+          value: level,
         })
       }),
     ]
@@ -439,7 +447,7 @@ export default function App() {
         if (fsRef.current) exitFullscreen()
         else setExpanded(false)
       }
-      if (!fsRef.current && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+      if (!fsRef.current && !document.querySelector('.chat') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         const dir = e.key === 'ArrowRight' ? 1 : -1
         setTab((t) => stepPage(pagesRef.current, t, dir))
       }
@@ -472,6 +480,7 @@ export default function App() {
   const social = DEMO_SOCIAL ? demo.social : realSocial
   const { saveProfile } = auth
   useAutoIdle(auth.profile?.presence ?? (auth.profile ? 'online' : undefined), (v) => void saveProfile({ presence: v }), Boolean(auth.profile))
+  useHeartbeat(DEMO_SOCIAL ? undefined : auth.user?.id)
   const unreadCount = Object.values(social.unread).reduce((a, b) => a + b, 0)
   const { publishActivity } = social
   useEffect(() => {
@@ -898,7 +907,8 @@ export default function App() {
       </div>
     )
   } else if (mode === 'alert' && alert) {
-    contentKey = `alert-${alert.id}`
+    // held volume/brightness keys keep one mounted alert so the bar slides instead of fading out and in
+    contentKey = alert.kind ? `alert-${alert.kind}` : `alert-${alert.id}`
     content = (
       <div className="alert">
         {alert.avatar ? <Avatar profile={alert.avatar} size={34} /> : <span className="alert-icon">{alert.icon}</span>}
@@ -992,8 +1002,8 @@ export default function App() {
         contentKey={contentKey}
         bubble={bubble}
         floating={pos.y > 2}
-        shift={fsWin && !fs ? pos : { x: 0, y: 0 }}
-        shiftJump={fsJump}
+        offset={pos}
+        centered={Boolean(fs)}
         dragHandlers={dragHandlers}
         onClick={(e) => {
           e.stopPropagation()
@@ -1035,7 +1045,8 @@ export default function App() {
           </b>
           <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 })}>Plug in charger</button>
           <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 })}>Low battery</button>
-          <button onClick={() => pushAlert({ icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
+          <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
+          <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
           <button onClick={() => startTimer(0.25)}>15 s timer</button>
           <button
             onClick={() => {

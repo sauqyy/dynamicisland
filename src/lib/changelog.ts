@@ -7,6 +7,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.3.11',
+    title: 'Offline status, brightness',
+    items: [
+      'Friends now show as offline once your app has been closed for a few minutes, instead of staying Available.',
+      'Changing the screen brightness shows an alert in the island.',
+      'Chats group messages by day (Today, Yesterday, weekday or date).',
+    ],
+  },
+  {
     version: '0.3.10',
     title: 'Smoother fullscreen',
     items: ['Fixed the island jumping for a moment when entering or leaving fullscreen chat.'],

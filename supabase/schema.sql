@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   avatar_color text not null default '#60a5fa' check (avatar_color ~ '^#[0-9a-fA-F]{6}$'),
   status text not null default '' check (char_length(status) <= 80),
   presence text not null default 'online' check (presence in ('online', 'idle', 'dnd', 'invisible')),
+  last_seen timestamptz not null default now(),
   avatar_url text check (avatar_url is null or char_length(avatar_url) <= 40000),
   created_at timestamptz not null default now()
 );
@@ -99,6 +100,9 @@ alter publication supabase_realtime add table public.messages, public.friendship
 
 -- already ran an older version of this file? run this line once to add the presence column:
 -- alter table public.profiles add column if not exists presence text not null default 'online' check (presence in ('online', 'idle', 'dnd', 'invisible'));
+
+-- already ran an older version of this file? run this line once so closed apps show as offline:
+-- alter table public.profiles add column if not exists last_seen timestamptz not null default now();
 
 -- already ran an older version of this file? run this once to add read receipts:
 -- alter table public.messages add column if not exists read_at timestamptz;

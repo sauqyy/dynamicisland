@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { BACKEND_READY, type Message } from '../lib/supabase'
 import type { Auth } from '../lib/useAuth'
 import type { Friend, Social } from '../lib/useSocial'
@@ -22,6 +22,21 @@ interface Props {
 
 function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function dayStart(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+/** "Today", "Yesterday", the weekday for the past week, otherwise the date. */
+function dayLabel(iso: string) {
+  const d = new Date(iso)
+  const days = Math.round((dayStart(new Date()) - dayStart(d)) / 86_400_000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return d.toLocaleDateString([], { weekday: 'long' })
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString([], { day: 'numeric', month: 'long', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
 function noteText() {
@@ -108,8 +123,15 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
         {!list ? (
           <div className="empty">Loading…</div>
         ) : list.length ? (
-          list.map((m) => (
-            <Bubble key={m.id} m={m} mine={m.sender === me} />
+          list.map((m, i) => (
+            <Fragment key={m.id}>
+              {(i === 0 || dayStart(new Date(m.created_at)) !== dayStart(new Date(list[i - 1].created_at))) && (
+                <div className="chat-day">
+                  <span>{dayLabel(m.created_at)}</span>
+                </div>
+              )}
+              <Bubble m={m} mine={m.sender === me} />
+            </Fragment>
           ))
         ) : (
           <div className="empty">Say hi 👋</div>

@@ -29,7 +29,7 @@ use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{
-    AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, State, WebviewWindow,
+    AppHandle, Emitter, Manager, Monitor, PhysicalSize, State, WebviewWindow,
 };
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -251,42 +251,42 @@ fn target_monitor(window: &WebviewWindow) -> Option<Monitor> {
     window.primary_monitor().ok().flatten()
 }
 
-/// Size the window for the target monitor's scale factor and centre it at the top.
+/// The island's drag offset in physical px, kept on the monitor whatever offset was saved
+/// (e.g. from a bigger display).
+fn island_offset(monitor: &Monitor) -> (f64, f64) {
+    let scale = monitor.scale_factor();
+    let (off_x, off_y) = *OFFSET.lock().unwrap();
+    let mon_w = monitor.size().width as f64;
+    let mon_h = monitor.size().height as f64;
+    (
+        (off_x * scale).clamp(-(mon_w / 2.0 - 80.0 * scale), mon_w / 2.0 - 80.0 * scale),
+        (off_y * scale).clamp(0.0, (mon_h - 120.0 * scale).max(0.0)),
+    )
+}
+
+/// Put the window at the monitor's top-left corner, as wide as the monitor. It never moves: dragging the
+/// island only moves it inside the page (and makes the window taller), so going fullscreen is just a height
+/// change and the island can't jump. The window is click-through outside the pill.
 /// Does nothing when it is already in place, so it is cheap to call repeatedly.
 fn place_window(window: &WebviewWindow) {
     let Some(monitor) = target_monitor(window) else { return };
     let scale = monitor.scale_factor();
-    if FULLSCREEN.load(Ordering::Relaxed) {
-        let want = *monitor.size();
-        let at = *monitor.position();
-        let (Ok(size), Ok(pos)) = (window.outer_size(), window.outer_position()) else { return };
-        if size != want {
-            let _ = window.set_size(want);
-        }
-        if pos != at {
-            let _ = window.set_position(at);
-        }
-        return;
-    }
-    let (_, win_h) = *WIN_SIZE.lock().unwrap();
-    // As wide as the monitor even when idle (it is click-through outside the pill anyway), so going
-    // fullscreen only changes the height and the pill never moves or re-centres while the window resizes.
-    let want = PhysicalSize::new(monitor.size().width, (win_h * scale).round() as u32);
-    // keep the pill on this monitor, whatever offset was saved (e.g. from a bigger display)
-    let (off_x, off_y) = *OFFSET.lock().unwrap();
-    let mon_w = monitor.size().width as f64;
-    let mon_h = monitor.size().height as f64;
-    let off_x = (off_x * scale).clamp(-(mon_w / 2.0 - 80.0 * scale), mon_w / 2.0 - 80.0 * scale);
-    let off_y = (off_y * scale).clamp(0.0, (mon_h - 120.0 * scale).max(0.0));
-    let x = monitor.position().x + (monitor.size().width as i32 - want.width as i32) / 2 + off_x as i32;
-    let y = monitor.position().y + off_y as i32;
+    let height = if FULLSCREEN.load(Ordering::Relaxed) {
+        monitor.size().height
+    } else {
+        let (_, win_h) = *WIN_SIZE.lock().unwrap();
+        // rounded up to steps so dragging the island down doesn't resize the window on every frame
+        (((island_offset(&monitor).1 + win_h * scale) / 96.0).ceil() * 96.0) as u32
+    };
+    let want = PhysicalSize::new(monitor.size().width, height);
+    let at = *monitor.position();
 
     let (Ok(size), Ok(pos)) = (window.outer_size(), window.outer_position()) else { return };
     if size != want {
         let _ = window.set_size(want);
     }
-    if pos.x != x || pos.y != y {
-        let _ = window.set_position(PhysicalPosition::new(x, y));
+    if pos != at {
+        let _ = window.set_position(at);
     }
 }
 
@@ -325,8 +325,13 @@ fn spawn_watcher(window: WebviewWindow, app: AppHandle) {
             let scale = window.scale_factor().unwrap_or(1.0);
             let (w, h) = *app.state::<HitArea>().0.lock().unwrap();
             let (w, h) = ((w + MARGIN * 2.0) * scale, (h + MARGIN * 2.0) * scale);
-            let left = pos.x as f64 + (size.width as f64 - w) / 2.0;
-            let top = pos.y as f64 + (TOP - MARGIN) * scale;
+            let (off_x, off_y) = if FULLSCREEN.load(Ordering::Relaxed) {
+                (0.0, 0.0)
+            } else {
+                target_monitor(&window).map(|m| island_offset(&m)).unwrap_or((0.0, 0.0))
+            };
+            let left = pos.x as f64 + (size.width as f64 - w) / 2.0 + off_x;
+            let top = pos.y as f64 + off_y + (TOP - MARGIN) * scale;
             let now_inside = !hidden
                 && (DRAGGING.load(Ordering::Relaxed)
                     || (cursor.x >= left
@@ -396,6 +401,7 @@ pub fn run() {
             media::spawn(app.handle().clone());
             system::spawn_battery(app.handle().clone());
             system::spawn_volume(app.handle().clone());
+            system::spawn_brightness(app.handle().clone());
             system::spawn_lock_keys(app.handle().clone());
             system::spawn_privacy(app.handle().clone());
             Ok(())

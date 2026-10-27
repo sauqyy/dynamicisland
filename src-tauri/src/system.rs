@@ -94,6 +94,80 @@ pub fn spawn_volume(app: AppHandle) {
 }
 
 #[derive(Serialize, Clone, PartialEq)]
+struct Brightness {
+    /// 0–100
+    level: u8,
+}
+
+/// Current level of the built-in panel via the video driver; None on desktops / external-only setups.
+fn read_brightness() -> Option<Brightness> {
+    use windows::core::w;
+    use windows::Win32::Foundation::{CloseHandle, GENERIC_READ, GENERIC_WRITE};
+    use windows::Win32::Storage::FileSystem::{
+        CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
+    };
+    use windows::Win32::System::IO::DeviceIoControl;
+
+    // CTL_CODE(FILE_DEVICE_VIDEO, 0x126, METHOD_BUFFERED, FILE_ANY_ACCESS)
+    const IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS: u32 = 0x0023_0498;
+    // DISPLAY_BRIGHTNESS { ucDisplayPolicy, ucACBrightness, ucDCBrightness }
+    let mut out = [0u8; 3];
+    let mut returned = 0u32;
+    unsafe {
+        let h = CreateFileW(
+            w!(r"\\.\LCD"),
+            GENERIC_READ.0 | GENERIC_WRITE.0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+        .ok()?;
+        let ok = DeviceIoControl(
+            h,
+            IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS,
+            None,
+            0,
+            Some(out.as_mut_ptr().cast()),
+            out.len() as u32,
+            Some(&mut returned),
+            None,
+        )
+        .is_ok();
+        let _ = CloseHandle(h);
+        if !ok {
+            return None;
+        }
+    }
+    let mut s = SYSTEM_POWER_STATUS::default();
+    let on_ac = unsafe { GetSystemPowerStatus(&mut s).is_ok() } && s.ACLineStatus == 1;
+    let level = if on_ac { out[1] } else { out[2] };
+    Some(Brightness { level: level.min(100) })
+}
+
+pub fn spawn_brightness(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut last: Option<Brightness> = None;
+        loop {
+            std::thread::sleep(Duration::from_millis(150));
+            let Some(now) = read_brightness() else {
+                // no built-in panel: check back rarely
+                std::thread::sleep(Duration::from_secs(10));
+                continue;
+            };
+            // the first reading is just the starting state, not a change worth an alert
+            if let Some(prev) = &last {
+                if *prev != now {
+                    let _ = app.emit("brightness", &now);
+                }
+            }
+            last = Some(now);
+        }
+    });
+}
+
+#[derive(Serialize, Clone, PartialEq)]
 struct LockKeys {
     caps: bool,
     num: bool,

@@ -69,6 +69,8 @@ export interface IslandAlert {
   icon: string
   text: string
   sub?: string
+  /** alerts of one kind (volume, brightness) update in place instead of re-fading on every change */
+  kind?: string
   /** 0–100, renders a liquid bar */
   value?: number
   /** shown instead of the icon, e.g. the friend who wrote */
