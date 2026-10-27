@@ -1,13 +1,21 @@
 import { useCallback, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
-import type { Message, MessageKind, Profile } from './supabase'
+import { BACKEND_READY, type Message, type MessageKind, type Profile } from './supabase'
 import type { Auth } from './useAuth'
 import type { Friend, Request, Social } from './useSocial'
 import type { Call, CallState } from './useCall'
 import { joinCode, type Group, type GroupInvite, type GroupMessage, type Groups } from './useGroups'
 
-/** Open the browser demo with `?demo` to try accounts, friends and chat with made-up data. */
-export const DEMO_SOCIAL = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null
+const IN_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+/**
+ * Accounts, friends and chat with made-up data. On by itself in the browser dev server when no
+ * Supabase project is configured (there is nothing real to talk to), and anywhere with `?demo`.
+ * `?nodemo` turns the automatic one off.
+ */
+export const DEMO_SOCIAL =
+  params !== null && (params.has('demo') || (import.meta.env.DEV && !BACKEND_READY && !IN_TAURI && !params.has('nodemo')))
 
 const ME: Profile = {
   id: 'me',
@@ -41,7 +49,11 @@ const seed = (): Record<string, Message[]> => ({
     { id: 4, sender: 'a', recipient: 'me', kind: 'note', body: 'To buy: milk, eggs, coffee beans\nCall mom at 7', created_at: ago(5) },
   ],
   b: [{ id: 5, sender: 'b', recipient: 'me', kind: 'text', body: 'are you free tonight?', created_at: ago(180) }],
-  c: [],
+  c: [
+    { id: 8, sender: 'c', recipient: 'me', kind: 'text', body: 'gg last night 🎮', created_at: ago(60 * 26) },
+    { id: 9, sender: 'me', recipient: 'c', kind: 'text', body: 'rematch this weekend?', created_at: ago(60 * 25), read_at: ago(60 * 25) },
+    { id: 10, sender: 'c', recipient: 'me', kind: 'text', body: 'deal, saturday after lunch', created_at: ago(60 * 24) },
+  ],
 })
 
 /** In-memory stand-ins for useAuth and useSocial. Messages get a canned reply after a moment. */
