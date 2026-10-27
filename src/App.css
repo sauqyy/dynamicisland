@@ -138,42 +138,6 @@
   font-weight: 600;
 }
 
-.alert {
-  width: 100%;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.alert-icon {
-  font-size: 22px;
-}
-.alert-text {
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 70px;
-}
-.alert-text small {
-  font-weight: 400;
-  opacity: 0.6;
-}
-.liquid-bar {
-  flex: 1;
-  height: 10px;
-  border-radius: 6px;
-  background: rgb(var(--fg-rgb) / 0.15);
-  overflow: hidden;
-}
-.liquid-fill {
-  height: 100%;
-  border-radius: 6px;
-  background: var(--accent, #4ade80);
-  /* short and overshoot-free so it keeps up with a held key */
-  transition: width 0.14s ease-out;
-}
-
 /* ---------- expanded ---------- */
 .expanded {
   width: 100%;
@@ -986,10 +950,7 @@
 .clip {
   padding: 10px 14px;
 }
-.alert {
-  padding: 0 26px;
-  gap: 14px;
-}
+
 .drop-overlay {
   inset: 56px 18px 36px;
 }
@@ -1990,9 +1951,6 @@
 .dot.unread-dot {
   background: var(--accent, #4ade80);
   box-shadow: 0 0 6px var(--accent, #4ade80);
-}
-.alert .avatar {
-  flex: none;
 }
 
 /* unread count next to the clock: a small round badge with the number of new messages */
@@ -3131,4 +3089,119 @@ button.ao-text:hover {
 .live > .bars {
   flex: none;
   margin-left: auto;
+}
+
+/* ---------- alerts: progress drawn along the island's bottom edge ---------- */
+.alert2 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px 0 9px;
+}
+.alert2.msg-alert {
+  padding: 0 12px 0 11px;
+}
+.al-ic {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--c, var(--text-1));
+}
+.al-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
+.al-tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.al-tx b,
+.al-tx small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.al-tx b {
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+.al-tx small {
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+}
+.al-val {
+  flex: none;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--c, var(--text-1));
+}
+.al-reply {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+.edge {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.edge::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--v);
+  border-radius: 2px;
+  background: var(--c);
+  box-shadow: 0 0 10px var(--c);
+  transition: width 0.4s;
+}
+.alert2.hud {
+  gap: 12px;
+  padding: 0 16px 0 14px;
+}
+.hud-ic {
+  flex: none;
+  display: grid;
+  color: var(--text-2);
+}
+.hud-ticks {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+}
+.hud-ticks i {
+  flex: 1;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--pressed);
+  transition: background 0.12s;
+}
+.hud-ticks i.on {
+  background: var(--text-1);
+}
+.hud-val {
+  flex: none;
+  width: 24px;
+  text-align: right;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }

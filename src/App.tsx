@@ -25,6 +25,7 @@ import { useSocial } from './lib/useSocial'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { useClipboard } from './lib/useClipboard'
 import { Rail } from './island/Rail'
+import { AlertIcon, alertTone } from './island/AlertIcon'
 import {
   DEFAULT_APPS,
   DEMO_APPS,
@@ -596,13 +597,16 @@ export default function App() {
         if (fs) return { w: fs.w / settings.scale, h: fs.h / settings.scale, r: 0 }
         return { w: settings.cardW, h: expandedHeight, r: 32 }
       case 'alert':
-        return { w: 320, h: 60, r: 26 }
+        // volume and brightness are a slim level meter; a message has room for the friend and a reply
+        if (!updating && alert?.kind) return { w: 290, h: 40, r: 16 }
+        if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
+        return { w: 340, h: 48, r: 22 }
       case 'peek':
         return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -946,32 +950,56 @@ export default function App() {
     contentKey = 'updating'
     const installing = updating.stage === 'installing'
     content = (
-      <div className="alert">
-        <span className="alert-icon">⬇️</span>
-        <div className="alert-text">
-          <span>{installing ? 'Installing' : 'Updating'}</span>
-          <small>{installing ? 'Restarting…' : `${updating.percent}%`}</small>
-        </div>
-        <div className="liquid-bar">
-          <div className="liquid-fill" style={{ width: `${updating.percent}%` }} />
-        </div>
+      <div className="alert2" style={{ ['--c' as string]: 'var(--info)' }}>
+        <span className="al-ic">
+          <AlertIcon icon="⬇️" />
+        </span>
+        <span className="al-tx">
+          <b>{installing ? 'Installing' : 'Updating'}</b>
+          <small>{installing ? 'Restarting…' : 'Downloading the new version'}</small>
+        </span>
+        {!installing && <span className="al-val">{updating.percent}%</span>}
+        <span className="edge" style={{ ['--v' as string]: `${installing ? 100 : updating.percent}%` }} />
+      </div>
+    )
+  } else if (mode === 'alert' && alert?.kind) {
+    // held volume/brightness keys keep one mounted alert so the meter moves instead of fading out and in
+    contentKey = `alert-${alert.kind}`
+    const lit = Math.round(((alert.value ?? 0) / 100) * 16)
+    content = (
+      <div className="alert2 hud">
+        <span className="hud-ic">
+          <AlertIcon icon={alert.icon} size={16} />
+        </span>
+        <span className="hud-ticks" aria-label={`${alert.text} ${alert.value ?? 0}%`}>
+          {Array.from({ length: 16 }, (_, i) => (
+            <i key={i} className={i < lit ? 'on' : ''} />
+          ))}
+        </span>
+        <span className="hud-val">{alert.value ?? 0}</span>
       </div>
     )
   } else if (mode === 'alert' && alert) {
-    // held volume/brightness keys keep one mounted alert so the bar slides instead of fading out and in
-    contentKey = alert.kind ? `alert-${alert.kind}` : `alert-${alert.id}`
+    contentKey = `alert-${alert.id}`
+    const value = alert.value
+    // the percentage is drawn on the right, so a sub line that only repeats it is left out
+    const sub = value !== undefined && alert.sub === `${value}%` ? undefined : alert.sub
     content = (
-      <div className="alert">
-        {alert.avatar ? <Avatar profile={alert.avatar} size={34} /> : <span className="alert-icon">{alert.icon}</span>}
-        <div className="alert-text">
-          <span>{alert.text}</span>
-          {alert.sub && <small>{alert.sub}</small>}
-        </div>
-        {alert.value !== undefined && (
-          <div className="liquid-bar">
-            <div className="liquid-fill" style={{ width: `${alert.value}%` }} />
-          </div>
+      <div className={`alert2 ${alert.avatar ? 'msg-alert' : ''}`} style={{ ['--c' as string]: alertTone(alert.icon) }}>
+        {alert.avatar ? (
+          <Avatar profile={alert.avatar} size={34} />
+        ) : (
+          <span className="al-ic">
+            <AlertIcon icon={alert.icon} />
+          </span>
         )}
+        <span className="al-tx">
+          <b>{alert.text}</b>
+          {sub && <small>{sub}</small>}
+        </span>
+        {value !== undefined && <span className="al-val">{value}%</span>}
+        {alert.chatWith && <span className="al-reply">Reply</span>}
+        {value !== undefined && <span className="edge" style={{ ['--v' as string]: `${value}%` }} />}
       </div>
     )
   } else if (mode === 'peek') {
