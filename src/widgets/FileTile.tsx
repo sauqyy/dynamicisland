@@ -3,6 +3,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { startDrag } from '@crabnebula/tauri-plugin-drag'
 import { fmtSize, isImage, openPath, type FileItem } from '../lib/files'
 import { IS_TAURI } from '../lib/useMedia'
+import { File, FileImage, Folder } from 'lucide-react'
 
 interface Props {
   item: FileItem
@@ -14,9 +15,8 @@ interface Props {
 }
 
 function fallbackGlyph(item: FileItem) {
-  if (item.isDir) return '📁'
-  if (isImage(item.name)) return '🖼️'
-  return '📄'
+  const Icon = item.isDir ? Folder : isImage(item.name) ? FileImage : File
+  return <Icon size={22} strokeWidth={1.7} aria-hidden />
 }
 
 async function dragOut(path: string) {

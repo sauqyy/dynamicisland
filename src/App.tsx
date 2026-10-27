@@ -44,7 +44,8 @@ import { useAutoIdle } from './lib/useAutoIdle'
 import { useHeartbeat } from './lib/useHeartbeat'
 import { play, type PlayOptions, type SoundName } from 'cuelume'
 import { useSoundSetup } from './lib/sound'
-import { cachedWeather, describe as describeWeather } from './lib/weather'
+import { cachedWeather } from './lib/weather'
+import { WeatherIcon, isNight } from './widgets/WeatherIcon'
 import { GROUPS, PAGES, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
@@ -602,14 +603,16 @@ export default function App() {
 
   // other things the pill can show; falls back to the clock when there is nothing to show yet.
   // Re-read when the card closes, which is when the city may have changed.
-  const idleExtra = useMemo(() => {
+  const idleWeather = useMemo(() => {
     if (settings.idle === 'weather' && settings.city) {
       const w = cachedWeather(settings.city, settings.fahrenheit)
-      return w ? `${describeWeather(w.code).icon} ${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` : ''
+      if (w) return { code: w.code, text: `${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` }
     }
-    return ''
+    return null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
+  const idleExtra = idleWeather?.text ?? ''
+  const weatherGlyph = idleWeather && !idleLyric ? <WeatherIcon code={idleWeather.code} night={isNight(new Date(now).getHours())} size={15} /> : null
   const idleText = idleLyric ? lyricText : idleExtra
   const d = new Date(now)
   const clock = clockText(d, settings.clock24)
@@ -1103,6 +1106,7 @@ export default function App() {
     content = (
       <div className="live">
         <Art track={track} size={22} />
+        {weatherGlyph}
         <LiveText text={live} k={idleLyric ? lyricIdx : live} />
         {(unreadCount > 0 || privacy.camera || privacy.mic) && (
           <span className="live-dots">
@@ -1121,6 +1125,7 @@ export default function App() {
         {idleText ? (
           <>
             {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
+            {weatherGlyph}
             <span className="idle-lyric">{idleText}</span>
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}

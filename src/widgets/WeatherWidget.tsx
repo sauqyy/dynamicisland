@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { play } from 'cuelume'
 import { cachedWeather, describe, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
 import type { Settings } from '../lib/settings'
+import { CloudRain, Droplets, Wind } from 'lucide-react'
+import { WeatherIcon, isNight } from './WeatherIcon'
 
 interface Props {
   settings: Settings
@@ -92,15 +94,21 @@ export function WeatherWidget({ settings, update }: Props) {
           <span>
             H {hi}° · L {lo}° · Feels {weather.feels}°
           </span>
-          <span>
-            💧{weather.humidity}% · 💨{weather.wind}
+          <span className="wx-extra">
+            <Droplets size={13} aria-hidden /> {weather.humidity}%
+            <Wind size={13} aria-hidden /> {weather.wind} km/h
           </span>
         </span>
         <button className="chip wx-city" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => { setDraft(city); setEditing(true) }}>
           {weather.city} · {unit}
         </button>
       </div>
-      {rainText && <div className="wx-rain">🌧️ {rainText}</div>}
+      {rainText && (
+        <div className="wx-rain">
+          <CloudRain size={16} aria-hidden />
+          <span>{rainText}</span>
+        </div>
+      )}
       <TempCurve hours={weather.hourly} now={start} />
     </div>
   )
@@ -173,7 +181,7 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
         <div className="wx-cols" style={{ gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` }}>
           {hours.map((h, i) => (
             <div key={h.hour} className={isRain(h.code) ? 'rain' : ''}>
-              <span>{describe(h.code).icon}</span>
+              <WeatherIcon code={h.code} night={isNight(Number(h.hour))} size={16} />
               <small>{i === now ? 'Now' : h.hour}</small>
             </div>
           ))}

@@ -3557,3 +3557,40 @@ button.ao-text:hover {
   flex: none;
 }
 
+/* line icons in place of emoji */
+.wx-extra {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.wx-extra svg:last-of-type {
+  margin-left: 6px;
+}
+.wx-rain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wx-rain svg {
+  flex: none;
+  color: var(--info);
+}
+.wx-cols div {
+  color: var(--text-2);
+}
+.wx-cols .rain {
+  color: var(--info);
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 0 8px;
+}
+.wx-cols svg {
+  display: block;
+}
+.live > svg {
+  flex: none;
+}

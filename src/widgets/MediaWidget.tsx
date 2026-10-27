@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { Music2, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { currentLineIndex } from '../lib/lyrics'
 import type { Track } from '../types'
 
@@ -52,7 +53,9 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   if (!track) {
     return (
       <div className="media nothing" onClick={(e) => e.stopPropagation()}>
-        <div className="nothing-icon">♫</div>
+        <div className="nothing-icon">
+          <Music2 size={28} strokeWidth={1.7} aria-hidden />
+        </div>
         <div>Nothing playing</div>
         <small>Start a song in Spotify or any media app</small>
       </div>
@@ -117,28 +120,13 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
 
       <div className="np-controls">
         <button onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M19 5.6v12.8a.7.7 0 0 1-1.1.6L9 12.6a.7.7 0 0 1 0-1.2l8.9-6.4a.7.7 0 0 1 1.1.6z" />
-            <rect x="5" y="5" width="2.6" height="14" rx="1.1" />
-          </svg>
+          <SkipBack size={18} fill="currentColor" aria-hidden />
         </button>
         <button className="np-play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            {playing ? (
-              <>
-                <rect x="6" y="4.5" width="4.2" height="15" rx="1.2" />
-                <rect x="13.8" y="4.5" width="4.2" height="15" rx="1.2" />
-              </>
-            ) : (
-              <path d="M7.5 4.8v14.4a.8.8 0 0 0 1.2.7l11.6-7.2a.8.8 0 0 0 0-1.4L8.7 4.1a.8.8 0 0 0-1.2.7z" />
-            )}
-          </svg>
+          {playing ? <Pause size={18} fill="currentColor" aria-hidden /> : <Play size={18} fill="currentColor" aria-hidden />}
         </button>
         <button onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M5 5.6v12.8a.7.7 0 0 0 1.1.6l8.9-6.4a.7.7 0 0 0 0-1.2L6.1 5a.7.7 0 0 0-1.1.6z" />
-            <rect x="16.4" y="5" width="2.6" height="14" rx="1.1" />
-          </svg>
+          <SkipForward size={18} fill="currentColor" aria-hidden />
         </button>
       </div>
     </div>
