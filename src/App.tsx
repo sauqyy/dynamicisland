@@ -729,6 +729,24 @@ export default function App() {
     if (!IS_TAURI && track) pushAlert({ icon: '🎵', text: track.title, sub: track.artist, nowPlaying: true })
   }
 
+  // browser demo: the lock keys it pretends to toggle, and a fake update download
+  const demoLocks = useRef({ caps: false, num: false })
+  const demoUpdate = useRef(0)
+  const runDemoUpdate = () => {
+    clearInterval(demoUpdate.current)
+    setExpanded(false)
+    play('loading')
+    let percent = 0
+    setUpdating({ stage: 'downloading', percent })
+    demoUpdate.current = window.setInterval(() => {
+      percent = Math.min(100, percent + 7)
+      if (percent < 100) return setUpdating({ stage: 'downloading', percent })
+      clearInterval(demoUpdate.current)
+      setUpdating({ stage: 'installing', percent: 100 })
+      setTimeout(() => setUpdating(null), 1800)
+    }, 160)
+  }
+
   // Drag the island to move it. The pill follows the cursor on a spring and sticks to the
   // centre line / top edge like a magnet: it gets pulled in with a little overshoot.
   const stepSpring = useCallback(() => {
@@ -1220,40 +1238,120 @@ export default function App() {
           >
             ⠿ Browser demo
           </b>
-          <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'forward' })}>Plug in charger</button>
-          <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 }, 'warning')}>Low battery</button>
-          <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
-          <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
-          <button onClick={() => startTimer(0.25)}>15 s timer</button>
-          <button
-            onClick={() => {
-              if (DEMO_SOCIAL) {
-                const { friend, body } = demo.ping()
-                if (auth.profile?.presence !== 'dnd') {
+          <div className="demo-row">
+            <span>Power</span>
+            <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'forward' })}>Plug in charger</button>
+            <button onClick={() => pushAlert({ icon: '🔋', text: 'On battery', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'back' })}>Unplug charger</button>
+            <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 }, 'warning')}>Low battery</button>
+          </div>
+          <div className="demo-row">
+            <span>Keys</span>
+            <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
+            <button onClick={() => pushAlert({ kind: 'volume', icon: '🔇', text: 'Muted', value: 0 })}>Mute</button>
+            <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
+            <button
+              onClick={() => {
+                const caps = !demoLocks.current.caps
+                demoLocks.current.caps = caps
+                pushAlert({ icon: caps ? '🔠' : '🔡', text: caps ? 'Caps Lock on' : 'Caps Lock off' }, 'toggle', { emphasis: 'subtle', direction: caps ? 'forward' : 'back' })
+              }}
+            >
+              Caps Lock
+            </button>
+            <button
+              onClick={() => {
+                const num = !demoLocks.current.num
+                demoLocks.current.num = num
+                pushAlert({ icon: '🔢', text: num ? 'Num Lock on' : 'Num Lock off' }, 'toggle', { emphasis: 'subtle', direction: num ? 'forward' : 'back' })
+              }}
+            >
+              Num Lock
+            </button>
+          </div>
+          <div className="demo-row">
+            <span>Media</span>
+            <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>
+            <button onClick={() => onSkip(1)}>Next song</button>
+            <button onClick={() => startTimer(0.25)}>15 s timer</button>
+            <button onClick={() => advancePomo(pomo ?? { phase: 'break', done: 0 })}>Pomodoro phase</button>
+          </div>
+          <div className="demo-row">
+            <span>Privacy</span>
+            <button
+              onClick={() => {
+                const on = !privacy.mic
+                setPrivacy((p) => ({ ...p, mic: on ? 'Zoom' : null }))
+                if (on) pushAlert({ icon: '🎙️', text: 'Microphone in use', sub: 'Zoom' }, 'warning', { emphasis: 'subtle' })
+              }}
+            >
+              Mic {privacy.mic ? 'off' : 'on'}
+            </button>
+            <button
+              onClick={() => {
+                const on = !privacy.camera
+                setPrivacy((p) => ({ ...p, camera: on ? 'Zoom' : null }))
+                if (on) pushAlert({ icon: '📷', text: 'Camera in use', sub: 'Zoom' }, 'warning', { emphasis: 'subtle' })
+              }}
+            >
+              Camera {privacy.camera ? 'off' : 'on'}
+            </button>
+            <button onClick={() => pushAlert({ icon: '📋', text: 'Copied' }, 'success', { emphasis: 'subtle' })}>Copied</button>
+          </div>
+          <div className="demo-row">
+            <span>Social</span>
+            <button
+              onClick={() => {
+                if (DEMO_SOCIAL) {
+                  const { friend, body } = demo.ping()
+                  if (auth.profile?.presence !== 'dnd') {
+                    playMessageSound()
+                    pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+                  }
+                } else {
                   playMessageSound()
-                  pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+                  pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
                 }
-              } else {
+              }}
+            >
+              Message
+            </button>
+            <button
+              onClick={() => {
                 playMessageSound()
-                pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
-              }
-            }}
-          >
-            Message
-          </button>
-          <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>
-            Update alert
-          </button>
-          <button
-            onClick={() => {
-              setNotes(CHANGELOG[0])
-              setExpanded(true)
-            }}
-          >
-            What's new
-          </button>
-          <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
-          <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>
+                pushAlert({ icon: '👥', text: 'Weekend squad', sub: 'Mira: who is up for tonight?' })
+              }}
+            >
+              Group message
+            </button>
+            <button
+              onClick={() => {
+                const f = DEMO_SOCIAL ? demo.social.friends[0] : null
+                pushAlert(
+                  f
+                    ? { icon: '📞', text: f.profile.display_name || f.profile.username, sub: 'Incoming voice call', avatar: f.profile, chatWith: f.profile.id }
+                    : { icon: '📞', text: 'Rina', sub: 'Incoming voice call' },
+                  'attention',
+                )
+              }}
+            >
+              Incoming call
+            </button>
+          </div>
+          <div className="demo-row">
+            <span>App</span>
+            <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>Update alert</button>
+            <button onClick={runDemoUpdate}>Update download</button>
+            <button onClick={() => pushAlert({ icon: '⚠️', text: 'Update failed', sub: 'Try again from Settings' }, 'error')}>Update failed</button>
+            <button
+              onClick={() => {
+                setNotes(CHANGELOG[0])
+                setExpanded(true)
+              }}
+            >
+              What's new
+            </button>
+            <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
+          </div>
         </div>
       )}
     </div>
