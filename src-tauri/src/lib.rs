@@ -268,8 +268,10 @@ fn place_window(window: &WebviewWindow) {
         }
         return;
     }
-    let (win_w, win_h) = *WIN_SIZE.lock().unwrap();
-    let want = PhysicalSize::new((win_w * scale).round() as u32, (win_h * scale).round() as u32);
+    let (_, win_h) = *WIN_SIZE.lock().unwrap();
+    // As wide as the monitor even when idle (it is click-through outside the pill anyway), so going
+    // fullscreen only changes the height and the pill never moves or re-centres while the window resizes.
+    let want = PhysicalSize::new(monitor.size().width, (win_h * scale).round() as u32);
     // keep the pill on this monitor, whatever offset was saved (e.g. from a bigger display)
     let (off_x, off_y) = *OFFSET.lock().unwrap();
     let mon_w = monitor.size().width as f64;

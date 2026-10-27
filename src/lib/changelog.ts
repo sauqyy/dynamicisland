@@ -7,6 +7,11 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.3.10',
+    title: 'Smoother fullscreen',
+    items: ['Fixed the island jumping for a moment when entering or leaving fullscreen chat.'],
+  },
+  {
     version: '0.3.9',
     title: 'Fullscreen chat',
     items: [
