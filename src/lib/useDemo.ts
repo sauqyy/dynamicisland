@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Message, MessageKind, Profile } from './supabase'
 import type { Auth } from './useAuth'
 import type { Friend, Request, Social } from './useSocial'
+import { joinCode, type Group, type GroupInvite, type GroupMessage, type Groups } from './useGroups'
 
 /** Open the browser demo with `?demo` to try accounts, friends and chat with made-up data. */
 export const DEMO_SOCIAL = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
@@ -43,7 +44,7 @@ const seed = (): Record<string, Message[]> => ({
 })
 
 /** In-memory stand-ins for useAuth and useSocial. Messages get a canned reply after a moment. */
-export function useDemo(): { auth: Auth; social: Social; ping: () => { friend: Friend; body: string } } {
+export function useDemo(): { auth: Auth; social: Social; groups: Groups; ping: () => { friend: Friend; body: string } } {
   const [profile, setProfile] = useState<Profile>(ME)
   const [messages, setMessages] = useState<Record<string, Message[]>>(seed)
   const [unread, setUnread] = useState<Record<string, number>>({ a: 1, b: 1 })
@@ -52,6 +53,18 @@ export function useDemo(): { auth: Auth; social: Social; ping: () => { friend: F
   const [outgoing, setOutgoing] = useState<Request[]>([])
   const [removed, setRemoved] = useState<string[]>([])
   const opened = useRef<string | null>(null)
+
+  const [groupList, setGroupList] = useState<Group[]>(() => [
+    { id: 'g1', name: 'Study crew', emoji: '📚', color: '#60a5fa', owner: 'a', inviteCode: 'STUDY123', members: [ME, people[0], people[1]] },
+  ])
+  const [groupInvites, setGroupInvites] = useState<GroupInvite[]>([{ group: { id: 'g2', name: 'Weekend gaming', emoji: '🎮', color: '#c084fc' }, from: people[2] }])
+  const [groupMsgs, setGroupMsgs] = useState<Record<string, GroupMessage[]>>({
+    g1: [
+      { id: 1, group_id: 'g1', sender: 'a', kind: 'text', body: 'exam prep tonight?', created_at: ago(90) },
+      { id: 2, group_id: 'g1', sender: 'b', kind: 'text', body: 'yes! library at 7', created_at: ago(80) },
+    ],
+  })
+  const [groupUnread, setGroupUnread] = useState<Record<string, number>>({ g1: 2 })
 
   const friends: Friend[] = [
     ...people.map((p, i) => ({
@@ -148,5 +161,59 @@ export function useDemo(): { auth: Auth; social: Social; ping: () => { friend: F
     publishActivity: async () => {},
   }
 
-  return { auth, social, ping }
+  const groups: Groups = {
+    groups: groupList,
+    invites: groupInvites,
+    messages: groupMsgs,
+    unread: groupUnread,
+    create: async (name, emoji, color) => {
+      if (!name.trim()) return 'Give the group a name'
+      const id = `g${nextId++}`
+      setGroupList((l) => [...l, { id, name: name.trim(), emoji: emoji || '👥', color, owner: 'me', inviteCode: id.toUpperCase().padEnd(8, 'X'), members: [ME] }])
+      return null
+    },
+    join: async (input) => {
+      if (joinCode(input) !== 'STUDY123' && joinCode(input) !== 'JOIN2025') return 'That invite code does not exist (try JOIN2025)'
+      setGroupList((l) => [...l, { id: `g${nextId++}`, name: 'Design club', emoji: '🎨', color: '#f472b6', owner: 'e', inviteCode: 'JOIN2025', members: [ME, people[3]] }])
+      return null
+    },
+    invite: async (gid, username) => {
+      if (!username.trim()) return 'Enter a username'
+      const p: Profile = { ...requester, id: `x${nextId++}`, username: username.trim().replace(/^@/, ''), display_name: '', avatar_emoji: '🙂' }
+      setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, members: [...g.members, p] } : g)))
+      return null
+    },
+    respond: async (gid, accept) => {
+      const inv = groupInvites.find((i) => i.group.id === gid)
+      setGroupInvites((l) => l.filter((i) => i.group.id !== gid))
+      if (inv && accept) setGroupList((l) => [...l, { ...inv.group, owner: 'c', inviteCode: 'GAME4567', members: [ME, people[2]] }])
+    },
+    removeMember: async (gid, uid) => {
+      if (uid === 'me') setGroupList((l) => l.filter((g) => g.id !== gid))
+      else setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, members: g.members.filter((p) => p.id !== uid) } : g)))
+    },
+    setIcon: async (gid, emoji, color) => {
+      setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, emoji, color } : g)))
+      return null
+    },
+    deleteGroup: async (gid) => setGroupList((l) => l.filter((g) => g.id !== gid)),
+    resetCode: async (gid) => {
+      setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, inviteCode: 'NEW' + String(nextId++).padStart(5, '0') } : g)))
+      return null
+    },
+    open: async (gid) => {
+      if (gid) setGroupUnread((u) => (u[gid] ? { ...u, [gid]: 0 } : u))
+    },
+    send: async (gid, kind, body) => {
+      const text = body.trim()
+      if (!text) return null
+      setGroupMsgs((c) => ({ ...c, [gid]: [...(c[gid] ?? []), { id: nextId++, group_id: gid, sender: 'me', kind, body: text, created_at: new Date().toISOString() }] }))
+      setTimeout(() => {
+        setGroupMsgs((c) => ({ ...c, [gid]: [...(c[gid] ?? []), { id: nextId++, group_id: gid, sender: 'a', kind: 'text', body: 'sounds good 👍', created_at: new Date().toISOString() }] }))
+      }, 1400)
+      return null
+    },
+  }
+
+  return { auth, social, groups, ping }
 }

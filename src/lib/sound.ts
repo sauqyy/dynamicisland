@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { bind, play, setEnabled, setTheme, unlock, type ThemeName } from 'cuelume'
+import { bind, play, setEnabled, setTheme, setVolume, unlock, type ThemeName } from 'cuelume'
 import type { SoundPack } from './settings'
 
 /*
@@ -12,10 +12,25 @@ import type { SoundPack } from './settings'
 export const soundTheme = (pack: SoundPack): ThemeName => (pack === 'basic' ? 'default' : pack)
 
 /** Wires every marked control and follows the Interface sounds settings. Mounted once, in App. */
-export function useSoundSetup(enabled: boolean, pack: SoundPack) {
+export function useSoundSetup(enabled: boolean, pack: SoundPack, volume: number, typing: boolean) {
   useEffect(() => bind(), [])
   useEffect(() => setEnabled(enabled), [enabled])
   useEffect(() => setTheme(soundTheme(pack)), [pack])
+  useEffect(() => setVolume(volume), [volume])
+  useEffect(() => {
+    if (typing) return
+    // cuelume reads data-cuelume-type while it handles the keydown, so the mark is lifted for that one
+    // event (our capture listener runs first) and put back right after
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target instanceof Element ? e.target.closest('[data-cuelume-type]') : null
+      if (!el) return
+      const value = el.getAttribute('data-cuelume-type') ?? ''
+      el.removeAttribute('data-cuelume-type')
+      setTimeout(() => el.setAttribute('data-cuelume-type', value), 0)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [typing])
 }
 
 /**

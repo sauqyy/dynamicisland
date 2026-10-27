@@ -3,6 +3,7 @@
 1. Create a project at https://supabase.com (free tier is fine).
 2. **SQL editor** → paste and run [`schema.sql`](schema.sql). It creates the tables, the row-level-security
    policies (friends only can message each other or see each other's activity) and enables realtime.
+2b. For group chats, also run [`groups.sql`](groups.sql) the same way (after `schema.sql`).
 3. **Authentication → Providers → Email**: for quick testing turn off "Confirm email",
    otherwise new accounts must click the link in their inbox before signing in.
 4. **Authentication → Providers → Google**: create an OAuth client in Google Cloud Console
@@ -15,3 +16,18 @@
    (**Project Settings → API**). Restart `npm run tauri dev` / rebuild so they are picked up.
 
 The anon key is public by design; the policies in `schema.sql` are what protect the data.
+
+## Voice calls (1:1)
+
+Calls are peer to peer (WebRTC) and need no extra setup: the invite/offer/answer messages travel over
+Supabase Realtime broadcast, and Google's public STUN servers help friends find each other.
+The call button is in a friend's chat header (the friend must be online).
+
+STUN alone fails for roughly 1 in 10 connections (strict NATs). To cover those, add a free TURN relay
+(e.g. the Metered or Cloudflare free tier) to `.env.local`:
+
+```
+VITE_TURN_URL=turn:your-relay:443?transport=tcp
+VITE_TURN_USER=…
+VITE_TURN_PASS=…
+```

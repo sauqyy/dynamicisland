@@ -41,6 +41,10 @@ export interface Settings {
   uiSounds: boolean
   /** which material the interface sounds are made of */
   soundPack: SoundPack
+  /** loudness of the interface sounds, 0-1 */
+  soundVolume: number
+  /** the keystroke sound in text fields */
+  typingSounds: boolean
   /** font size of the idle pill text in px */
   clockSize: number
   /** seconds the lyrics run ahead of the player; the fade-in and Windows' position lag make them feel late */
@@ -86,6 +90,7 @@ export const SIZE_LIMITS = {
   cardH: { min: 300, max: 352, step: 2 },
   clockSize: { min: 12, max: 22, step: 1 },
   lyricOffset: { min: -1.5, max: 1.5, step: 0.05 },
+  soundVolume: { min: 0, max: 1, step: 0.05 },
 }
 
 export const SIZE_DEFAULTS = { scale: 1, cardW: 460, cardH: 344 }
@@ -106,6 +111,8 @@ const DEFAULTS: Settings = {
   messageSound: true,
   uiSounds: true,
   soundPack: 'mech',
+  soundVolume: 1,
+  typingSounds: true,
   clockSize: 15,
   lyricOffset: 0.35,
   hiddenPages: [],

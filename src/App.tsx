@@ -20,9 +20,11 @@ import { Dock } from './widgets/Dock'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
-import { FriendsWidget } from './widgets/FriendsWidget'
+import { FriendsWidget, type OpenChat } from './widgets/FriendsWidget'
 import { useAuth } from './lib/useAuth'
 import { useSocial } from './lib/useSocial'
+import { useGroups } from './lib/useGroups'
+import { useCall } from './lib/useCall'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { useClipboard } from './lib/useClipboard'
 import { ExpandedHeader } from './widgets/ExpandedHeader'
@@ -103,7 +105,7 @@ function clockText(d: Date, clock24: boolean) {
 export default function App() {
   const { track, playing, position, toggle, seek, skip } = useMedia()
   const { settings, update } = useSettings()
-  useSoundSetup(settings.uiSounds, settings.soundPack)
+  useSoundSetup(settings.uiSounds, settings.soundPack, settings.soundVolume, settings.typingSounds)
   const [hidden, setHidden] = useState(false)
   const updater = useUpdater()
   const [pomo, setPomo] = useState<PomodoroState | null>(null)
@@ -150,6 +152,7 @@ export default function App() {
   const [alert, setAlert] = useState<IslandAlert | null>(null)
   const [holdOpen, setHoldOpen] = useState(false)
   const [pendingChat, setPendingChat] = useState<string | null>(null)
+  const [openChat, setOpenChat] = useState<OpenChat>({ friend: null, group: null })
   const [updating, setUpdating] = useState<{ stage: string; percent: number } | null>(null)
   const [timer, setTimer] = useState<TimerState | null>(null)
   const [sw, setSw] = useState<StopwatchState>({ running: false, startedAt: 0, base: 0, laps: [] })
@@ -259,6 +262,24 @@ export default function App() {
       sub: (m.kind === 'activity' ? '🎵 shared an activity' : m.kind === 'note' ? '📝 shared a note' : m.body).slice(0, 42),
       avatar: from?.profile,
       chatWith: from?.profile.id,
+    })
+  })
+
+  const call = useCall(meId, realSocial.friends, (from) => {
+    if (auth.profile?.presence === 'dnd') return
+    pushAlert(
+      { icon: '📞', text: from.profile.display_name || from.profile.username, sub: 'Incoming voice call', avatar: from.profile, chatWith: from.profile.id },
+      'attention',
+    )
+  })
+
+  const groupChats = useGroups(meId, (m, group, from) => {
+    if (auth.profile?.presence === 'dnd') return
+    playMessageSound()
+    pushAlert({
+      icon: group?.emoji ?? '👥',
+      text: group?.name ?? 'Group chat',
+      sub: `${from?.display_name || from?.username || 'Someone'}: ${m.kind === 'activity' ? '🎵 shared an activity' : m.kind === 'note' ? '📝 shared a note' : m.body}`.slice(0, 42),
     })
   })
 
@@ -483,9 +504,14 @@ export default function App() {
       .catch(() => {})
   }, [])
 
+  // chats only live on the Friends and Groups pages
+  useEffect(() => {
+    if (tab !== 'friends' && tab !== 'groups') setOpenChat({ friend: null, group: null })
+  }, [tab])
+
   // fullscreen only belongs to an open chat
   useEffect(() => {
-    if (fs && !(expanded && tab === 'friends')) exitFullscreen()
+    if (fs && !(expanded && (tab === 'friends' || tab === 'groups'))) exitFullscreen()
   }, [fs, expanded, tab, exitFullscreen])
 
   // what friends can see: the song or timer that is running
@@ -494,7 +520,9 @@ export default function App() {
   const { saveProfile } = auth
   useAutoIdle(auth.profile?.presence ?? (auth.profile ? 'online' : undefined), (v) => void saveProfile({ presence: v }), Boolean(auth.profile))
   useHeartbeat(DEMO_SOCIAL ? undefined : auth.user?.id)
-  const unreadCount = Object.values(social.unread).reduce((a, b) => a + b, 0)
+  const unreadCount =
+    Object.values(social.unread).reduce((a, b) => a + b, 0) +
+    (DEMO_SOCIAL ? 0 : Object.values(groupChats.unread).reduce((a, b) => a + b, 0) + groupChats.invites.length)
   const { publishActivity } = social
   useEffect(() => {
     if (!meId) return
@@ -595,12 +623,16 @@ export default function App() {
   }
 
   // the card opening and closing, and every page change inside it (arrows, dock, keys, swipes)
+  // jumping between a friend's chat and a group's chat is a chat selection, not a page change
+  const isSocial = (t: Tab) => t === 'friends' || t === 'groups'
+  const chatSwitch = useRef(false)
+  chatSwitch.current = Boolean(openChat.friend || openChat.group)
   const soundState = useRef({ expanded, tab })
   useEffect(() => {
     const was = soundState.current
     // opening is a press on the island, so it taps; closing lets the card fall shut
     if (expanded !== was.expanded) play(expanded ? 'tap' : 'close', { emphasis: expanded ? 'normal' : 'subtle' })
-    else if (expanded && tab !== was.tab) play('navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
+    else if (expanded && tab !== was.tab && !(chatSwitch.current && isSocial(tab) && isSocial(was.tab))) play('navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
     soundState.current = { expanded, tab }
   }, [expanded, tab])
 
@@ -784,7 +816,8 @@ export default function App() {
           {action && <div className="body-actions">{action}</div>}
           <AnimatePresence mode="popLayout" initial={false} custom={dirRef.current}>
             <motion.div
-              key={tab}
+              // Friends and Groups share one page, so moving between them (e.g. from a chat) does not animate
+              key={tab === 'groups' ? 'friends' : tab}
               className="page"
               custom={dirRef.current}
               variants={PAGE_VARIANTS[settings.tabAnim]}
@@ -863,12 +896,20 @@ export default function App() {
                 emptyHint="Drop an app or shortcut here to pin it"
               />
             )}
-            {tab === 'friends' && (
+            {(tab === 'friends' || tab === 'groups') && (
               <FriendsWidget
+                section={tab}
                 auth={auth}
                 social={social}
+                call={DEMO_SOCIAL ? undefined : call}
+                groups={DEMO_SOCIAL ? demo.groups : groupChats}
                 activityText={activityText}
                 onGoProfile={() => setTab('profile')}
+                chat={openChat}
+                onChat={(c, page) => {
+                  setOpenChat(c)
+                  if (page && page !== tab) setTab(page)
+                }}
                 openChatId={pendingChat}
                 onChatOpened={() => setPendingChat(null)}
                 fullscreen={Boolean(fs)}

@@ -163,6 +163,17 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         </div>
       </div>
       <Slider
+        label="Sound volume"
+        value={settings.soundVolume}
+        limits={SIZE_LIMITS.soundVolume}
+        format={(v) => `${Math.round(v * 100)}%`}
+        onChange={(soundVolume) => update({ soundVolume })}
+      />
+      <div className="row">
+        <span>Keyboard sounds</span>
+        <Toggle on={settings.typingSounds} onChange={(v) => update({ typingSounds: v })} />
+      </div>
+      <Slider
         label="Text size"
         value={settings.clockSize}
         limits={SIZE_LIMITS.clockSize}
