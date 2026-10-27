@@ -3640,3 +3640,14 @@ button.ao-text:hover {
   user-select: none;
 }
 
+/* empty states sit in the page's flow, so the card grows to fit them instead of covering the page */
+.page-fit .empty,
+.page-fit .clips .empty,
+.page-fit .shelf .empty,
+.page-fit .media.nothing,
+.page-fit .empty-block {
+  position: relative;
+  inset: auto;
+  min-height: 110px;
+  padding: 18px 16px 8px;
+}
