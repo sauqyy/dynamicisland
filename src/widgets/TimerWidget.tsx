@@ -12,11 +12,11 @@ interface Props {
   onCancel: () => void
 }
 
-export function Ring({ fraction, size, stroke }: { fraction: number; size: number; stroke: number }) {
+export function Ring({ fraction, size, stroke, className = '' }: { fraction: number; size: number; stroke: number; className?: string }) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   return (
-    <svg width={size} height={size} className="ring">
+    <svg width={size} height={size} className={`ring ${className}`}>
       <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="ring-bg" />
       <circle
         cx={size / 2}

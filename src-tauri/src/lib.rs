@@ -48,6 +48,8 @@ static MONITOR: AtomicUsize = AtomicUsize::new(0);
 static HIDE_ON_FULLSCREEN: AtomicBool = AtomicBool::new(true);
 /// True while the user drags the island, so the watcher doesn't turn click-through back on.
 static DRAGGING: AtomicBool = AtomicBool::new(false);
+/// True while the chat is fullscreen: the window then covers the whole target monitor.
+static FULLSCREEN: AtomicBool = AtomicBool::new(false);
 /// How far the user moved the island from its default spot (centre top), in logical px.
 static OFFSET: Mutex<(f64, f64)> = Mutex::new((0.0, 0.0));
 
@@ -92,6 +94,21 @@ fn set_hit_area(state: State<HitArea>, w: f64, h: f64) {
 fn set_window_size(window: WebviewWindow, w: f64, h: f64) {
     *WIN_SIZE.lock().unwrap() = (w.clamp(300.0, 1400.0), h.clamp(120.0, 900.0));
     place_window(&window);
+}
+
+/// Grow the window to cover the target monitor (or put it back). Returns the monitor's
+/// logical size so the frontend can size the island to match.
+#[tauri::command]
+fn set_fullscreen(window: WebviewWindow, on: bool) -> (f64, f64) {
+    FULLSCREEN.store(on, Ordering::Relaxed);
+    place_window(&window);
+    match target_monitor(&window) {
+        Some(m) => {
+            let scale = m.scale_factor();
+            (m.size().width as f64 / scale, m.size().height as f64 / scale)
+        }
+        None => (0.0, 0.0),
+    }
 }
 
 #[tauri::command]
@@ -239,6 +256,18 @@ fn target_monitor(window: &WebviewWindow) -> Option<Monitor> {
 fn place_window(window: &WebviewWindow) {
     let Some(monitor) = target_monitor(window) else { return };
     let scale = monitor.scale_factor();
+    if FULLSCREEN.load(Ordering::Relaxed) {
+        let want = *monitor.size();
+        let at = *monitor.position();
+        let (Ok(size), Ok(pos)) = (window.outer_size(), window.outer_position()) else { return };
+        if size != want {
+            let _ = window.set_size(want);
+        }
+        if pos != at {
+            let _ = window.set_position(at);
+        }
+        return;
+    }
     let (win_w, win_h) = *WIN_SIZE.lock().unwrap();
     let want = PhysicalSize::new((win_w * scale).round() as u32, (win_h * scale).round() as u32);
     // keep the pill on this monitor, whatever offset was saved (e.g. from a bigger display)
@@ -323,6 +352,7 @@ pub fn run() {
             set_window_size,
             set_monitor,
             set_offset,
+            set_fullscreen,
             set_dragging,
             auth::oauth_wait,
             auth::open_url,

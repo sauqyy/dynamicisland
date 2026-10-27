@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { PAGE_VARIANTS } from '../lib/pageAnim'
 import { ColorPicker } from './ColorPicker'
 import { invoke } from '@tauri-apps/api/core'
-import { getVersion } from '@tauri-apps/api/app'
+import { useUpdater } from '../lib/useUpdater'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
@@ -14,6 +14,7 @@ import { PAGES } from '../types'
 interface Props {
   settings: Settings
   update: (patch: Partial<Settings>) => void
+  updater: ReturnType<typeof useUpdater>
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
@@ -61,30 +62,10 @@ const CLEAR_OPTIONS: [number, string][] = [
   [60, '1h'],
 ]
 
-const RELEASES = 'https://api.github.com/repos/sauqyy/dynamicisland/releases/latest'
-
-type UpdateState =
-  | { s: 'idle' }
-  | { s: 'checking' }
-  | { s: 'current' }
-  | { s: 'available'; version: string; url: string }
-  | { s: 'downloading' }
-  | { s: 'error'; msg: string }
-
-function newer(a: string, b: string) {
-  const pa = a.replace(/^v/, '').split('.').map(Number)
-  const pb = b.replace(/^v/, '').split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0)
-  }
-  return false
-}
-
-export function SettingsWidget({ settings, update }: Props) {
+export function SettingsWidget({ settings, update, updater }: Props) {
+  const { state: update_, version, check: checkUpdate, install: downloadUpdate } = updater
   const [autostart, setAutostart] = useState(false)
   const [monitors, setMonitors] = useState(1)
-  const [version, setVersion] = useState('')
-  const [update_, setUpdate] = useState<UpdateState>({ s: 'idle' })
   // page-animation preview: two sample cards that swap, replayed on every click
   const [swap, setSwap] = useState({ n: 0, dir: 1 as 1 | -1 })
   const [customOpen, setCustomOpen] = useState(false)
@@ -96,7 +77,6 @@ export function SettingsWidget({ settings, update }: Props) {
   useEffect(() => {
     if (!IS_TAURI) return
     isEnabled().then(setAutostart).catch(() => {})
-    getVersion().then(setVersion).catch(() => {})
     invoke<number>('monitor_count').then(setMonitors).catch(() => {})
   }, [])
 
@@ -106,37 +86,6 @@ export function SettingsWidget({ settings, update }: Props) {
       await (v ? enable() : disable())
     } catch {
       setAutostart(!v)
-    }
-  }
-
-  const checkUpdate = async () => {
-    setUpdate({ s: 'checking' })
-    try {
-      const res = await fetch(RELEASES, { headers: { Accept: 'application/vnd.github+json' } })
-      if (res.status === 404) return setUpdate({ s: 'current' })
-      if (!res.ok) throw new Error(`GitHub returned ${res.status}`)
-      const rel = (await res.json()) as {
-        tag_name: string
-        assets: { name: string; browser_download_url: string }[]
-      }
-      if (!newer(rel.tag_name, version)) return setUpdate({ s: 'current' })
-      // the silent updater needs the regular installer, not the friendly first-time Setup.exe
-      const asset = IS_MAC
-        ? rel.assets.find((a) => /\.dmg$/i.test(a.name))
-        : (rel.assets.find((a) => /x64-setup\.exe$/i.test(a.name)) ?? rel.assets.find((a) => /\.exe$/i.test(a.name)))
-      if (!asset) throw new Error('No installer in release')
-      setUpdate({ s: 'available', version: rel.tag_name.replace(/^v/, ''), url: asset.browser_download_url })
-    } catch (e) {
-      setUpdate({ s: 'error', msg: e instanceof Error ? e.message : 'Check failed' })
-    }
-  }
-
-  const downloadUpdate = async (url: string) => {
-    setUpdate({ s: 'downloading' })
-    try {
-      await invoke('install_update', { url })
-    } catch (e) {
-      setUpdate({ s: 'error', msg: String(e) })
     }
   }
 
@@ -167,7 +116,7 @@ export function SettingsWidget({ settings, update }: Props) {
       <div className="row">
         <span>Show in pill</span>
         <div className="segmented small">
-          {(['clock', 'lyrics', 'weather', 'notes'] as IdleDisplay[]).map((v) => (
+          {(['clock', 'lyrics', 'weather'] as IdleDisplay[]).map((v) => (
             <button key={v} className={settings.idle === v ? 'active' : ''} onClick={() => update({ idle: v })}>
               {v}
             </button>
@@ -177,6 +126,10 @@ export function SettingsWidget({ settings, update }: Props) {
       <div className="row">
         <span>Equalizer while playing</span>
         <Toggle on={settings.idleBars} onChange={(v) => update({ idleBars: v })} />
+      </div>
+      <div className="row">
+        <span>Message sound</span>
+        <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />
       </div>
       <Slider
         label="Text size"

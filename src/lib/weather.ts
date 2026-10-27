@@ -6,7 +6,10 @@ export interface Weather {
   code: number
   humidity: number
   wind: number
+  /** every hour of today, midnight to 23:00 */
   hourly: { hour: string; temp: number; code: number }[]
+  /** index in `hourly` of the current hour */
+  nowHour?: number
   fetchedAt: number
 }
 
@@ -39,7 +42,7 @@ export function cachedWeather(city: string, fahrenheit: boolean): Weather | null
   return null
 }
 
-export const isFresh = (w: Weather) => Date.now() - w.fetchedAt < MAX_AGE
+export const isFresh = (w: Weather) => w.nowHour != null && Date.now() - w.fetchedAt < MAX_AGE
 
 export interface CityHit {
   name: string
@@ -102,12 +105,14 @@ export async function fetchWeather(
   if (!res.ok) throw new Error('Weather service unavailable')
   const f = (await res.json()) as ForecastResult
 
-  const start = Math.max(0, f.hourly.time.findIndex((t) => t >= f.current.time.slice(0, 13)))
-  const hourly = f.hourly.time.slice(start + 1, start + 7).map((t, i) => ({
+  const day = f.current.time.slice(0, 10)
+  const first = Math.max(0, f.hourly.time.findIndex((t) => t.startsWith(day)))
+  const hourly = f.hourly.time.slice(first, first + 24).map((t, i) => ({
     hour: t.slice(11, 13),
-    temp: Math.round(f.hourly.temperature_2m[start + 1 + i]),
-    code: f.hourly.weather_code[start + 1 + i],
+    temp: Math.round(f.hourly.temperature_2m[first + i]),
+    code: f.hourly.weather_code[first + i],
   }))
+  const nowHour = Math.min(hourly.length - 1, Number(f.current.time.slice(11, 13)))
 
   const w: Weather = {
     city: place.name,
@@ -118,6 +123,7 @@ export async function fetchWeather(
     humidity: f.current.relative_humidity_2m,
     wind: Math.round(f.current.wind_speed_10m),
     hourly,
+    nowHour,
     fetchedAt: Date.now(),
   }
   try {

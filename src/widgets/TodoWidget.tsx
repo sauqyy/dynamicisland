@@ -13,7 +13,7 @@ export function TodoWidget({ todos, setTodos }: Props) {
   const add = () => {
     const text = draft.trim()
     if (!text) return
-    setTodos([{ id: Date.now(), text, done: false }, ...todos])
+    setTodos([...todos, { id: Date.now(), text, done: false }])
     setDraft('')
   }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { readImage, readText, writeImage, writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { Image } from '@tauri-apps/api/image'
 import { IS_TAURI } from './useMedia'
 
 const MAX_ITEMS = 10
@@ -17,8 +18,27 @@ export interface ClipOptions {
 }
 
 export interface ClipItem {
+  /** the copied text, or a unique key (`image:<hash>`) for a picture */
   text: string
   at: number
+  /** PNG data URL when a picture was copied */
+  image?: string
+}
+
+/** Cheap fingerprint of a bitmap: size plus ~4k sampled bytes. */
+function hashPixels(rgba: Uint8Array, w: number, h: number) {
+  let x = 2166136261
+  const step = Math.max(1, Math.floor(rgba.length / 4096))
+  for (let i = 0; i < rgba.length; i += step) x = Math.imul(x ^ rgba[i], 16777619)
+  return `image:${w}x${h}:${(x >>> 0).toString(36)}`
+}
+
+function toDataUrl(rgba: Uint8Array, w: number, h: number) {
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(rgba), w, h), 0, 0)
+  return canvas.toDataURL('image/png')
 }
 
 /** A single "word" mixing at least three of lower/upper/digit/symbol, or a well-known token shape. */
@@ -31,30 +51,49 @@ export function looksSecret(text: string) {
 }
 
 /**
- * Recent copied text. Kept in memory only (never saved to disk) because clipboards
+ * Recent copied text and pictures. Kept in memory only (never saved to disk) because clipboards
  * often hold passwords and other private things. Can be paused, filtered and auto-cleared.
  */
 export function useClipboard({ paused, autoClearMin, skipSecrets }: ClipOptions) {
   const [items, setItems] = useState<ClipItem[]>(IS_TAURI ? [] : DEMO.map((text) => ({ text, at: Date.now() })))
   const skipRef = useRef(skipSecrets)
+  const lastImage = useRef('')
   skipRef.current = skipSecrets
 
   useEffect(() => {
     if (!IS_TAURI || paused) return
     let stopped = false
+    const push = (item: ClipItem) =>
+      setItems((cur) =>
+        cur[0]?.text === item.text
+          ? cur
+          : [item, ...cur.filter((c) => c.text !== item.text)].slice(0, MAX_ITEMS),
+      )
     const poll = async () => {
+      let text: string | undefined
       try {
-        const text = (await readText())?.trim()
-        if (stopped || !text) return
-        if (skipRef.current && looksSecret(text)) return
-        const clipped = text.slice(0, MAX_LEN)
-        setItems((cur) =>
-          cur[0]?.text === clipped
-            ? cur
-            : [{ text: clipped, at: Date.now() }, ...cur.filter((c) => c.text !== clipped)].slice(0, MAX_ITEMS),
-        )
+        text = (await readText())?.trim()
       } catch {
         /* clipboard holds something that is not text */
+      }
+      if (stopped) return
+      if (text) {
+        if (skipRef.current && looksSecret(text)) return
+        push({ text: text.slice(0, MAX_LEN), at: Date.now() })
+        return
+      }
+      try {
+        const img = await readImage()
+        const { width, height } = await img.size()
+        const rgba = await img.rgba()
+        img.close().catch(() => {})
+        if (stopped) return
+        const key = hashPixels(rgba, width, height)
+        if (lastImage.current === key) return
+        lastImage.current = key
+        push({ text: key, at: Date.now(), image: toDataUrl(rgba, width, height) })
+      } catch {
+        /* nothing copied, or not an image */
       }
     }
     poll()
@@ -76,8 +115,12 @@ export function useClipboard({ paused, autoClearMin, skipSecrets }: ClipOptions)
     return () => clearInterval(id)
   }, [autoClearMin])
 
-  const copy = useCallback((text: string) => {
-    if (IS_TAURI) writeText(text).catch(() => {})
+  const copy = useCallback(async ({ text, image }: ClipItem) => {
+    if (image) {
+      if (!IS_TAURI) return
+      const bytes = new Uint8Array(await (await fetch(image)).arrayBuffer())
+      writeImage(await Image.fromBytes(bytes)).catch(() => {})
+    } else if (IS_TAURI) writeText(text).catch(() => {})
     else navigator.clipboard?.writeText(text).catch(() => {})
   }, [])
 

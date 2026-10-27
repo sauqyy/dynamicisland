@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.3.8"
+version = "0.3.9"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -21,7 +21,7 @@ tauri-build = { version = "2.7.4", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.12.5", features = ["protocol-asset", "tray-icon", "macos-private-api"] }
+tauri = { version = "2.12.5", features = ["protocol-asset", "tray-icon", "macos-private-api", "image-png"] }
 tauri-plugin-log = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-drag = "2"

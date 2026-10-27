@@ -23,6 +23,8 @@ interface Props {
   profileActive: boolean
   onSettings: () => void
   settingsActive: boolean
+  /** a newer version was found: put a dot on the cog */
+  updateAvailable?: boolean
 }
 
 /** The avatar button: opens a Discord-style menu to set availability, with Edit profile at the bottom. */
@@ -107,7 +109,7 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
 }
 
 /** Title on the left, status (timer ring, date, time, music bars) on the right. */
-export function ExpandedHeader({ title, action, timer, date, clock, bars, profile, onProfile, onPresence, profileActive, onSettings, settingsActive }: Props) {
+export function ExpandedHeader({ title, action, timer, date, clock, bars, profile, onProfile, onPresence, profileActive, onSettings, settingsActive, updateAvailable }: Props) {
   return (
     <div className={`xhead ${action ? 'has-action' : ''}`} onClick={(e) => e.stopPropagation()}>
       <div className="xhead-left">
@@ -122,7 +124,12 @@ export function ExpandedHeader({ title, action, timer, date, clock, bars, profil
         <b className="xhead-time">{clock}</b>
         {bars !== null && <Bars active hue={bars} />}
         <ProfileMenu profile={profile} active={profileActive} onProfile={onProfile} onPresence={onPresence} />
-        <button className={`gear ${settingsActive ? 'active' : ''}`} aria-label="Settings" title="Settings" onClick={onSettings}>
+        <button
+          className={`gear ${settingsActive ? 'active' : ''} ${updateAvailable ? 'has-update' : ''}`}
+          aria-label={updateAvailable ? 'Settings (update available)' : 'Settings'}
+          title={updateAvailable ? 'Update available' : 'Settings'}
+          onClick={onSettings}
+        >
           <SettingsCog size={18} />
         </button>
       </div>

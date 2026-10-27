@@ -9,7 +9,7 @@ export type TabAnim = 'fade' | 'slide' | 'liquid' | 'zoom' | 'stack' | 'flip' | 
 
 export const TAB_ANIMS: TabAnim[] = ['fade', 'slide', 'liquid', 'zoom', 'stack', 'flip', 'blur', 'rise', 'morph', 'elastic']
 export type Theme = 'dark' | 'light' | 'glass' | 'auto'
-export type IdleDisplay = 'clock' | 'lyrics' | 'weather' | 'notes'
+export type IdleDisplay = 'clock' | 'lyrics' | 'weather'
 
 export interface Settings {
   /** 0 = primary monitor, n = n-th monitor */
@@ -31,6 +31,8 @@ export interface Settings {
   idle: IdleDisplay
   /** equalizer bars next to the idle text while music plays */
   idleBars: boolean
+  /** play a sound when a chat message arrives */
+  messageSound: boolean
   /** font size of the idle pill text in px */
   clockSize: number
   /** seconds the lyrics run ahead of the player; the fade-in and Windows' position lag make them feel late */
@@ -93,6 +95,7 @@ const DEFAULTS: Settings = {
   shareActivity: false,
   idle: 'lyrics',
   idleBars: true,
+  messageSound: true,
   clockSize: 15,
   lyricOffset: 0.35,
   hiddenPages: [],

@@ -9,6 +9,9 @@ import { Art, Bars, MediaWidget } from './widgets/MediaWidget'
 import { Ring } from './widgets/TimerWidget'
 import { TimerTab, type ClockMode } from './widgets/TimerTab'
 import { TodoWidget } from './widgets/TodoWidget'
+import { useUpdater } from './lib/useUpdater'
+import { getVersion } from '@tauri-apps/api/app'
+import { CHANGELOG, releaseToShow, type Release } from './lib/changelog'
 import { SettingsWidget } from './widgets/SettingsWidget'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
@@ -40,6 +43,11 @@ import { cachedWeather, describe as describeWeather } from './lib/weather'
 import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
+// loaded once at startup: building a fresh Audio per message re-fetches and re-decodes the file, which is what made the sound lag
+const messageAudio = new Audio('/message.mp3')
+messageAudio.preload = 'auto'
+messageAudio.volume = 0.3
+
 const LOW_BATTERY = 20
 const POMO_MIN: Record<PomoPhase, number> = { focus: 25, break: 5, long: 15 }
 
@@ -70,14 +78,6 @@ function loadTab(): Tab {
   return 'media'
 }
 
-function firstNoteLine(): string {
-  try {
-    return (localStorage.getItem('di.notes') ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? ''
-  } catch {
-    return ''
-  }
-}
-
 /** Pill width that fits a line of text, up to what the stage can hold. */
 const textWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(300, text.length * 7.2 + 80))
 
@@ -101,6 +101,7 @@ export default function App() {
   const { track, playing, position, toggle, seek, skip } = useMedia()
   const { settings, update } = useSettings()
   const [hidden, setHidden] = useState(false)
+  const updater = useUpdater()
   const [pomo, setPomo] = useState<PomodoroState | null>(null)
   const [dragging, setDragging] = useState(false)
   const [privacy, setPrivacy] = useState<{ mic: string | null; camera: string | null }>({ mic: null, camera: null })
@@ -112,6 +113,15 @@ export default function App() {
   const shelf = useStoredList('di.shelf', IS_TAURI ? [] : DEMO_SHELF)
   const apps = useStoredList('di.apps', IS_TAURI ? [] : DEMO_APPS)
   const [expanded, setExpanded] = useState(false)
+  // fullscreen chat: the window first grows to the monitor, then the island springs out to fill it
+  const [fs, setFs] = useState<{ w: number; h: number } | null>(null)
+  const [fsWin, setFsWin] = useState(false) // the window is covering the monitor
+  const [fsJump, setFsJump] = useState(0)
+  const fsTimer = useRef(0)
+  const [notes, setNotes] = useState<Release | null>(null) // "What's new" card after an update
+  // the browser demo's button panel can be dragged out of the way by its title
+  const [panelPos, setPanelPos] = useState({ x: 0, y: 0 })
+  const panelDrag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const realAuth = useAuth()
   const demo = useDemo()
   const auth = DEMO_SOCIAL ? demo.auth : realAuth
@@ -160,8 +170,36 @@ export default function App() {
   const lastInGroup = useRef<Record<string, Tab>>({})
   const pagesRef = useRef(pages)
   pagesRef.current = pages
+  const fsRef = useRef(fs)
+  fsRef.current = fs
   const posRef = useRef(pos)
   posRef.current = pos
+
+  const enterFullscreen = useCallback(async () => {
+    if (!IS_TAURI) {
+      setFs({ w: window.innerWidth, h: window.innerHeight })
+      return
+    }
+    clearTimeout(fsTimer.current)
+    const [w, h] = await invoke<[number, number]>('set_fullscreen', { on: true }).catch(() => [0, 0] as [number, number])
+    if (!w) return
+    // the window just moved to the screen corner: hold the island where it was, then let it grow from there
+    setFsWin(true)
+    setFsJump((n) => n + 1)
+    fsTimer.current = window.setTimeout(() => setFs({ w, h }), 40)
+  }, [])
+  const exitFullscreen = useCallback(() => {
+    setFs(null)
+    if (!IS_TAURI) return
+    // hand the window back once the island has shrunk into the card again
+    clearTimeout(fsTimer.current)
+    fsTimer.current = window.setTimeout(() => {
+      invoke('set_fullscreen', { on: false }).catch(() => {})
+      setFsWin(false)
+      setFsJump((n) => n + 1)
+    }, 750)
+  }, [])
+  const toggleFullscreen = (on: boolean) => (on ? void enterFullscreen() : exitFullscreen())
 
   useEffect(() => {
     try {
@@ -196,8 +234,24 @@ export default function App() {
     setAlert({ ...a, id: ++alertId.current })
   }, [])
 
+  // tell the user once per version when the automatic check finds an update; the cog keeps a dot until it is installed
+  const alertedUpdate = useRef('')
+  useEffect(() => {
+    if (updater.state.s !== 'available' || alertedUpdate.current === updater.state.version) return
+    alertedUpdate.current = updater.state.version
+    pushAlert({ icon: '⬆️', text: 'Update available', sub: `v${updater.state.version} · open Settings to install` })
+  }, [updater.state, pushAlert])
+
+  const playMessageSound = () => {
+    if (settings.messageSound) {
+      messageAudio.currentTime = 0
+      messageAudio.play().catch(() => {})
+    }
+  }
+
   const realSocial = useSocial(meId, (m, from) => {
     if (auth.profile?.presence === 'dnd') return
+    playMessageSound()
     pushAlert({
       icon: '💬',
       text: from?.profile.display_name || from?.profile.username || 'New message',
@@ -213,23 +267,32 @@ export default function App() {
     return () => clearTimeout(id)
   }, [alert])
 
-  useEffect(() => {
-    if (!timer || now < timer.endsAt) return
-    if (pomo) {
-      const next = nextPomo(pomo)
+  const advancePomo = useCallback(
+    (p: PomodoroState) => {
+      const next = nextPomo(p)
       const total = POMO_MIN[next.phase] * 60_000
+      const start = Date.now()
       setPomo(next)
-      setTimer({ endsAt: Date.now() + total, total })
+      setTimer({ endsAt: start + total, total })
+      setNow(start) // so the ring shows the new phase full straight away instead of waiting for the next tick
       pushAlert(
         next.phase === 'focus'
           ? { icon: '🎯', text: 'Focus time', sub: `Session ${next.done + 1}` }
           : { icon: '☕', text: next.phase === 'long' ? 'Long break' : 'Break time', sub: `${next.done} done` },
       )
+    },
+    [pushAlert],
+  )
+
+  useEffect(() => {
+    if (!timer || now < timer.endsAt) return
+    if (pomo) {
+      advancePomo(pomo)
     } else {
       setTimer(null)
       pushAlert({ icon: '⏰', text: 'Timer done' })
     }
-  }, [now, timer, pomo, pushAlert])
+  }, [now, timer, pomo, pushAlert, advancePomo])
 
   // Windows battery + volume events from Rust
   useEffect(() => {
@@ -365,22 +428,44 @@ export default function App() {
 
   // Clicking outside can't be detected when click-through, so collapse when the cursor leaves.
   useEffect(() => {
-    if (!IS_TAURI || !expanded || hovered || holdOpen) return
+    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes) return
     const id = setTimeout(() => setExpanded(false), 700)
     return () => clearTimeout(id)
-  }, [expanded, hovered, holdOpen])
+  }, [expanded, hovered, holdOpen, fs, notes])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExpanded(false)
-      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+      if (e.key === 'Escape') {
+        if (fsRef.current) exitFullscreen()
+        else setExpanded(false)
+      }
+      if (!fsRef.current && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         const dir = e.key === 'ArrowRight' ? 1 : -1
         setTab((t) => stepPage(pagesRef.current, t, dir))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [exitFullscreen])
+
+  // after an update, open the island once with what changed
+  useEffect(() => {
+    if (!IS_TAURI) return
+    getVersion()
+      .then((v) => {
+        const r = releaseToShow(v)
+        if (r) {
+          setNotes(r)
+          setExpanded(true)
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  // fullscreen only belongs to an open chat
+  useEffect(() => {
+    if (fs && !(expanded && tab === 'friends')) exitFullscreen()
+  }, [fs, expanded, tab, exitFullscreen])
 
   // what friends can see: the song or timer that is running
   const activityText = playing && track ? `🎵 ${track.title} – ${track.artist}` : timer ? (pomo ? '🍅 Focusing' : '⏳ Timer running') : ''
@@ -415,13 +500,12 @@ export default function App() {
   const idleLyric = settings.idle === 'lyrics' && showLyricPeek
 
   // other things the pill can show; falls back to the clock when there is nothing to show yet.
-  // Re-read when the card closes, which is when the notes or city may have changed.
+  // Re-read when the card closes, which is when the city may have changed.
   const idleExtra = useMemo(() => {
     if (settings.idle === 'weather' && settings.city) {
       const w = cachedWeather(settings.city, settings.fahrenheit)
       return w ? `${describeWeather(w.code).icon} ${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` : ''
     }
-    if (settings.idle === 'notes') return firstNoteLine()
     return ''
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
@@ -439,6 +523,7 @@ export default function App() {
   const shape: Shape = useMemo(() => {
     switch (mode) {
       case 'expanded':
+        if (fs) return { w: fs.w / settings.scale, h: fs.h / settings.scale, r: 0 }
         return { w: settings.cardW, h: expandedHeight, r: 44 }
       case 'alert':
         return { w: 320, h: 60, r: 26 }
@@ -447,7 +532,7 @@ export default function App() {
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, expandedHeight, settings.cardW, showLyricPeek, idleW, lyricW])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, showLyricPeek, idleW, lyricW])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -499,7 +584,7 @@ export default function App() {
     setPomo({ phase: 'focus', done: 0 })
     setTimer({ endsAt: Date.now() + POMO_MIN.focus * 60_000, total: POMO_MIN.focus * 60_000 })
   }
-  const skipPomo = () => pomo && setTimer({ endsAt: Date.now(), total: 1 })
+  const skipPomo = () => pomo && advancePomo(pomo)
 
   const onSkip = (dir: -1 | 1) => {
     skip(dir)
@@ -631,7 +716,7 @@ export default function App() {
         </>
       ) : null
     content = (
-      <div className="expanded">
+      <div className={`expanded ${fs ? 'fs' : ''}`}>
         <ExpandedHeader
           title={page.title}
           timer={timer ? remaining / (timer.total / 1000) : null}
@@ -644,6 +729,7 @@ export default function App() {
           profileActive={tab === 'profile'}
           onSettings={() => setTab('settings')}
           settingsActive={tab === 'settings'}
+          updateAvailable={updater.state.s === 'available'}
         />
         {group && group.pages.length > 1 && (
           <div className="subtabs" onClick={(e) => e.stopPropagation()}>
@@ -723,8 +809,8 @@ export default function App() {
                 paused={settings.clipPaused}
                 mask={settings.clipMask}
                 onRemove={clipboard.remove}
-                onCopy={(t) => {
-                  clipboard.copy(t)
+                onCopy={(item) => {
+                  clipboard.copy(item)
                   pushAlert({ icon: '📋', text: 'Copied' })
                 }}
               />
@@ -748,10 +834,12 @@ export default function App() {
                 onGoProfile={() => setTab('profile')}
                 openChatId={pendingChat}
                 onChatOpened={() => setPendingChat(null)}
+                fullscreen={Boolean(fs)}
+                onFullscreen={toggleFullscreen}
               />
             )}
             {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
-            {tab === 'settings' && <SettingsWidget settings={settings} update={update} />}
+            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
             </motion.div>
           </AnimatePresence>
           <button className="nav-arrow left" aria-label="Previous page" onClick={(e) => { e.stopPropagation(); go(-1) }}>
@@ -773,6 +861,20 @@ export default function App() {
             setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
           }}
         />
+        {notes && (
+          <div className="whatsnew" onClick={(e) => e.stopPropagation()}>
+            <small>What's new in v{notes.version}</small>
+            <b>{notes.title}</b>
+            <ul>
+              {notes.items.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+            <button className="pill-btn" onClick={() => setNotes(null)}>
+              Got it
+            </button>
+          </div>
+        )}
         {dragging && (
           <div className="drop-overlay">
             {tab === 'apps' ? 'Release to pin' : 'Release to add to Shelf'}
@@ -864,7 +966,7 @@ export default function App() {
 
   return (
     <div
-      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''}`}
+      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''} ${fs || fsWin ? 'fullchat' : ''}`}
       style={{
         ['--accent' as string]: accent,
         ['--on-accent' as string]: onAcc,
@@ -890,6 +992,8 @@ export default function App() {
         contentKey={contentKey}
         bubble={bubble}
         floating={pos.y > 2}
+        shift={fsWin && !fs ? pos : { x: 0, y: 0 }}
+        shiftJump={fsJump}
         dragHandlers={dragHandlers}
         onClick={(e) => {
           e.stopPropagation()
@@ -909,8 +1013,26 @@ export default function App() {
       </Island>
 
       {!IS_TAURI && (
-        <div className="demo-panel" onClick={(e) => e.stopPropagation()}>
-          <b>Browser demo</b>
+        <div
+          className="demo-panel"
+          style={{ translate: `${panelPos.x}px ${panelPos.y}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <b
+            className="demo-grip"
+            title="Drag to move"
+            onPointerDown={(e) => {
+              panelDrag.current = { sx: e.clientX, sy: e.clientY, ox: panelPos.x, oy: panelPos.y }
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              const g = panelDrag.current
+              if (g) setPanelPos({ x: g.ox + e.clientX - g.sx, y: g.oy + e.clientY - g.sy })
+            }}
+            onPointerUp={() => (panelDrag.current = null)}
+          >
+            ⠿ Browser demo
+          </b>
           <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 })}>Plug in charger</button>
           <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 })}>Low battery</button>
           <button onClick={() => pushAlert({ icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
@@ -920,14 +1042,27 @@ export default function App() {
               if (DEMO_SOCIAL) {
                 const { friend, body } = demo.ping()
                 if (auth.profile?.presence !== 'dnd') {
+                  playMessageSound()
                   pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
                 }
               } else {
+                playMessageSound()
                 pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
               }
             }}
           >
             Message
+          </button>
+          <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' })}>
+            Update alert
+          </button>
+          <button
+            onClick={() => {
+              setNotes(CHANGELOG[0])
+              setExpanded(true)
+            }}
+          >
+            What's new
           </button>
           <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
           <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>

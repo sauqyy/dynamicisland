@@ -33,6 +33,9 @@ interface Props {
   floating?: boolean
   /** pointer handlers used to drag the island around */
   dragHandlers?: React.HTMLAttributes<HTMLDivElement>
+  /** where the island is drawn relative to the window's centre-top; springs there, and `shiftJump` bumps to jump instead */
+  shift?: { x: number; y: number }
+  shiftJump?: number
 }
 
 const BUBBLE = 34
@@ -91,7 +94,7 @@ function notchPath(w: number, h: number, r: number, floating: boolean) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0 }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, shift = { x: 0, y: 0 }, shiftJump = 0 }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -118,7 +121,25 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
     return () => c.stop()
   }, [enterY, intro])
   // whole pixels only: the glass filters redraw jagged on fractional offsets while the island is moving
-  const enterT = useTransform(enterY, (v) => `0 ${Math.round(v)}px`)
+  // the window moves to the screen corner for fullscreen, so the island is shifted to stay where it was and then glides in
+  const shiftX = useMotionValue(shift.x)
+  const shiftY = useMotionValue(shift.y)
+  const springForShift = useRef(spring)
+  springForShift.current = spring
+  useEffect(() => {
+    shiftX.jump(shift.x)
+    shiftY.jump(shift.y)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shiftJump])
+  useEffect(() => {
+    const a = animate(shiftX, shift.x, { type: 'spring', ...springForShift.current })
+    const b = animate(shiftY, shift.y, { type: 'spring', ...springForShift.current })
+    return () => {
+      a.stop()
+      b.stop()
+    }
+  }, [shift.x, shift.y, shiftX, shiftY])
+  const enterT = useTransform([enterY, shiftX, shiftY], ([ey, sx, sy]: number[]) => `${Math.round(sx)}px ${Math.round(ey + sy)}px`)
 
   return (
     <motion.div className="stage" style={{ translate: enterT }}>

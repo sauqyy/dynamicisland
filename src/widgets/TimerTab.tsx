@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Ring, TimerWidget } from './TimerWidget'
 import { fmt } from './MediaWidget'
 import type { PomodoroState, StopwatchState, TimerState } from '../types'
@@ -65,6 +65,28 @@ function Stopwatch({ sw, setSw }: StopwatchProps) {
   )
 }
 
+/** The Pomodoro ring: on a phase change it drains to empty in the old colour, then refills in the new phase's colour. */
+function PomoRing({ fraction, phase, phaseKey }: { fraction: number; phase: PomodoroState['phase']; phaseKey: string }) {
+  const [step, setStep] = useState<'idle' | 'out' | 'in'>('idle')
+  const [shownPhase, setShownPhase] = useState(phase)
+  const lastKey = useRef(phaseKey)
+  useEffect(() => {
+    if (lastKey.current === phaseKey) return
+    lastKey.current = phaseKey
+    setStep('out')
+    const refill = setTimeout(() => {
+      setShownPhase(phase)
+      setStep('in')
+    }, 520)
+    const done = setTimeout(() => setStep('idle'), 520 + 1150)
+    return () => {
+      clearTimeout(refill)
+      clearTimeout(done)
+    }
+  }, [phaseKey, phase])
+  return <Ring fraction={step === 'out' ? 0 : fraction} size={76} stroke={6} className={`pomo-ring ${step} ${shownPhase}`} />
+}
+
 const PHASE_LABEL = { focus: 'Focus', break: 'Short break', long: 'Long break' } as const
 
 function Pomodoro({
@@ -91,18 +113,22 @@ function Pomodoro({
     )
   }
   const remaining = Math.max(0, (timer.endsAt - now) / 1000)
+  // changes on every phase switch (skipped or finished), so the pieces below replay their entrance
+  const phaseKey = `${pomo.phase}-${pomo.done}`
   return (
-    <div className="timer">
-      <div className="timer-label">
-        {PHASE_LABEL[pomo.phase]} · {pomo.done} done
-      </div>
+    <div className="timer pomo-run">
       <div className="timer-ring">
-        <Ring fraction={remaining / (timer.total / 1000)} size={84} stroke={6} />
-        <div className="timer-time">{fmt(Math.ceil(remaining))}</div>
+        <PomoRing fraction={remaining / (timer.total / 1000)} phase={pomo.phase} phaseKey={phaseKey} />
+        <div className="timer-time pomo-swap" key={phaseKey}>{fmt(Math.ceil(remaining))}</div>
       </div>
-      <div className="presets">
-        <button className="pill-btn" onClick={onSkip}>Skip</button>
-        <button className="pill-btn danger" onClick={onStop}>Stop</button>
+      <div className="pomo-side">
+        <div className={`timer-label pomo-swap ${pomo.phase}`} key={phaseKey}>
+          {PHASE_LABEL[pomo.phase]} · {pomo.done} done
+        </div>
+        <div className="presets">
+          <button className="pill-btn" onClick={onSkip}>Skip</button>
+          <button className="pill-btn danger" onClick={onStop}>Stop</button>
+        </div>
       </div>
     </div>
   )

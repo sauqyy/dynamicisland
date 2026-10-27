@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Idle Character Demo</title>
+<style>
+  :root {
+    --accent: #5eead4;
+    --bg: #0e0f1a;
+    --panel: #171a2c;
+    --fg: #e8ecf5;
+    --muted: #8a90ab;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% 0%, #1d1840 0%, var(--bg) 60%);
+    color: var(--fg); font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; gap: 32px; padding: 24px 16px 48px;
+  }
+  h1 { font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 8px 0 0; }
+
+  /* ---------- the island ---------- */
+  .screen { width: 100%; max-width: 560px; display: flex; justify-content: center; padding-top: 4px; }
+  .island {
+    background: #000; border-radius: 22px; height: 44px; width: 150px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
+    transition: width .5s cubic-bezier(.3,1.3,.5,1), height .5s cubic-bezier(.3,1.3,.5,1), border-radius .5s;
+    overflow: hidden; position: relative;
+  }
+  .island:hover { width: 230px; }
+  .island .slot { width: 34px; height: 34px; }
+  .island .label {
+    font-size: 12px; color: var(--muted); max-width: 0; opacity: 0; white-space: nowrap;
+    transition: max-width .5s, opacity .4s, margin .5s;
+  }
+  .island:hover .label { max-width: 120px; opacity: 1; margin-left: 10px; }
+
+  /* ---------- big stage ---------- */
+  .stage {
+    background: var(--panel); border-radius: 28px; padding: 28px 40px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .stage .slot { width: 240px; height: 240px; }
+  .status { font-size: 13px; color: var(--muted); height: 18px; }
+  .status b { color: var(--accent); font-weight: 600; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 560px; }
+  button {
+    font: inherit; font-size: 13px; color: var(--fg); background: var(--panel); border: 1px solid rgba(255,255,255,.08);
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; transition: background .2s, transform .1s;
+  }
+  button:hover { background: #22264a; }
+  button:active { transform: scale(.95); }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  .swatches { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+  .swatch { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+  .swatch.on { border-color: #fff; }
+
+  /* ---------- robot ---------- */
+  .robot { width: 100%; height: 100%; overflow: visible; }
+  .robot * { transform-box: fill-box; transform-origin: center; }
+  .bob      { animation: bob 3.2s ease-in-out infinite; }
+  .tilt     { transition: transform .6s cubic-bezier(.3,1.4,.5,1); }
+  .eyes     { transition: transform .35s cubic-bezier(.3,1.4,.5,1); }
+  .eye      { fill: var(--accent); filter: drop-shadow(0 0 3px var(--accent)); transition: transform .12s ease-in, fill .4s; }
+  .blink .eye { transform: scaleY(.08); }
+  .smile-eye { display: none; stroke: var(--accent); fill: none; stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--accent)); }
+  .happy .eye { display: none; }
+  .happy .smile-eye { display: block; }
+  .sleepy .eye { transform: scaleY(.14); }
+  .cheek { fill: #ff8fb1; opacity: .35; transition: opacity .3s; }
+  .happy .cheek { opacity: .8; }
+  .mouth { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; opacity: .8; transition: d .3s; }
+  .antenna-ball { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); animation: pulse 2.4s ease-in-out infinite; }
+  .antenna { transform-origin: 50% 100%; animation: sway 4s ease-in-out infinite; }
+  .arm-l, .arm-r { transform-origin: 50% 10%; transition: transform .3s; }
+  .wave .arm-r { animation: wave .5s ease-in-out 4; }
+  .zzz { opacity: 0; fill: var(--accent); font: 700 14px 'Segoe UI', sans-serif; }
+  .sleepy .zzz { animation: zzz 2.6s ease-out infinite; }
+  .sleepy .zzz.z2 { animation-delay: .9s; }
+  .sleepy .zzz.z3 { animation-delay: 1.8s; }
+  .sleepy .bob { animation-duration: 5s; }
+  .spin .head { animation: spin .8s cubic-bezier(.3,1.3,.5,1); }
+  .bounce .root { animation: bounce .6s cubic-bezier(.3,1.5,.5,1); }
+
+  /* ---------- critter overrides ---------- */
+  .critter .eye { fill: #2b2140; filter: none; }
+  .critter .smile-eye { stroke: #2b2140; filter: none; }
+  .critter .mouth { stroke: #2b2140; opacity: .9; }
+  .critter .zzz { fill: #c9a7ff; }
+  .critter .hl { fill: #fff; }
+  .sticker .smile-eye { stroke-width: 3; }
+  .sticker .cheek { fill: #ff9fb8; }
+  .blink .hl, .sleepy .hl, .happy .hl { display: none; }
+  .critter .antenna { transform-origin: 50% 100%; animation: sway 3s ease-in-out infinite; }
+  .critter .sprout-leaf { fill: #86efac; }
+  .tail { transform-origin: 0% 100%; animation: tail 1.8s ease-in-out infinite; }
+  .ear-l { transform-origin: 50% 100%; animation: ear 5s ease-in-out infinite; }
+  .happy .tail { animation-duration: .4s; }
+  .sleepy .tail { animation-duration: 5s; }
+  .wave .paw-r { animation: wave .5s ease-in-out 4; transform-origin: 50% 10%; }
+  [hidden] { display: none !important; }
+  .picker { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .squish { transform-origin: 50% 100%; animation: squish 2.6s ease-in-out infinite; }
+  .happy .squish { animation-duration: .5s; }
+  .sleepy .squish { animation-duration: 5s; }
+  .tent { transform-origin: 50% 0%; animation: tent 2.4s ease-in-out infinite; }
+  .tent.t2, .tent.t4 { animation-delay: -1.2s; }
+  .happy .tent { animation-duration: .6s; }
+  .ghost-arm { animation: tent 3s ease-in-out infinite; transform-origin: 50% 0%; }
+  .critter .shadow { animation: shadow 3.2s ease-in-out infinite; }
+  .wing { animation: flap .12s linear infinite alternate; }
+  .sleepy .wing { animation-duration: .7s; }
+  @keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(.35); } }
+  @keyframes squish { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.05,.94); } }
+  @keyframes tent   { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+  @keyframes shadow { 0%,100% { transform: scale(1); } 50% { transform: scale(.85); } }
+
+  @keyframes tail   { 0%,100% { transform: rotate(-14deg); } 50% { transform: rotate(16deg); } }
+  @keyframes ear    { 0%,88%,100% { transform: rotate(0); } 92% { transform: rotate(-12deg); } 96% { transform: rotate(4deg); } }
+  @keyframes bob    { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes pulse  { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+  @keyframes sway   { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+  @keyframes wave   { 0%,100% { transform: rotate(-20deg); } 50% { transform: rotate(-70deg); } }
+  @keyframes zzz    { 0% { opacity: 0; transform: translate(0,0) scale(.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(10px,-22px) scale(1.2); } }
+  @keyframes spin   { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-10px); } }
+</style>
+</head>
+<body>
+  <h1>Dynamic Island · Idle character</h1>
+
+  <div class="screen">
+    <div class="island" title="hover me">
+      <div class="slot" data-robot></div>
+      <span class="label">Idle · all quiet</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="slot" data-robot></div>
+    <div class="status">Now: <b id="status">idle</b></div>
+  </div>
+
+  <div class="picker" id="picker"></div>
+  <div class="picker" id="skins"></div>
+  <div class="controls" id="actions"></div>
+  <div class="controls">
+    <button id="auto" class="on">Auto idle: on</button>
+    <div class="swatches" id="swatches">Color</div>
+  </div>
+
+  <template id="robot-tpl">
+    <svg class="robot" viewBox="0 0 100 100" aria-label="Cute robot">
+      <g class="root">
+        <g class="bob">
+          <!-- body -->
+          <g class="body">
+            <rect x="34" y="76" width="32" height="18" rx="9" fill="#c9cfe3"/>
+            <circle cx="50" cy="85" r="3" fill="var(--accent)" opacity=".8"/>
+            <rect class="arm-l" x="24" y="78" width="8" height="14" rx="4" fill="#b7bed6"/>
+            <rect class="arm-r" x="68" y="78" width="8" height="14" rx="4" fill="#b7bed6"/>
+          </g>
+          <g class="tilt">
+            <g class="head">
+              <!-- antenna -->
+              <g class="antenna">
+                <line x1="50" y1="21" x2="50" y2="9" stroke="#b7bed6" stroke-width="3" stroke-linecap="round"/>
+                <circle class="antenna-ball" cx="50" cy="7" r="4.5"/>
+              </g>
+              <!-- ears -->
+              <rect x="6" y="40" width="9" height="18" rx="4.5" fill="#b7bed6"/>
+              <rect x="85" y="40" width="9" height="18" rx="4.5" fill="#b7bed6"/>
+              <!-- head -->
+              <rect x="12" y="20" width="76" height="58" rx="24" fill="#eef1fa"/>
+              <rect x="12" y="20" width="76" height="58" rx="24" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="1.5"/>
+              <!-- screen -->
+              <rect x="20" y="28" width="60" height="42" rx="17" fill="#0b0d1a"/>
+              <g class="eyes">
+                <rect class="eye" x="33" y="38" width="11" height="17" rx="5.5"/>
+                <rect class="eye" x="56" y="38" width="11" height="17" rx="5.5"/>
+                <path class="smile-eye" d="M32 52 Q38.5 40 45 52"/>
+                <path class="smile-eye" d="M55 52 Q61.5 40 68 52"/>
+              </g>
+              <ellipse class="cheek" cx="30" cy="59" rx="5" ry="3"/>
+              <ellipse class="cheek" cx="70" cy="59" rx="5" ry="3"/>
+              <path class="mouth" d="M44 61 Q50 66 56 61"/>
+              <text class="zzz z1" x="78" y="26">z</text>
+              <text class="zzz z2" x="78" y="26">Z</text>
+              <text class="zzz z3" x="78" y="26">z</text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </template>
+
+  <template id="critter-tpl">
+    <svg class="robot critter" viewBox="0 0 100 100" aria-label="Cute critter">
+      <g class="root">
+        <g class="bob">
+          <!-- tail -->
+          <g class="tail"><circle cx="82" cy="78" r="9" fill="#fff"/><circle cx="82" cy="78" r="9" fill="none" stroke="#ffc2d9" stroke-width="2"/></g>
+          <!-- feet -->
+          <ellipse cx="38" cy="90" rx="9" ry="5.5" fill="#ffc2d9"/>
+          <ellipse cx="62" cy="90" rx="9" ry="5.5" fill="#ffc2d9"/>
+          <!-- body blob -->
+          <ellipse cx="50" cy="66" rx="31" ry="25" fill="#ffe4ef"/>
+          <ellipse cx="50" cy="72" rx="16" ry="13" fill="#fff"/>
+          <ellipse class="paw-l" cx="26" cy="72" rx="6" ry="8" fill="#ffd0e2"/>
+          <ellipse class="paw-r" cx="74" cy="72" rx="6" ry="8" fill="#ffd0e2"/>
+          <g class="tilt">
+            <g class="head">
+              <!-- ears -->
+              <g class="ear-l"><path d="M20 38 Q14 10 34 22 Q36 30 34 38Z" fill="#ffe4ef"/><path d="M24 34 Q21 18 31 24 Q32 29 31 34Z" fill="#ff9ec1"/></g>
+              <g class="ear-r"><path d="M80 38 Q86 10 66 22 Q64 30 66 38Z" fill="#ffe4ef"/><path d="M76 34 Q79 18 69 24 Q68 29 69 34Z" fill="#ff9ec1"/></g>
+              <!-- sprout -->
+              <g class="antenna">
+                <path d="M50 28 Q50 20 50 15" stroke="#6ee7a0" stroke-width="3" stroke-linecap="round" fill="none"/>
+                <path class="sprout-leaf" d="M50 16 Q40 16 38 8 Q47 7 50 16Z"/>
+                <path class="sprout-leaf" d="M50 16 Q60 16 62 8 Q53 7 50 16Z"/>
+              </g>
+              <!-- head -->
+              <ellipse cx="50" cy="48" rx="35" ry="27" fill="#ffe4ef"/>
+              <g class="eyes">
+                <ellipse class="eye" cx="36" cy="48" rx="5.5" ry="7.5"/>
+                <ellipse class="eye" cx="64" cy="48" rx="5.5" ry="7.5"/>
+                <circle class="hl" cx="38" cy="45" r="2"/>
+                <circle class="hl" cx="66" cy="45" r="2"/>
+                <path class="smile-eye" d="M30 52 Q36 41 42 52"/>
+                <path class="smile-eye" d="M58 52 Q64 41 70 52"/>
+              </g>
+              <ellipse class="cheek" cx="25" cy="58" rx="6" ry="3.5"/>
+              <ellipse class="cheek" cx="75" cy="58" rx="6" ry="3.5"/>
+              <path d="M48 55 L52 55 L50 57.5Z" fill="#ff8fb1"/>
+              <path class="mouth" d="M43 59 Q46.5 63 50 59 Q53.5 63 57 59"/>
+              <text class="zzz z1" x="80" y="26">z</text>
+              <text class="zzz z2" x="80" y="26">Z</text>
+              <text class="zzz z3" x="80" y="26">z</text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </template>
+
+  <!-- Boo: a tiny ghost -->
+  <template id="ghost-tpl">
+    <svg class="robot critter" viewBox="0 0 100 100" aria-label="Cute ghost">
+      <g class="root">
+        <ellipse class="shadow" cx="50" cy="95" rx="22" ry="3.5" fill="#fff" opacity=".12"/>
+        <g class="bob">
+          <g class="tilt">
+            <g class="head">
+              <g class="antenna">
+                <path d="M50 18 Q44 8 52 6 Q58 6 56 11" stroke="#dfe6ff" stroke-width="3" stroke-linecap="round" fill="none"/>
+              </g>
+              <ellipse class="paw-l ghost-arm" cx="16" cy="60" rx="6" ry="9" fill="#e6ebff"/>
+              <ellipse class="paw-r ghost-arm" cx="84" cy="60" rx="6" ry="9" fill="#e6ebff"/>
+              <path d="M18 88 V46 Q18 17 50 17 Q82 17 82 46 V88 Q74 82 66 88 Q58 94 50 88 Q42 82 34 88 Q26 94 18 88Z" fill="#f4f7ff"/>
+              <g class="eyes">
+                <ellipse class="eye" cx="38" cy="44" rx="5.5" ry="8"/>
+                <ellipse class="eye" cx="62" cy="44" rx="5.5" ry="8"/>
+                <circle class="hl" cx="40" cy="41" r="2"/>
+                <circle class="hl" cx="64" cy="41" r="2"/>
+                <path class="smile-eye" d="M32 48 Q38 37 44 48"/>
+                <path class="smile-eye" d="M56 48 Q62 37 68 48"/>
+              </g>
+              <ellipse class="cheek" cx="28" cy="55" rx="6" ry="3.5"/>
+              <ellipse class="cheek" cx="72" cy="55" rx="6" ry="3.5"/>
+              <ellipse class="mouth" cx="50" cy="56" rx="3" ry="2.4" style="fill:#2b2140;stroke:none"/>
+              <text class="zzz z1" x="76" y="24">z</text>
+              <text class="zzz z2" x="76" y="24">Z</text>
+              <text class="zzz z3" x="76" y="24">z</text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </template>
+
+  <!-- Jelly: a wobbly mint slime with a cherry -->
+  <template id="jelly-tpl">
+    <svg class="robot critter jelly" viewBox="0 0 100 100" aria-label="Cute slime">
+      <g class="root">
+        <ellipse cx="50" cy="93" rx="30" ry="4" fill="#000" opacity=".25"/>
+        <g class="bob">
+          <g class="squish">
+            <g class="tilt">
+              <g class="head">
+                <g class="antenna">
+                  <path d="M50 30 Q50 18 56 12" stroke="#4ade80" stroke-width="3" stroke-linecap="round" fill="none"/>
+                  <circle cx="58" cy="12" r="6" fill="#ff5c8a"/>
+                  <circle cx="56" cy="10" r="1.8" fill="#fff" opacity=".8"/>
+                </g>
+                <ellipse class="paw-l" cx="17" cy="70" rx="5" ry="6" fill="#7ee0a8"/>
+                <ellipse class="paw-r" cx="83" cy="70" rx="5" ry="6" fill="#7ee0a8"/>
+                <path d="M14 90 Q10 56 30 40 Q50 24 70 40 Q90 56 86 90 Q50 98 14 90Z" fill="#9af0bf"/>
+                <path d="M22 50 Q30 38 42 35" stroke="#fff" stroke-opacity=".7" stroke-width="4" stroke-linecap="round" fill="none"/>
+                <g class="eyes">
+                  <ellipse class="eye" cx="36" cy="62" rx="5.5" ry="7.5"/>
+                  <ellipse class="eye" cx="64" cy="62" rx="5.5" ry="7.5"/>
+                  <circle class="hl" cx="38" cy="59" r="2"/>
+                  <circle class="hl" cx="66" cy="59" r="2"/>
+                  <path class="smile-eye" d="M30 66 Q36 55 42 66"/>
+                  <path class="smile-eye" d="M58 66 Q64 55 70 66"/>
+                </g>
+                <ellipse class="cheek" cx="25" cy="72" rx="6" ry="3.5"/>
+                <ellipse class="cheek" cx="75" cy="72" rx="6" ry="3.5"/>
+                <path class="mouth" d="M45 72 Q50 77 55 72"/>
+                <text class="zzz z1" x="80" y="30">z</text>
+                <text class="zzz z2" x="80" y="30">Z</text>
+                <text class="zzz z3" x="80" y="30">z</text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </template>
+
+  <!-- Inky: a little purple octopus -->
+  <template id="octo-tpl">
+    <svg class="robot critter octo" viewBox="0 0 100 100" aria-label="Cute octopus">
+      <g class="root">
+        <g class="bob">
+          <g class="tent t1"><path d="M30 70 Q18 80 24 92 Q30 96 32 88 Q32 80 38 76Z" fill="#b69cf5"/></g>
+          <g class="tent t2"><path d="M42 74 Q36 86 40 94 Q47 97 48 88 Q48 82 50 76Z" fill="#b69cf5"/></g>
+          <g class="tent t3"><path d="M58 74 Q64 86 60 94 Q53 97 52 88 Q52 82 50 76Z" fill="#b69cf5"/></g>
+          <g class="tent t4"><path d="M70 70 Q82 80 76 92 Q70 96 68 88 Q68 80 62 76Z" fill="#b69cf5"/></g>
+          <ellipse class="paw-r" cx="84" cy="62" rx="5" ry="8" fill="#b69cf5"/>
+          <ellipse class="paw-l" cx="16" cy="62" rx="5" ry="8" fill="#b69cf5"/>
+          <g class="tilt">
+            <g class="head">
+              <g class="antenna">
+                <path d="M50 16 Q46 8 52 5 Q58 4 57 10" stroke="#9f82ec" stroke-width="3" stroke-linecap="round" fill="none"/>
+              </g>
+              <path d="M12 66 Q8 14 50 14 Q92 14 88 66 Q50 80 12 66Z" fill="#c4b0fa"/>
+              <circle cx="30" cy="28" r="3" fill="#d9ccfd"/><circle cx="68" cy="24" r="2.2" fill="#d9ccfd"/><circle cx="76" cy="34" r="1.8" fill="#d9ccfd"/>
+              <g class="eyes">
+                <ellipse class="eye" cx="36" cy="48" rx="6" ry="8"/>
+                <ellipse class="eye" cx="64" cy="48" rx="6" ry="8"/>
+                <circle class="hl" cx="38" cy="45" r="2.2"/>
+                <circle class="hl" cx="66" cy="45" r="2.2"/>
+                <path class="smile-eye" d="M30 52 Q36 40 42 52"/>
+                <path class="smile-eye" d="M58 52 Q64 40 70 52"/>
+              </g>
+              <ellipse class="cheek" cx="24" cy="58" rx="6" ry="3.5"/>
+              <ellipse class="cheek" cx="76" cy="58" rx="6" ry="3.5"/>
+              <path class="mouth" d="M45 59 Q50 64 55 59"/>
+              <text class="zzz z1" x="82" y="22">z</text>
+              <text class="zzz z2" x="82" y="22">Z</text>
+              <text class="zzz z3" x="82" y="22">z</text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </template>
+
+<script>
+  // ---------- pet factory: shared face + behaviour hooks, per-pet body parts ----------
+  const smile = (cx, cy) => `M${cx - 6} ${cy + 4} Q${cx} ${cy - 8} ${cx + 6} ${cy + 4}`;
+  function pet(o) {
+    const { ex = [36, 64], ey = 50, rx = 5.5, ry = 7.5, eyeFill, hlFill, back = '', body = '', paws = '', ears = '', top = '',
+      head, marks = '', extra = '', cheek = [25, 75, 60], zz = [80, 24],
+      mouth = '<path class="mouth" d="M44 60 Q50 65 56 60"/>' } = o;
+    const fill = eyeFill ? ` style="fill:${eyeFill}"` : '';
+    const stroke = eyeFill ? ` style="stroke:${eyeFill}"` : '';
+    const hl = hlFill ? ` style="fill:${hlFill}"` : '';
+    const eyes = ex.map(cx => `<ellipse class="eye"${fill} cx="${cx}" cy="${ey}" rx="${rx}" ry="${ry}"/>`).join('')
+      + ex.map(cx => `<circle class="hl"${hl} cx="${cx + rx * .35}" cy="${ey - ry * .35}" r="${o.sparkle ? rx * .38 : 2}"/>`
+        + (o.sparkle ? `<circle class="hl"${hl} cx="${cx - rx * .4}" cy="${ey + ry * .45}" r="${rx * .17}"/>` : '')).join('')
+      + ex.map(cx => `<path class="smile-eye"${stroke} d="${smile(cx, ey + 2)}"/>`).join('');
+    const cheeks = cheek ? `<ellipse class="cheek" cx="${cheek[0]}" cy="${cheek[2]}" rx="6" ry="3.5"/><ellipse class="cheek" cx="${cheek[1]}" cy="${cheek[2]}" rx="6" ry="3.5"/>` : '';
+    const zzz = ['z', 'Z', 'z'].map((t, i) => `<text class="zzz z${i + 1}" x="${zz[0]}" y="${zz[1]}">${t}</text>`).join('');
+    return `<svg class="robot critter ${o.cls || ''}" viewBox="0 0 100 100"><g class="root"><g class="bob">${back}<g class="body">${body}${paws}</g>`
+      + `<g class="tilt"><g class="head">${ears}<g class="antenna">${top}</g>${head}${marks}<g class="eyes">${eyes}</g>${cheeks}${mouth}${extra}${zzz}</g></g></g></g></svg>`;
+  }
+  const ell = (cx, cy, rx, ry, f, c = '') => `<ellipse${c ? ` class="${c}"` : ''} cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${f}"/>`;
+  const pawPair = (f, y = 74, rx = 5.5, ry = 8, x = [25, 75]) => ell(x[0], y, rx, ry, f, 'paw-l') + ell(x[1], y, rx, ry, f, 'paw-r');
+  const nose = '<path d="M48 56 L52 56 L50 58.5Z" fill="#ff8fb1"/>';
+
+  const BUILT = {
+    bun: pet({
+      back: '<g class="tail"><circle cx="78" cy="84" r="7" fill="#fff"/></g>',
+      body: ell(38, 90, 9, 5.5, '#ffc2d9') + ell(62, 90, 9, 5.5, '#ffc2d9') + ell(50, 72, 27, 22, '#fff') + ell(50, 76, 14, 11, '#ffeef5'),
+      paws: pawPair('#f1f1fa'),
+      ears: '<g class="ear-l"><path d="M28 38 Q18 2 33 5 Q43 10 42 38Z" fill="#fff"/><path d="M31 34 Q26 12 33 12 Q38 15 38 34Z" fill="#ffb3cf"/></g><g class="ear-r"><path d="M72 38 Q82 2 67 5 Q57 10 58 38Z" fill="#fff"/><path d="M69 34 Q74 12 67 12 Q62 15 62 34Z" fill="#ffb3cf"/></g>',
+      head: ell(50, 52, 33, 26, '#fff'), extra: nose,
+    }),
+    fox: pet({
+      back: '<g class="tail"><path d="M78 90 Q100 82 94 58 Q86 70 74 80Z" fill="#ff9d4d"/><path d="M94 58 Q98 68 92 72 Q89 65 94 58Z" fill="#fff"/></g>',
+      body: ell(38, 91, 9, 5, '#7a4a2a') + ell(62, 91, 9, 5, '#7a4a2a') + ell(50, 72, 25, 20, '#ff9d4d') + ell(50, 76, 13, 12, '#fff3e6'),
+      paws: pawPair('#f08a3a'),
+      ears: '<path d="M18 42 L22 6 L44 28Z" fill="#ff9d4d"/><path d="M22 6 L19 22 L31 17Z" fill="#4a2c1a"/><path d="M82 42 L78 6 L56 28Z" fill="#ff9d4d"/><path d="M78 6 L81 22 L69 17Z" fill="#4a2c1a"/>',
+      head: ell(50, 52, 35, 26, '#ff9d4d'),
+      marks: '<path d="M14 58 Q30 50 44 66 Q28 74 14 58Z" fill="#fff"/><path d="M86 58 Q70 50 56 66 Q72 74 86 58Z" fill="#fff"/>',
+      extra: ell(50, 57, 3.2, 2.4, '#2b2140'), mouth: '<path class="mouth" d="M45 61 Q50 65 55 61"/>', cheek: null,
+    }),
+    panda: pet({
+      body: ell(36, 91, 9, 5, '#2b2140') + ell(64, 91, 9, 5, '#2b2140') + ell(50, 72, 26, 21, '#fff'),
+      paws: pawPair('#2b2140'),
+      ears: ell(22, 28, 10, 10, '#2b2140') + ell(78, 28, 10, 10, '#2b2140'),
+      head: ell(50, 52, 35, 27, '#fff'),
+      marks: ell(35, 50, 9, 11, '#2b2140') + ell(65, 50, 9, 11, '#2b2140'),
+      eyeFill: '#fff', hlFill: '#2b2140', ex: [35, 65], ey: 50, rx: 4.5, ry: 6,
+      extra: ell(50, 59, 4, 3, '#2b2140'), mouth: '<path class="mouth" d="M45 64 Q50 68 55 64"/>', cheek: [20, 80, 62],
+    }),
+    peng: pet({
+      body: ell(38, 93, 9, 4, '#ffb14a') + ell(62, 93, 9, 4, '#ffb14a') + ell(50, 70, 28, 24, '#3d4b73') + ell(50, 74, 18, 17, '#fff'),
+      paws: pawPair('#3d4b73', 72, 5, 10, [21, 79]),
+      top: '<path d="M50 24 Q44 14 52 9" stroke="#3d4b73" stroke-width="3" stroke-linecap="round" fill="none"/>',
+      head: ell(50, 50, 33, 28, '#3d4b73'),
+      marks: '<path d="M20 52 Q22 34 36 36 Q50 41 64 36 Q78 34 80 52 Q78 70 50 70 Q22 70 20 52Z" fill="#fff"/>',
+      ex: [37, 63], ey: 48, extra: '<path d="M44 55 Q50 51 56 55 Q50 63 44 55Z" fill="#ffb14a"/>', mouth: '', cheek: [27, 73, 60],
+    }),
+    froggy: pet({
+      body: ell(32, 92, 11, 5, '#5fc75e') + ell(68, 92, 11, 5, '#5fc75e') + ell(50, 74, 26, 20, '#7ddc7a') + ell(50, 78, 15, 11, '#d6f7c4'),
+      paws: pawPair('#6ed26d', 76, 5, 7),
+      head: ell(50, 56, 37, 25, '#7ddc7a'),
+      marks: '<circle cx="31" cy="34" r="13" fill="#7ddc7a"/><circle cx="69" cy="34" r="13" fill="#7ddc7a"/><circle cx="31" cy="34" r="9.5" fill="#fff"/><circle cx="69" cy="34" r="9.5" fill="#fff"/>',
+      ex: [31, 69], ey: 34, rx: 4.5, ry: 6, mouth: '<path class="mouth" d="M34 62 Q50 74 66 62"/>', cheek: [20, 80, 62],
+    }),
+    ducky: pet({
+      back: '<g class="tail"><path d="M76 78 Q92 70 90 82 Q84 85 76 84Z" fill="#ffd23f"/></g>',
+      body: ell(38, 92, 9, 4, '#ff9f43') + ell(62, 92, 9, 4, '#ff9f43') + ell(50, 72, 27, 21, '#ffe066'),
+      paws: pawPair('#ffd23f', 74, 6, 9, [23, 77]),
+      top: '<path d="M50 24 Q46 12 52 8 M50 24 Q54 14 60 14" stroke="#ffd23f" stroke-width="3" fill="none" stroke-linecap="round"/>',
+      head: ell(50, 50, 34, 27, '#ffe066'), ey: 46, ex: [35, 65], mouth: '',
+      extra: ell(50, 58, 10, 5.5, '#ff9f43') + '<path d="M41 58 Q50 61 59 58" stroke="#e2802a" stroke-width="1.5" fill="none"/>', cheek: [22, 78, 58],
+    }),
+    oink: pet({
+      back: '<g class="tail"><path d="M78 82 Q93 78 89 69 Q83 64 85 72" stroke="#ff9db8" stroke-width="3" fill="none" stroke-linecap="round"/></g>',
+      body: ell(38, 92, 8, 4, '#ff9db8') + ell(62, 92, 8, 4, '#ff9db8') + ell(50, 72, 26, 21, '#ffc4d4'),
+      paws: pawPair('#ffb3c7'),
+      ears: '<path d="M22 38 Q8 22 20 13 Q34 13 41 30Z" fill="#ff9db8"/><path d="M78 38 Q92 22 80 13 Q66 13 59 30Z" fill="#ff9db8"/>',
+      head: ell(50, 50, 35, 27, '#ffb3c7'), ey: 45, mouth: '', cheek: [20, 80, 56],
+      extra: ell(50, 58, 11, 8, '#ff8fb1') + ell(46, 58, 2, 3, '#b24d6e') + ell(54, 58, 2, 3, '#b24d6e'),
+    }),
+    dino: pet({
+      back: '<g class="tail"><path d="M76 84 Q99 86 96 66 Q88 77 74 76Z" fill="#6ee7a0"/></g>',
+      body: ell(38, 92, 9, 4.5, '#4fd18a') + ell(62, 92, 9, 4.5, '#4fd18a') + ell(50, 72, 26, 21, '#6ee7a0') + ell(50, 77, 15, 12, '#d9f99d'),
+      paws: pawPair('#5bd694', 74, 4, 5, [26, 74]),
+      top: '<path d="M28 30 L33 15 L40 27Z M43 26 L50 10 L57 26Z M60 27 L67 15 L72 30Z" fill="#ffb347"/>',
+      head: ell(50, 50, 33, 27, '#6ee7a0'),
+      marks: '<circle cx="25" cy="42" r="3" fill="#4fd18a"/><circle cx="76" cy="38" r="2.5" fill="#4fd18a"/><circle cx="72" cy="46" r="1.8" fill="#4fd18a"/>',
+      ey: 48, extra: '<circle cx="47" cy="57" r="1.2" fill="#2b2140"/><circle cx="53" cy="57" r="1.2" fill="#2b2140"/>',
+      mouth: '<path class="mouth" d="M42 62 Q50 68 58 62"/>',
+    }),
+    buzz: pet({
+      back: '<g class="wing"><ellipse cx="26" cy="54" rx="14" ry="9" fill="#bfe9ff" opacity=".85"/></g><g class="wing"><ellipse cx="74" cy="54" rx="14" ry="9" fill="#bfe9ff" opacity=".85"/></g>',
+      body: ell(50, 72, 25, 20, '#ffd84a') + '<path d="M27 66 Q50 74 73 66 L74 72 Q50 80 26 72Z" fill="#2b2140"/><path d="M32 80 Q50 88 68 80 L65 86 Q50 92 35 86Z" fill="#2b2140"/>',
+      paws: pawPair('#ffe680', 74, 4.5, 6, [24, 76]),
+      top: '<path d="M40 26 Q36 12 30 10 M60 26 Q64 12 70 10" stroke="#2b2140" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="30" cy="10" r="3.2" fill="#2b2140"/><circle cx="70" cy="10" r="3.2" fill="#2b2140"/>',
+      head: ell(50, 50, 33, 26, '#ffd84a'), cheek: [23, 77, 58],
+    }),
+    hoot: pet({
+      body: ell(38, 93, 8, 4, '#ffb14a') + ell(62, 93, 8, 4, '#ffb14a') + ell(50, 70, 28, 24, '#b98a5e') + ell(50, 74, 18, 17, '#f1dcc0')
+        + '<path d="M42 70 Q46 74 50 70 Q54 74 58 70 M42 80 Q46 84 50 80 Q54 84 58 80" stroke="#d2b48f" stroke-width="2" fill="none" stroke-linecap="round"/>',
+      paws: pawPair('#9c7148', 72, 6, 12, [20, 80]),
+      ears: '<path d="M20 36 L16 8 L42 24Z" fill="#9c7148"/><path d="M80 36 L84 8 L58 24Z" fill="#9c7148"/>',
+      head: ell(50, 48, 34, 27, '#b98a5e'),
+      marks: '<circle cx="36" cy="48" r="13" fill="#f6ecd9"/><circle cx="64" cy="48" r="13" fill="#f6ecd9"/>',
+      ex: [36, 64], ey: 48, rx: 5, ry: 7, extra: '<path d="M46 56 L54 56 L50 64Z" fill="#ffb14a"/>', mouth: '', cheek: [22, 78, 62],
+    }),
+  };
+
+  // ---------- cats: flat sticker style, thick plum outline, three skins ----------
+  const INK = '#4a3045';
+  const OL = `stroke="${INK}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"`;
+  const SKINS = {
+    tabby: { name: 'Orange', base: '#ffc88a', earL: '#ffc88a', earR: '#ffc88a', tip: '#f6a85c', stripe: '#f2a257',
+      marks: () => `<path d="M50 22 L50 29 M42 23 L44 30 M58 23 L56 30 M17 47 L24 49 M17 53 L24 54 M83 47 L76 49 M83 53 L76 54" stroke="#f2a257" stroke-width="3" stroke-linecap="round" fill="none"/>`,
+      bodyMarks: () => `<path d="M30 72 L36 75 M29 80 L35 82 M70 72 L64 75 M71 80 L65 82" stroke="#f2a257" stroke-width="3" stroke-linecap="round" fill="none"/>` },
+    tux: { name: 'Grey', base: '#d8cbc6', earL: '#b9a7a2', earR: '#b9a7a2', tip: '#b9a7a2',
+      marks: () => '<path d="M8 44 Q50 -6 92 44 Q70 36 50 34 Q30 36 8 44Z" fill="#b9a7a2"/><ellipse cx="50" cy="60" rx="9" ry="6.5" fill="#fff"/>',
+      bodyMarks: () => '' },
+    siam: { name: 'Calico', base: '#fffaf3', earL: '#ffc88a', earR: '#b9a7a2', tip: '#ffc88a',
+      marks: () => '<path d="M6 10 Q50 -4 56 28 Q40 46 8 44Z" fill="#ffc88a"/><path d="M66 8 Q96 12 96 46 Q78 42 62 30Z" fill="#b9a7a2"/>',
+      bodyMarks: () => '<ellipse cx="68" cy="74" rx="12" ry="9" fill="#ffc88a"/><ellipse cx="32" cy="86" rx="8" ry="6" fill="#b9a7a2"/>' },
+  };
+  const cat = s => pet({
+    cls: 'sticker',
+    back: `<g class="tail"><path d="M66 90 Q94 92 90 62 Q89 56 84 59" stroke="${INK}" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M66 90 Q94 92 90 62 Q89 56 84 59" stroke="${s.base}" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M90 66 Q89 56 84 59" stroke="${s.tip}" stroke-width="6" fill="none" stroke-linecap="round"/></g>`,
+    body: `<clipPath id="bc"><ellipse cx="50" cy="80" rx="22" ry="17"/></clipPath><ellipse cx="50" cy="80" rx="22" ry="17" fill="${s.base}"/>`
+      + `<g clip-path="url(#bc)">${s.bodyMarks()}<ellipse cx="50" cy="90" rx="12" ry="14" fill="#fff"/></g><ellipse cx="50" cy="80" rx="22" ry="17" fill="none" ${OL}/>`,
+    paws: `<ellipse class="paw-l" cx="41" cy="90" rx="6.5" ry="8" fill="#fff" ${OL}/><ellipse class="paw-r" cx="59" cy="90" rx="6.5" ry="8" fill="#fff" ${OL}/>`,
+    ears: `<g class="ear-l"><path d="M20 38 Q15 12 22 10 Q34 12 43 25Z" fill="${s.earL}" ${OL}/><path d="M25 29 Q24 19 27 18 Q32 20 35 26Z" fill="#ffb3c7"/></g>`
+      + `<g class="ear-r"><path d="M80 38 Q85 12 78 10 Q66 12 57 25Z" fill="${s.earR}" ${OL}/><path d="M75 29 Q76 19 73 18 Q68 20 65 26Z" fill="#ffb3c7"/></g>`,
+    head: `<clipPath id="hc"><ellipse cx="50" cy="48" rx="33" ry="27"/></clipPath><ellipse cx="50" cy="48" rx="33" ry="27" fill="${s.base}"/>`,
+    marks: `<g clip-path="url(#hc)">${s.marks()}</g><ellipse cx="50" cy="48" rx="33" ry="27" fill="none" ${OL}/>`,
+    hlFill: 'none', eyeFill: INK, ex: [34, 66], ey: 52, rx: 3, ry: 3.8, cheek: [25, 75, 59],
+    mouth: `<path class="mouth" d="M46.5 58 Q48.25 61 50 58 Q51.75 61 53.5 58" style="stroke-width:1.9"/>`, zz: [82, 22],
+  });
+  Object.entries(SKINS).forEach(([k, s]) => { BUILT['cat:' + k] = cat(s); });
+
+  let robots = [];
+  function mount(kind) {
+    const tpl = BUILT[kind]
+      ? Object.assign(document.createElement('template'), { innerHTML: BUILT[kind] })
+      : document.getElementById(kind + '-tpl');
+    document.querySelectorAll('[data-robot]').forEach(slot => { slot.replaceChildren(tpl.content.cloneNode(true)); });
+    robots = [...document.querySelectorAll('[data-robot] svg')];
+  }
+  mount('cat:tabby');
+  const all = fn => robots.forEach(fn);
+  const cls = (name, on) => all(r => r.classList.toggle(name, on));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const statusEl = document.getElementById('status');
+  const island = document.querySelector('.island .label');
+  const setStatus = (s, label) => { statusEl.textContent = s; island.textContent = label || s; };
+
+  const lookAt = (x, y) => all(r => { r.querySelector('.eyes').style.transform = `translate(${x}px, ${y}px)`; });
+  const tilt = deg => all(r => { r.querySelector('.tilt').style.transform = `rotate(${deg}deg)`; });
+  const oneShot = async (name, ms) => { cls(name, false); void document.body.offsetWidth; cls(name, true); await wait(ms); cls(name, false); };
+
+  const actions = {
+    blink:   { label: 'Blink',      run: async () => { await oneShot('blink', 140); if (Math.random() < .3) { await wait(120); await oneShot('blink', 140); } } },
+    look:    { label: 'Look around', run: async () => {
+        setStatus('looking around', 'Hmm…'); lookAt(-5, 1); tilt(-5); await wait(900);
+        lookAt(5, -1); tilt(5); await wait(1000); lookAt(0, 0); tilt(0); } },
+    happy:   { label: 'Happy',      run: async () => { setStatus('happy', 'Hi there!'); cls('happy', true); await oneShot('bounce', 600); await wait(1200); cls('happy', false); } },
+    wave:    { label: 'Wave',       run: async () => { setStatus('waving', 'Hello!'); cls('happy', true); await oneShot('wave', 2100); cls('happy', false); } },
+    spin:    { label: 'Spin',       run: async () => { setStatus('spinning', 'Wheee'); await oneShot('spin', 800); } },
+    curious: { label: 'Curious tilt', run: async () => { setStatus('curious', 'Huh?'); tilt(10); lookAt(3, -2); await wait(1600); tilt(0); lookAt(0, 0); } },
+    sleep:   { label: 'Sleep',      run: async () => { setStatus('sleeping', 'Zzz…'); tilt(-6); lookAt(0, 3); cls('sleepy', true); await wait(5500); cls('sleepy', false); tilt(0); lookAt(0, 0);
+        await oneShot('bounce', 600); } },
+  };
+
+  let busy = false, auto = true;
+  async function play(key) {
+    if (busy) return;
+    busy = true;
+    try { await actions[key].run(); } finally { setStatus('idle', 'Idle · all quiet'); busy = false; }
+  }
+
+  // buttons
+  const bar = document.getElementById('actions');
+  Object.entries(actions).forEach(([key, a]) => {
+    const b = document.createElement('button'); b.textContent = a.label; b.onclick = () => play(key); bar.appendChild(b);
+  });
+  const autoBtn = document.getElementById('auto');
+  autoBtn.onclick = () => { auto = !auto; autoBtn.classList.toggle('on', auto); autoBtn.textContent = `Auto idle: ${auto ? 'on' : 'off'}`; };
+
+  // character picker
+  const picker = document.getElementById('picker');
+  const skinsEl = document.getElementById('skins');
+  let skin = 'tabby';
+  const mark = (box, on) => box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === on));
+  [['cat', 'Cat'], ['critter', 'Mochi'], ['ghost', 'Boo'], ['jelly', 'Jelly'], ['octo', 'Inky'], ['robot', 'Robot'],
+    ['bun', 'Bun'], ['fox', 'Fox'], ['panda', 'Panda'], ['peng', 'Peng'], ['froggy', 'Froggy'],
+    ['ducky', 'Ducky'], ['oink', 'Oink'], ['dino', 'Dino'], ['buzz', 'Buzz'], ['hoot', 'Hoot']].forEach(([kind, name], i) => {
+    const b = document.createElement('button'); b.textContent = name; b.classList.toggle('on', i === 0);
+    b.onclick = () => { mount(kind === 'cat' ? 'cat:' + skin : kind); skinsEl.hidden = kind !== 'cat'; mark(picker, b); };
+    picker.appendChild(b);
+  });
+  Object.entries(SKINS).forEach(([k, s]) => {
+    const b = document.createElement('button'); b.textContent = s.name; b.classList.toggle('on', k === skin);
+    b.onclick = () => { skin = k; mount('cat:' + k); mark(skinsEl, b); };
+    skinsEl.appendChild(b);
+  });
+
+  // accent swatches
+  const sw = document.getElementById('swatches');
+  ['#5eead4', '#7dd3fc', '#a78bfa', '#f9a8d4', '#fbbf24', '#4ade80'].forEach((c, i) => {
+    const s = document.createElement('button'); s.className = 'swatch' + (i ? '' : ' on'); s.style.background = c;
+    s.onclick = () => { document.documentElement.style.setProperty('--accent', c); sw.querySelectorAll('.swatch').forEach(x => x.classList.toggle('on', x === s)); };
+    sw.appendChild(s);
+  });
+
+  // idle brain: blink often, other behaviours now and then, sleep after a long quiet spell
+  let quietSince = Date.now();
+  (async function loop() {
+    for (;;) {
+      await wait(1800 + Math.random() * 2600);
+      if (!auto || busy) continue;
+      const quiet = Date.now() - quietSince;
+      let pick;
+      if (quiet > 25000) { pick = 'sleep'; quietSince = Date.now(); }
+      else {
+        const r = Math.random();
+        pick = r < .45 ? 'blink' : r < .7 ? 'look' : r < .8 ? 'curious' : r < .9 ? 'happy' : r < .95 ? 'wave' : 'spin';
+      }
+      await play(pick);
+    }
+  })();
+</script>
+</body>
+</html>

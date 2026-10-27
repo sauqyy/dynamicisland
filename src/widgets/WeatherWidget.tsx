@@ -35,6 +35,31 @@ export function WeatherWidget({ settings, update }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city, fahrenheit])
 
+  const hourlyRef = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ left: false, right: false })
+  const updateEdges = () => {
+    const el = hourlyRef.current
+    if (el) setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 })
+  }
+  useEffect(() => {
+    const el = hourlyRef.current
+    const now = el?.children[weather?.nowHour ?? 0] as HTMLElement | undefined
+    if (el && now) el.scrollLeft = now.offsetLeft - el.offsetLeft - 8
+    updateEdges()
+  }, [weather])
+  // sideways wheel / trackpad scrolling; a plain mouse wheel scrolls the strip too
+  useEffect(() => {
+    const el = hourlyRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [weather])
+
   const unit = fahrenheit ? '°F' : '°C'
 
   if (editing || !city) {
@@ -86,10 +111,14 @@ export function WeatherWidget({ settings, update }: Props) {
           </small>
         </div>
       </div>
-      <div className="hourly">
-        {weather.hourly.map((h) => (
-          <div key={h.hour} className="hour">
-            <small>{h.hour}:00</small>
+      <div
+        className={`hourly ${edges.left ? 'more-left' : ''} ${edges.right ? 'more-right' : ''}`}
+        ref={hourlyRef}
+        onScroll={updateEdges}
+      >
+        {weather.hourly.map((h, i) => (
+          <div key={h.hour} className={`hour ${i === weather.nowHour ? 'now' : ''}`}>
+            <small>{i === weather.nowHour ? 'Now' : `${h.hour}:00`}</small>
             <span>{describe(h.code).icon}</span>
             <b>{h.temp}°</b>
           </div>

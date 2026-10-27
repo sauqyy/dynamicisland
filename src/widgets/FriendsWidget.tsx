@@ -15,6 +15,9 @@ interface Props {
   /** set by clicking a message alert: open this friend's chat */
   openChatId?: string | null
   onChatOpened?: () => void
+  /** chat only: the card is fullscreen, and the button to toggle it */
+  fullscreen?: boolean
+  onFullscreen?: (on: boolean) => void
 }
 
 function timeLabel(iso: string) {
@@ -53,7 +56,7 @@ function Bubble({ m, mine }: { m: Message; mine: boolean }) {
   )
 }
 
-function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me: string; social: Social; activityText: string; onBack: () => void }) {
+function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -88,6 +91,18 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
         <b>{friend.profile.display_name || `@${friend.profile.username}`}</b>
         {friend.profile.display_name && <small className="handle">@{friend.profile.username}</small>}
         {friend.activity && <small className="chat-activity">{friend.activity}</small>}
+        {onFullscreen && (
+          <button
+            className="chip chat-full"
+            title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            onClick={() => onFullscreen(!fullscreen)}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {fullscreen ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+            </svg>
+          </button>
+        )}
       </div>
       <div className="chat-list">
         {!list ? (
@@ -140,7 +155,7 @@ function Chat({ friend, me, social, activityText, onBack }: { friend: Friend; me
   )
 }
 
-export function FriendsWidget({ auth, social, activityText, onGoProfile, openChatId, onChatOpened }: Props) {
+export function FriendsWidget({ auth, social, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
   const [username, setUsername] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const [chatWith, setChatWith] = useState<string | null>(null)
@@ -169,9 +184,48 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
 
   const friend = social.friends.find((f) => f.profile.id === chatWith)
   if (friend) {
+    const chat = (
+      <Chat
+        key={friend.profile.id}
+        friend={friend}
+        me={auth.user.id}
+        social={social}
+        activityText={activityText}
+        onBack={() => {
+          onFullscreen?.(false)
+          setChatWith(null)
+        }}
+        fullscreen={fullscreen}
+        onFullscreen={onFullscreen}
+      />
+    )
+    if (!fullscreen) {
+      return (
+        <div className="friends" onClick={(e) => e.stopPropagation()}>
+          {chat}
+        </div>
+      )
+    }
+    // fullscreen: the contacts down the left, the open chat filling the right
     return (
-      <div className="friends" onClick={(e) => e.stopPropagation()}>
-        <Chat friend={friend} me={auth.user.id} social={social} activityText={activityText} onBack={() => setChatWith(null)} />
+      <div className="friends fs-split" onClick={(e) => e.stopPropagation()}>
+        <div className="fs-contacts">
+          {social.friends.map((f) => (
+            <button
+              key={f.friendshipId}
+              className={`fs-contact ${f.profile.id === friend.profile.id ? 'active' : ''}`}
+              onClick={() => setChatWith(f.profile.id)}
+            >
+              <Avatar profile={f.profile} size={34} presence={shownPresence(f.profile)} />
+              <span className="friend-meta">
+                <b>{f.profile.display_name || `@${f.profile.username}`}</b>
+                <small>{f.activity || f.profile.status || `@${f.profile.username}`}</small>
+              </span>
+              {social.unread[f.profile.id] > 0 && <span className="badge">{social.unread[f.profile.id]}</span>}
+            </button>
+          ))}
+        </div>
+        {chat}
       </div>
     )
   }
