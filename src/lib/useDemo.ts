@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import type { Message, MessageKind, Profile } from './supabase'
 import type { Auth } from './useAuth'
 import type { Friend, Request, Social } from './useSocial'
+import type { Call, CallState } from './useCall'
 import { joinCode, type Group, type GroupInvite, type GroupMessage, type Groups } from './useGroups'
 
 /** Open the browser demo with `?demo` to try accounts, friends and chat with made-up data. */
@@ -44,7 +45,7 @@ const seed = (): Record<string, Message[]> => ({
 })
 
 /** In-memory stand-ins for useAuth and useSocial. Messages get a canned reply after a moment. */
-export function useDemo(): { auth: Auth; social: Social; groups: Groups; ping: () => { friend: Friend; body: string } } {
+export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: Call; ping: () => { friend: Friend; body: string } } {
   const [profile, setProfile] = useState<Profile>(ME)
   const [messages, setMessages] = useState<Record<string, Message[]>>(seed)
   const [unread, setUnread] = useState<Record<string, number>>({ a: 1, b: 1 })
@@ -215,5 +216,28 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; ping: (
     },
   }
 
-  return { auth, social, groups, ping }
+  // a scripted call: rings, connects, then runs until ended. No microphone, no audio.
+  const [callState, setCallState] = useState<CallState>({ phase: 'idle', peer: null, muted: false, since: null, error: null })
+  const callTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const endCall = () => {
+    callTimers.current.forEach(clearTimeout)
+    callTimers.current = []
+    setCallState({ phase: 'idle', peer: null, muted: false, since: null, error: null })
+  }
+  const call: Call = {
+    state: callState,
+    start: async (peer) => {
+      setCallState({ phase: 'calling', peer, muted: false, since: null, error: null })
+      callTimers.current = [
+        setTimeout(() => setCallState((c) => ({ ...c, phase: 'connecting' })), 1500),
+        setTimeout(() => setCallState((c) => ({ ...c, phase: 'active', since: Date.now() })), 2500),
+      ]
+    },
+    accept: async () => {},
+    decline: endCall,
+    hangUp: endCall,
+    toggleMute: () => setCallState((c) => ({ ...c, muted: !c.muted })),
+  }
+
+  return { auth, social, groups, call, ping }
 }

@@ -3787,21 +3787,13 @@ button.ao-text:hover {
 /* ---------- voice call ---------- */
 .chat-call {
   flex: none;
-  width: 28px;
-  height: 24px;
+  align-self: center;
+  width: 32px;
+  height: 32px;
   padding: 0;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-}
-.chat-activity + .chat-call {
-  margin-left: 6px;
-}
-.chat-head .handle + .chat-call,
-.chat-head b + .chat-call {
-  margin-left: auto;
-}
-.chat-call + .chat-full {
-  margin-left: 0;
 }
 .call-bar {
   flex: none;

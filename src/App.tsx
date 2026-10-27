@@ -901,7 +901,7 @@ export default function App() {
                 section={tab}
                 auth={auth}
                 social={social}
-                call={DEMO_SOCIAL ? undefined : call}
+                call={DEMO_SOCIAL ? demo.call : call}
                 groups={DEMO_SOCIAL ? demo.groups : groupChats}
                 activityText={activityText}
                 onGoProfile={() => setTab('profile')}

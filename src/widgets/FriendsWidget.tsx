@@ -138,20 +138,6 @@ function Chat({ friend, me, social, call, activityText, onBack, fullscreen, onFu
         <b>{friend.profile.display_name || `@${friend.profile.username}`}</b>
         {friend.profile.display_name && <small className="handle">@{friend.profile.username}</small>}
         {friend.activity && <small className="chat-activity">{friend.activity}</small>}
-        {call && (
-          <button
-            className="chip chat-call"
-            disabled={call.state.phase !== 'idle' || shownPresence(friend.profile) === 'offline'}
-            data-cuelume-tap
-            title={shownPresence(friend.profile) === 'offline' ? 'Offline' : 'Voice call'}
-            aria-label="Voice call"
-            onClick={() => call.start(friend.profile.id)}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
-            </svg>
-          </button>
-        )}
         {onFullscreen && (
           <button
             className="chip chat-full"
@@ -219,6 +205,21 @@ function Chat({ friend, me, social, call, activityText, onBack, fullscreen, onFu
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
         />
+        {call && (
+          <button
+            type="button"
+            className="chip chat-call"
+            disabled={call.state.phase !== 'idle' || shownPresence(friend.profile) === 'offline'}
+            data-cuelume-tap
+            title={shownPresence(friend.profile) === 'offline' ? 'Offline' : 'Voice call'}
+            aria-label="Voice call"
+            onClick={() => call.start(friend.profile.id)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
+              <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" />
+            </svg>
+          </button>
+        )}
         <button className="pill-btn" type="submit" disabled={!draft.trim()} data-cuelume-tap>
           Send
         </button>
