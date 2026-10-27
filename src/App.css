@@ -182,11 +182,7 @@
   flex-direction: column;
   cursor: default;
 }
-.expanded-body {
-  flex: 1;
-  min-height: 0;
-  padding: 18px 22px 0;
-}
+
 .tabs {
   display: flex;
   justify-content: center;
@@ -631,37 +627,11 @@
   transform: scale(1.15);
 }
 
-
 /* ---------- expanded header + page dots ---------- */
 .expanded {
   position: relative;
 }
-.xhead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 26px 0;
-  height: 36px;
-  flex: none;
-}
-.xhead-left,
-.xhead-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.xhead-title {
-  font-size: 15px;
-  font-weight: 700;
-}
-.xhead-date {
-  font-size: 12px;
-  opacity: 0.75;
-}
-.xhead-time {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
+
 .chip {
   padding: 2px 10px;
   border-radius: 10px;
@@ -675,28 +645,6 @@
 }
 .chip:active {
   transform: scale(0.92);
-}
-.expanded-body {
-  padding: 8px 50px 0;
-}
-.dots {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 0 10px;
-  flex: none;
-}
-.dots button {
-  width: 6px;
-  height: 6px;
-  padding: 0;
-  border-radius: 3px;
-  background: rgb(var(--fg-rgb) / 0.3);
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.dots button.active {
-  width: 18px;
-  background: var(--accent, #4ade80);
 }
 
 /* ---------- shelf + apps ---------- */
@@ -825,39 +773,6 @@
   height: 100%;
   overflow: visible;
   pointer-events: none;
-}
-
-/* ---------- page arrows on the sides of the card (big, easy to hit) ---------- */
-.nav-arrow {
-  position: absolute;
-  top: 50%;
-  z-index: 3;
-  width: 34px;
-  height: 34px;
-  margin-top: -6px;
-  transform: translateY(-50%);
-  border-radius: 50%;
-  background: rgb(var(--fg-rgb) / 0.88);
-  color: var(--island-bg);
-  font-size: 24px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  padding-bottom: 3px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  transition: transform 0.15s, background 0.15s;
-}
-.nav-arrow.left {
-  left: 10px;
-}
-.nav-arrow.right {
-  right: 10px;
-}
-.nav-arrow:hover {
-  background: rgb(var(--fg-rgb));
-}
-.nav-arrow:active {
-  transform: translateY(-50%) scale(0.88);
 }
 
 /* ---------- privacy dots (camera green, microphone orange) ---------- */
@@ -1012,32 +927,6 @@
   font-size: 12px;
 }
 
-/* ---------- roomier layout (more breathing space everywhere) ---------- */
-.xhead {
-  height: 50px;
-  padding: 22px 36px 0;
-}
-.xhead-title {
-  font-size: 16px;
-}
-.xhead-left,
-.xhead-right {
-  gap: 12px;
-}
-.expanded-body {
-  padding: 18px 64px 0;
-}
-.dots {
-  gap: 8px;
-  padding: 8px 0 18px;
-}
-.nav-arrow.left {
-  left: 14px;
-}
-.nav-arrow.right {
-  right: 14px;
-}
-
 .media {
   height: 100%;
   display: flex;
@@ -1105,17 +994,6 @@
   inset: 56px 18px 36px;
 }
 
-/* ---------- shorter card: tighter vertical rhythm, settings scrolls ---------- */
-.xhead {
-  height: 46px;
-  padding: 18px 36px 0;
-}
-.expanded-body {
-  padding: 12px 64px 0;
-}
-.dots {
-  padding: 6px 0 14px;
-}
 .lyrics {
   height: 66px;
 }
@@ -1229,40 +1107,6 @@
   color: var(--on-accent, #000);
 }
 
-/* ---------- page dots with labels, custom timer input, settings groups ---------- */
-.dots button {
-  position: relative;
-}
-.dots button:hover::after {
-  content: attr(aria-label);
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 2px 8px;
-  border-radius: 8px;
-  background: rgb(var(--fg-rgb) / 0.92);
-  color: var(--island-bg);
-  font-size: 10.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.dots button.active:hover::after {
-  content: attr(aria-label);
-}
-.gear {
-  font-size: 14px;
-  opacity: 0.6;
-  transition: opacity 0.15s, transform 0.25s;
-}
-.gear:hover,
-.gear.active {
-  opacity: 1;
-}
-.gear:hover {
-  transform: rotate(40deg);
-}
 .timer-custom {
   display: flex;
   align-items: center;
@@ -1640,10 +1484,7 @@
   display: flex;
   gap: 8px;
 }
-/* an open chat needs the height: the Friends/Profile switcher hides until Back */
-.expanded:has(.chat) .subtabs {
-  display: none;
-}
+
 .chat-plus {
   flex: none;
   align-self: center;
@@ -1831,28 +1672,6 @@
   gap: 10px;
 }
 
-/* ---------- header lines up with the page content below it ---------- */
-.xhead {
-  padding-left: 64px;
-  padding-right: 64px;
-}
-.xhead-left,
-.xhead-right {
-  gap: 8px;
-  min-width: 0;
-}
-.xhead-title,
-.xhead-date,
-.xhead-time {
-  white-space: nowrap;
-}
-.xhead-right {
-  flex: none;
-}
-.gear {
-  margin-right: -4px;
-}
-
 /* ---------- tighter sign-in form ---------- */
 .profile-auth {
   gap: 8px;
@@ -1910,22 +1729,6 @@
   gap: 6px;
 }
 
-/* ---------- profile picture next to the gear ---------- */
-.head-avatar {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px transparent;
-  transition: box-shadow 0.15s, transform 0.15s;
-}
-.head-avatar:hover {
-  transform: scale(1.1);
-}
-.head-avatar.active {
-  box-shadow: 0 0 0 2px var(--accent, #4ade80);
-}
 .avatar.ghost {
   width: 22px;
   height: 22px;
@@ -1933,35 +1736,6 @@
   background: rgb(var(--fg-rgb) / 0.16);
 }
 
-/* ring hugs the circle: no default focus rectangle, no baseline gap */
-.head-avatar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  outline: none;
-  line-height: 0;
-}
-.head-avatar .avatar {
-  display: grid;
-}
-.head-avatar:focus-visible {
-  box-shadow: 0 0 0 2px var(--accent, #4ade80);
-}
-.head-avatar.active {
-  box-shadow: 0 0 0 2px var(--accent, #4ade80);
-}
-.gear {
-  outline: none;
-}
-
-/* ---------- centred messages sit at the same spot on every page ---------- */
-.expanded-body {
-  position: relative;
-}
 .empty,
 .clips .empty,
 .shelf .empty,
@@ -2005,14 +1779,6 @@
    looks hard. Two small stacked shadows stay inside that margin and fade out smoothly. */
 .root.light .outline-layer {
   filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.22)) drop-shadow(0 3px 5px rgb(0 0 0 / 0.16));
-}
-
-/* no ring around the header avatar */
-.head-avatar,
-.head-avatar:focus-visible,
-.head-avatar.active {
-  box-shadow: none;
-  outline: none;
 }
 
 /* ---------- status templates drop-down ---------- */
@@ -2099,15 +1865,6 @@
 .root.glass .size-box {
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14), inset 0 1px 0 rgb(255 255 255 / 0.18);
 }
-.root.glass .nav-arrow {
-  background: rgb(255 255 255 / 0.28);
-  color: #fff;
-  backdrop-filter: blur(8px);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.4), 0 2px 8px rgb(0 0 0 / 0.25);
-}
-.root.glass .nav-arrow:hover {
-  background: rgb(255 255 255 / 0.42);
-}
 
 /* city search sits in the middle like every other centred prompt; the list opens below it */
 .city-picker {
@@ -2118,24 +1875,11 @@
   max-height: 98px;
 }
 
-/* pages with header buttons (Pause / Clear) have no room for the date next to them */
-.xhead-left {
-  flex: none;
-}
-.xhead.has-action .xhead-date {
-  display: none;
-}
-
 /* A backdrop blur on the rectangular content box doesn't follow the pill's curved ears, so the
    glass tint changed shape at the top corners. The tint, rim and sheen come from the outline path instead. */
 .root.glass .content-clip {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-}
-
-/* arrows are centred on the page content (the body), not on the whole card incl. header and dots */
-.nav-arrow {
-  margin-top: 0;
 }
 
 /* ---------- glass styles: dark (default), light, gradient ---------- */
@@ -2163,13 +1907,7 @@
 .root.glass.tint-light .outline-layer path:first-of-type {
   stroke: rgb(255 255 255 / 0.85);
 }
-.root.glass.tint-light .nav-arrow {
-  background: rgb(255 255 255 / 0.6);
-  color: #16181f;
-}
-.root.glass.tint-light .nav-arrow:hover {
-  background: rgb(255 255 255 / 0.85);
-}
+
 .root.glass.tint-light .chip,
 .root.glass.tint-light .pill-btn,
 .root.glass.tint-light .todo-input,
@@ -2246,19 +1984,6 @@
 .scroll-panel > .profile-auth {
   margin: auto 0;
   padding-top: 6px;
-}
-
-/* Pause / Clear live in the page, so the header (title, date, time, avatar, gear) is identical everywhere */
-.body-actions {
-  position: absolute;
-  z-index: 2;
-  top: 2px;
-  right: 64px;
-  display: flex;
-  gap: 6px;
-}
-.expanded-body.with-actions .clips {
-  padding-top: 30px;
 }
 
 /* unread-message dot on the idle pill */
@@ -2426,246 +2151,6 @@
   width: 58%;
 }
 
-/* ---------- grouped navigation: dock at the bottom, tabs inside a group ---------- */
-.subtabs {
-  flex: none;
-  align-self: center;
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  margin-top: 4px;
-  border-radius: 14px;
-  background: rgb(var(--fg-rgb) / 0.1);
-}
-.subtabs button {
-  padding: 3px 14px;
-  border-radius: 11px;
-  font-size: 12px;
-  font-weight: 600;
-  opacity: 0.55;
-  transition: opacity 0.2s, background 0.2s;
-}
-.subtabs button:hover {
-  opacity: 0.85;
-}
-.subtabs button.active {
-  opacity: 1;
-  background: color-mix(in srgb, var(--accent, #4ade80) 38%, transparent);
-}
-.expanded-body.has-subtabs {
-  padding-top: 8px;
-}
-.dock {
-  flex: none;
-  align-self: center;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  margin: 2px 0 12px;
-  border-radius: 999px;
-  background: rgb(var(--fg-rgb) / 0.1);
-}
-.dock button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  transition: background 0.25s, padding 0.25s;
-}
-.dock-icon {
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.7;
-}
-.dock-label {
-  display: none;
-  white-space: nowrap;
-}
-.dock button:hover .dock-icon {
-  opacity: 1;
-}
-.dock button.active {
-  padding: 0 12px 0 10px;
-  background: color-mix(in srgb, var(--accent, #4ade80) 40%, transparent);
-}
-.dock button.active .dock-icon {
-  opacity: 1;
-}
-.dock button.active .dock-label {
-  display: inline;
-}
-
-/* custom line icons in the dock */
-.dock-icon {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  font-size: 0;
-}
-.dock button.active .dock-icon {
-  color: var(--accent, #4ade80);
-}
-.dock button.active {
-  color: var(--fg);
-}
-
-/* the arrow is a drawn chevron now, so it is centred exactly (a text glyph sat off-centre) */
-.nav-arrow {
-  padding: 0;
-  font-size: 0;
-  line-height: 0;
-}
-.nav-arrow svg {
-  display: block;
-}
-.nav-arrow.left svg {
-  margin-right: 1px;
-}
-.nav-arrow.right svg {
-  margin-left: 1px;
-}
-
-/* ---------- page arrows: round glass buttons with an accent chevron ---------- */
-.nav-arrow {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  color: var(--fg);
-  background: linear-gradient(160deg, rgb(var(--fg-rgb) / 0.2), rgb(var(--fg-rgb) / 0.07));
-  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.2), inset 0 1px 0 rgb(var(--fg-rgb) / 0.28), 0 4px 12px rgb(0 0 0 / 0.28);
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, color 0.2s, box-shadow 0.2s;
-}
-.nav-arrow svg {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.nav-arrow:hover {
-  color: var(--on-accent, #000);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent, #4ade80) 100%, #fff 18%), var(--accent, #4ade80));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 6px 18px color-mix(in srgb, var(--accent, #4ade80) 45%, transparent);
-}
-.nav-arrow.left:hover svg {
-  transform: translateX(-2px);
-}
-.nav-arrow.right:hover svg {
-  transform: translateX(2px);
-}
-.nav-arrow:active {
-  transform: translateY(-50%) scale(0.88);
-}
-.root.glass .nav-arrow {
-  background: linear-gradient(160deg, rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.1));
-  color: #fff;
-}
-.root.glass .nav-arrow:hover {
-  color: var(--on-accent, #000);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent, #4ade80) 100%, #fff 18%), var(--accent, #4ade80));
-}
-.root.glass.tint-light .nav-arrow {
-  color: #16181f;
-  background: linear-gradient(160deg, rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.4));
-}
-.root.glass.tint-light .nav-arrow:hover {
-  color: var(--on-accent, #000);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent, #4ade80) 100%, #fff 18%), var(--accent, #4ade80));
-}
-
-/* even spacing along the right side of the header: date, time, bars, avatar, gear */
-.xhead-right {
-  gap: 10px;
-}
-.head-avatar {
-  width: 22px;
-  height: 22px;
-}
-.gear {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1;
-}
-
-/* the gear is a drawn icon that fills its box, so the gaps look equal */
-.gear {
-  width: 18px;
-  height: 18px;
-  font-size: 0;
-}
-.gear svg {
-  display: block;
-}
-
-/* ---------- settings cog: turns with a springy overshoot, lights up in the accent colour ---------- */
-.gear {
-  position: relative;
-  opacity: 0.65;
-  transition: opacity 0.2s, color 0.2s;
-}
-.gear .cog {
-  transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s;
-  transform-origin: 50% 50%;
-}
-.gear::before {
-  content: '';
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent, #4ade80) 40%, transparent), transparent 70%);
-  opacity: 0;
-  transform: scale(0.5);
-  transition: opacity 0.3s, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  pointer-events: none;
-}
-.gear:hover,
-.gear:focus-visible,
-.gear.active {
-  opacity: 1;
-  color: var(--accent, #4ade80);
-}
-.gear:hover .cog,
-.gear:focus-visible .cog {
-  transform: rotate(120deg) scale(1.14);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent, #4ade80) 70%, transparent));
-}
-.gear:hover::before,
-.gear:focus-visible::before {
-  opacity: 1;
-  transform: scale(1);
-}
-.gear:active .cog {
-  transform: rotate(200deg) scale(0.88);
-  transition-duration: 0.25s;
-}
-/* while the settings page is open the cog stays turned and tinted */
-.gear.active .cog {
-  transform: rotate(45deg);
-}
-.gear:hover {
-  transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .gear .cog,
-  .gear::before {
-    transition: none;
-  }
-}
-
-/* breathing room between the page content and the dock (the player controls were touching it) */
-.expanded-body {
-  padding-bottom: 12px;
-}
-.dock {
-  margin-top: 8px;
-}
 .lyrics {
   height: 76px;
   margin: 2px 0;
@@ -2741,44 +2226,6 @@ button.ao-text:hover {
   height: 92px;
 }
 
-/* more room between the title row and the tabs, and between the tabs and the page */
-.xhead {
-  height: 52px;
-}
-.subtabs {
-  margin-top: 8px;
-}
-.expanded-body.has-subtabs {
-  padding-top: 14px;
-}
-
-/* ---------- glass pill (page groups) + underline text (modes inside a page) ---------- */
-.subtabs {
-  gap: 0;
-  border-radius: 999px;
-  background: rgb(var(--fg-rgb) / 0.05);
-}
-.subtabs button {
-  position: relative;
-  padding: 4px 15px;
-  border-radius: 999px;
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-.subtabs button.active {
-  background: none;
-  opacity: 1;
-}
-.subtab-ind {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: rgb(var(--fg-rgb) / 0.14);
-  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.14), 0 1px 4px rgb(0 0 0 / 0.3);
-}
-.subtab-label {
-  position: relative;
-}
 .timer-tab .segmented {
   gap: 18px;
   padding: 0;
@@ -2810,107 +2257,6 @@ button.ao-text:hover {
   transform: scaleX(1);
 }
 
-/* dock: label grows with a CSS grid track, the highlight slides with the same timing */
-.dock {
-  position: relative;
-  gap: 4px;
-  --dock-ease: cubic-bezier(0.32, 0.72, 0, 1);
-}
-.dock button,
-.dock button.active {
-  position: relative;
-  gap: 0;
-  padding: 0 10px;
-  background: none;
-  transition: none;
-}
-.dock-ind {
-  position: absolute;
-  top: 4px;
-  left: 0;
-  height: 28px;
-  border-radius: 999px;
-  background: rgb(var(--fg-rgb) / 0.14);
-  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.14), 0 1px 4px rgb(0 0 0 / 0.3);
-}
-.dock-ind.ready {
-  transition: transform 0.45s var(--dock-ease), width 0.45s var(--dock-ease);
-}
-.dock-icon {
-  position: relative;
-}
-.dock button .dock-label,
-.dock button.active .dock-label {
-  position: relative;
-  display: grid;
-  grid-template-columns: 0fr;
-  opacity: 0;
-  transition: grid-template-columns 0.45s var(--dock-ease), opacity 0.3s;
-}
-.dock button.active .dock-label {
-  grid-template-columns: 1fr;
-  opacity: 1;
-}
-.dock-label-clip {
-  min-width: 0;
-  overflow: hidden;
-}
-.dock-label em {
-  display: inline-block;
-  vertical-align: top;
-  padding-left: 6px;
-  font-style: normal;
-  white-space: nowrap;
-}
-
-/* ---------- sliding highlights: plain look for every theme ---------- */
-.dock-ind,
-.subtab-ind {
-  z-index: 0;
-  pointer-events: none;
-  background: rgb(var(--fg-rgb) / 0.14);
-  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.12), 0 1px 4px rgb(0 0 0 / 0.25);
-}
-.dock,
-.subtabs {
-  background: rgb(var(--fg-rgb) / 0.08);
-}
-
-/* ---------- liquid glass theme only: frosted tracks, lens highlight with a lit rim, small lift while it moves ---------- */
-.root.glass .dock,
-.root.glass .subtabs {
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.03));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.1), 0 6px 18px rgb(0 0 0 / 0.25);
-}
-.root.glass .dock-ind,
-.root.glass .subtab-ind {
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.09));
-  box-shadow:
-    inset 0 0 10px rgb(255 255 255 / 0.07),
-    0 3px 10px rgb(0 0 0 / 0.35);
-}
-.root.glass .dock-ind::before,
-.root.glass .subtab-ind::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  background: linear-gradient(
-    135deg,
-    rgb(255 255 255 / 0.8),
-    rgb(255 255 255 / 0.1) 32%,
-    rgb(255 255 255 / 0.04) 62%,
-    rgb(255 255 255 / 0.5)
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-}
-.root.glass .dock-ind.moving {
-  animation: glass-lift 0.6s cubic-bezier(0.32, 0.72, 0, 1);
-}
 @keyframes glass-lift {
   0%,
   100% {
@@ -2919,25 +2265,6 @@ button.ao-text:hover {
   35% {
     scale: 1.08;
   }
-}
-.root.glass.tint-light .dock,
-.root.glass.tint-light .subtabs {
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0.2));
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.8), 0 6px 18px rgb(0 0 0 / 0.12);
-}
-@media (prefers-reduced-motion: reduce) {
-  .dock-ind,
-  .subtab-ind {
-    animation: none !important;
-  }
-}
-
-/* action chips (Pause / Clear) get breathing room under the page tabs */
-.expanded-body.has-subtabs .body-actions {
-  top: 12px;
-}
-.expanded-body.with-actions.has-subtabs .clips {
-  padding-top: 42px;
 }
 
 /* custom colour: a rainbow ring around a centre that shows the chosen colour, same size and selection as the other swatches */
@@ -3127,11 +2454,6 @@ button.ao-text:hover {
   display: none;
 }
 
-/* the arrows centre on the page body, which is shorter under a tab row: push the pages without one down by half that row so the arrows sit in the same place everywhere */
-.expanded-body:not(.has-subtabs) .nav-arrow {
-  top: calc(50% + 19px);
-}
-
 /* colour popup in the liquid glass theme: frosted card with a lit rim instead of a solid dark panel */
 .root.glass .cp-pop {
   background: rgb(0 0 0 / 0.16);
@@ -3230,50 +2552,10 @@ button.ao-text:hover {
   box-shadow: none;
 }
 
-/* ---------- avatar menu: pick an availability, then Edit profile ---------- */
-.profile-menu-wrap {
-  position: relative;
-  display: flex;
-}
-.profile-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: -34px;
-  z-index: 30;
-  width: 224px;
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-radius: 18px;
-  background: var(--island-solid, #17181f);
-  color: var(--fg);
-  box-shadow: 0 0 0 1px rgb(var(--fg-rgb) / 0.12), 0 12px 32px rgb(0 0 0 / 0.5);
-  animation: menu-in 0.18s cubic-bezier(0.34, 1.4, 0.64, 1);
-  transform-origin: top right;
-}
 @keyframes menu-in {
   from { opacity: 0; transform: scale(0.92) translateY(-4px); }
 }
-.root.light .profile-menu {
-  --island-solid: #fff;
-}
-.pm-who {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 2px 0;
-}
-.pm-who span {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  font-size: 13px;
-}
-.pm-who small {
-  opacity: 0.6;
-  font-size: 11px;
-}
+
 .presence-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3307,31 +2589,6 @@ button.ao-text:hover {
   box-shadow: inset 0 0 0 1.5px var(--c);
   font-weight: 600;
 }
-.pm-hint {
-  min-height: 14px;
-  padding: 0 2px;
-  font-size: 11px;
-  opacity: 0.6;
-}
-.pm-edit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.22);
-  color: inherit;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.pm-edit:hover {
-  background: rgb(var(--fg-rgb) / 0.1);
-}
 
 /* Now Playing: the lyric box takes whatever the other rows leave, enough for the previous, current and next line */
 .media {
@@ -3356,9 +2613,6 @@ button.ao-text:hover {
   .lyric.next {
     display: none;
   }
-}
-.expanded-body:has(.media) {
-  padding-top: 10px;
 }
 
 /* keep the island on its own GPU layer so the glass filters aren't re-rasterised while it drops in */
@@ -3436,25 +2690,6 @@ button.ao-text:hover {
   mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
 }
 
-/* update-available dot on the settings cog */
-.gear {
-  position: relative;
-}
-.gear.has-update {
-  opacity: 1;
-}
-.gear.has-update::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  right: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent, #4ade80);
-  box-shadow: 0 0 0 2px #000, 0 0 8px var(--accent, #4ade80);
-  animation: update-pulse 2s ease-in-out infinite;
-}
 @keyframes update-pulse {
   50% {
     transform: scale(1.25);
@@ -3478,25 +2713,6 @@ button.ao-text:hover {
   margin-left: auto;
 }
 
-.dock,
-.nav-arrow {
-  transition: opacity 0.25s ease 0.35s;
-}
-.expanded.fs .dock,
-.expanded.fs .nav-arrow {
-  opacity: 0;
-  pointer-events: none;
-  transition-delay: 0s;
-}
-.expanded.fs .dock {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-}
-.expanded.fs .expanded-body {
-  padding: 18px max(22px, 5vw) 28px;
-}
 .expanded.fs .chat {
   width: 100%;
   max-width: 920px;
@@ -3554,10 +2770,6 @@ button.ao-text:hover {
   cursor: grabbing;
 }
 
-/* fullscreen chat: contacts on the left, the conversation fills the right */
-.expanded.fs .expanded-body {
-  padding: 14px 28px 28px;
-}
 .expanded.fs .chat {
   max-width: none;
   margin: 0;
@@ -3684,11 +2896,6 @@ button.ao-text:hover {
   from { opacity: 0; transform: translateY(6px) scale(0.96); }
 }
 
-/* inside a chat the page arrows are in the way (Back returns to the list) */
-.expanded:has(.chat) .nav-arrow {
-  display: none;
-}
-
 /* date dividers in a chat */
 .chat-day {
   align-self: center;
@@ -3703,4 +2910,153 @@ button.ao-text:hover {
 .expanded.fs .chat-day {
   font-size: 12px;
   padding: 3px 14px;
+}
+
+/* ---------- open card: rail on top, page below ---------- */
+.expanded::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 220px;
+  /* the accent (from the album art when that is on) lights the top-left of the card */
+  background: radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%);
+  pointer-events: none;
+}
+.root.light .expanded::before {
+  background: radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 62%);
+}
+.xtop {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 18px 10px 14px;
+}
+.xtop-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-2);
+}
+.xtop-time {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.rail {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--raised);
+}
+.rail-lit {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: var(--pressed);
+  transition:
+    transform 0.32s cubic-bezier(0.3, 1.3, 0.5, 1),
+    width 0.32s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+.rail-lit.follow {
+  transition: none;
+}
+.rail-g {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.rail-ic {
+  position: relative;
+  width: 30px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--text-3);
+  transition: color 0.2s;
+}
+.rail-ic:hover {
+  color: var(--text-1);
+}
+.rail-g.on .rail-ic {
+  color: var(--accent);
+}
+.rail-dot {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--island-bg);
+}
+.rail-pages {
+  display: grid;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns 0.34s cubic-bezier(0.3, 1.1, 0.4, 1);
+}
+.rail-g.on .rail-pages {
+  grid-template-columns: 1fr;
+}
+.rail-in {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+}
+.rail-pg {
+  position: relative;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-3);
+  transition: color 0.2s;
+}
+.rail-pg:hover {
+  color: var(--text-2);
+}
+.rail-pg.on {
+  color: var(--text-1);
+}
+.rail-g.on .rail-pg:last-child {
+  margin-right: 2px;
+}
+.xbody {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 2px 18px 18px;
+  display: flex;
+  flex-direction: column;
+}
+.xbody > .page {
+  flex: 1;
+  min-height: 0;
+}
+.xactions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.expanded.fs .xbody {
+  padding: 4px max(22px, 5vw) 28px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-lit,
+  .rail-pages {
+    transition: none;
+  }
 }

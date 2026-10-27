@@ -3,7 +3,7 @@ import { ACCENTS, type Settings } from '../lib/settings'
 import { BACKEND_READY } from '../lib/supabase'
 import { USERNAME_RE, type Auth } from '../lib/useAuth'
 import { squarePhoto } from '../lib/photo'
-import { presenceOf } from '../lib/presence'
+import { PRESENCES, presenceOf } from '../lib/presence'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { Avatar } from './Avatar'
 import { play } from 'cuelume'
@@ -267,6 +267,35 @@ function Editor({ auth, settings, update, onHold }: Props) {
       </div>
 
       {!p && <div className="form-msg">Pick a username so friends can find you.</div>}
+
+      {p && (
+        <div className="field">
+          <label>Availability</label>
+          <div className="presence-grid" role="radiogroup">
+            {PRESENCES.map((o) => (
+              <button
+                key={o.id}
+                role="radio"
+                data-p={o.id}
+                aria-checked={o.id === presenceOf(p)}
+                className={o.id === presenceOf(p) ? 'active' : ''}
+                data-cuelume-select
+                onClick={async () => {
+                  const err = await auth.saveProfile({ presence: o.id })
+                  if (err) {
+                    play('error', { emphasis: 'subtle' })
+                    setMsg(err)
+                  }
+                }}
+              >
+                <i className={`presence-dot inline ${o.id}`} />
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <small>{PRESENCES.find((o) => o.id === presenceOf(p))?.hint}</small>
+        </div>
+      )}
 
       <div className="field">
         <label>Avatar</label>

@@ -16,7 +16,6 @@ import { SettingsWidget } from './widgets/SettingsWidget'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
-import { Dock } from './widgets/Dock'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
@@ -25,7 +24,7 @@ import { useAuth } from './lib/useAuth'
 import { useSocial } from './lib/useSocial'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { useClipboard } from './lib/useClipboard'
-import { ExpandedHeader } from './widgets/ExpandedHeader'
+import { Rail } from './island/Rail'
 import {
   DEFAULT_APPS,
   DEMO_APPS,
@@ -43,7 +42,7 @@ import { useHeartbeat } from './lib/useHeartbeat'
 import { play, type PlayOptions, type SoundName } from 'cuelume'
 import { useSoundSetup } from './lib/sound'
 import { cachedWeather, describe as describeWeather } from './lib/weather'
-import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
+import { GROUPS, PAGES, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
 // loaded once at startup: building a fresh Audio per message re-fetches and re-decodes the file, which is what made the sound lag
@@ -594,13 +593,17 @@ export default function App() {
     prevIdx.current = pageIdx
   }
 
-  // the card opening and closing, and every page change inside it (arrows, dock, keys, swipes)
+  // the card opening and closing, and every page change inside it (rail, keys, swipes)
   const soundState = useRef({ expanded, tab })
   useEffect(() => {
     const was = soundState.current
-    // opening is a press on the island, so it taps; closing lets the card fall shut
+    const groupOf = (t: Tab) => GROUPS.find((g) => g.pages.includes(t))?.id
+    // opening is a press on the island, so it taps; closing lets the card fall shut.
+    // Moving to another group on the rail selects it; moving within a group navigates.
     if (expanded !== was.expanded) play(expanded ? 'tap' : 'close', { emphasis: expanded ? 'normal' : 'subtle' })
-    else if (expanded && tab !== was.tab) play('navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
+    else if (expanded && tab !== was.tab) {
+      play(groupOf(tab) !== groupOf(was.tab) ? 'select' : 'navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
+    }
     soundState.current = { expanded, tab }
   }, [expanded, tab])
 
@@ -679,7 +682,7 @@ export default function App() {
           const el = e.target as HTMLElement
           if (el.closest('button, input, textarea, a, .scrub, [draggable="true"]')) return
           // inside the open card only the header strip is a handle
-          if (mode === 'expanded' && !el.closest('.xhead')) return
+          if (mode === 'expanded' && !el.closest('.xtop')) return
           dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy: posRef.current.y, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
@@ -735,7 +738,6 @@ export default function App() {
 
   if (mode === 'expanded') {
     contentKey = 'expanded'
-    const page = PAGES.find((p) => p.id === tab)!
     const action =
       tab === 'shelf' && shelf.items.length ? (
         <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={shelf.clear}>Clear</button>
@@ -754,34 +756,24 @@ export default function App() {
       ) : null
     content = (
       <div className={`expanded ${fs ? 'fs' : ''}`}>
-        <ExpandedHeader
-          title={page.title}
-          timer={timer ? remaining / (timer.total / 1000) : null}
-          date={d}
-          clock={clock}
-          bars={playing && track ? track.hue : null}
-          profile={auth.profile}
-          onProfile={() => setTab('profile')}
-          onPresence={(v) => auth.saveProfile({ presence: v })}
-          profileActive={tab === 'profile'}
-          onSettings={() => setTab('settings')}
-          settingsActive={tab === 'settings'}
-          updateAvailable={updater.state.s === 'available'}
-        />
-        {group && group.pages.length > 1 && (
-          <div className="subtabs" onClick={(e) => e.stopPropagation()}>
-            {group.pages.map((id) => (
-              <button key={id} className={id === tab ? 'active' : ''} onClick={() => setTab(id)}>
-                {id === tab && (
-                  <motion.span layoutId="subtab-ind" className="subtab-ind" style={{ borderRadius: 999 }} transition={{ type: 'spring', stiffness: 380, damping: 38 }} />
-                )}
-                <span className="subtab-label">{SHORT[id]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <div className={`expanded-body ${action ? 'with-actions' : ''} ${group && group.pages.length > 1 ? 'has-subtabs' : ''}`}>
-          {action && <div className="body-actions">{action}</div>}
+        <div className="xtop">
+          <Rail
+            groups={groups}
+            tab={tab}
+            onPage={setTab}
+            onGroup={(id) => {
+              const g = groups.find((x) => x.id === id)!
+              setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
+            }}
+            dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+          />
+          <span className="xtop-status">
+            {timer && <Ring fraction={remaining / (timer.total / 1000)} size={16} stroke={2.5} />}
+            <b className="xtop-time">{clock}</b>
+          </span>
+        </div>
+        <div className="xbody">
+          {action && <div className="xactions">{action}</div>}
           <AnimatePresence mode="popLayout" initial={false} custom={dirRef.current}>
             <motion.div
               key={tab}
@@ -879,25 +871,7 @@ export default function App() {
             {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
             </motion.div>
           </AnimatePresence>
-          <button className="nav-arrow left" aria-label="Previous page" onClick={(e) => { e.stopPropagation(); go(-1) }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M14.5 6 8.5 12l6 6" />
-            </svg>
-          </button>
-          <button className="nav-arrow right" aria-label="Next page" onClick={(e) => { e.stopPropagation(); go(1) }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M9.5 6l6 6-6 6" />
-            </svg>
-          </button>
         </div>
-        <Dock
-          groups={groups}
-          activeId={group?.id}
-          onSelect={(id) => {
-            const g = groups.find((x) => x.id === id)!
-            setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
-          }}
-        />
         {notes && (
           <div className="whatsnew" onClick={(e) => e.stopPropagation()}>
             <small>What's new in v{notes.version}</small>

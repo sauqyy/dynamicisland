@@ -1,4 +1,4 @@
-/** Line icons for the page groups in the dock. They use the current text colour. */
+/** Line icons for the page groups on the rail. They use the current text colour. */
 export function GroupIcon({ id, size = 18 }: { id: string; size?: number }) {
   const common = {
     width: size,
