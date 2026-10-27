@@ -37,7 +37,7 @@ export interface Settings {
   idleBars: boolean
   /** play a sound when a chat message arrives */
   messageSound: boolean
-  /** small sounds for clicks, typing, pages and alerts */
+  /** small sounds for clicks, typing, pages and alerts; off = muted */
   uiSounds: boolean
   /** which material the interface sounds are made of */
   soundPack: SoundPack
