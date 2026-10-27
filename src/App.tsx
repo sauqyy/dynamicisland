@@ -90,6 +90,27 @@ const ACTIONS_H = 34
 
 /** Pill width that fits a line of text, up to what the stage can hold. */
 const textWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(300, text.length * 7.2 + 80))
+/** The same with room for the art on the left and the waveform on the right. */
+const liveWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(236, text.length * 7.2 + 104))
+
+/** One line of pill text; a new line rises in as the old one leaves. */
+function LiveText({ text, k }: { text: string; k: string | number }) {
+  return (
+    <span className="live-text">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={k}
+          className="live-line"
+          initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.28 } }}
+          exit={{ opacity: 0, y: -8, filter: 'blur(4px)', transition: { duration: 0.16 } }}
+        >
+          {text}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  )
+}
 
 function stepPage(list: { id: Tab }[], from: Tab, dir: -1 | 1): Tab {
   const i = list.findIndex((p) => p.id === from)
@@ -550,6 +571,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
   const idleText = idleLyric ? lyricText : idleExtra
+  const d = new Date(now)
+  const clock = clockText(d, settings.clock24)
+  // while music plays the pill carries the album art and the waveform around its text:
+  // the lyric line when the pill shows lyrics, otherwise the weather or the clock
+  const live = playing && track ? idleText || clock : ''
+  const peekText = playing && track ? lyricText || `${track.title} · ${track.artist}` : ''
 
   const mode = updating ? 'alert' : expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
 
@@ -560,8 +587,8 @@ export default function App() {
     : Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
 
   // grow the pill to fit the lyric line, up to what the stage can hold
-  const lyricW = textWidth(lyricText)
-  const idleW = idleLyric ? lyricW : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
+  const idleW = live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
+  const peekW = peekText ? Math.max(340, liveWidth(peekText)) : 300
 
   const shape: Shape = useMemo(() => {
     switch (mode) {
@@ -571,11 +598,11 @@ export default function App() {
       case 'alert':
         return { w: 320, h: 60, r: 26 }
       case 'peek':
-        return { w: showLyricPeek ? lyricW : 230, h: 40, r: 16 }
+        return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, showLyricPeek, idleW, lyricW])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -753,8 +780,6 @@ export default function App() {
       }
     : undefined
 
-  const d = new Date(now)
-  const clock = clockText(d, settings.clock24)
   let content: React.ReactNode
   let contentKey: string
 
@@ -950,30 +975,45 @@ export default function App() {
       </div>
     )
   } else if (mode === 'peek') {
-    contentKey = showLyricPeek ? 'peek-lyric' : playing && track ? 'peek-track' : 'peek-clock'
-    content =
-      showLyricPeek && track ? (
-        <div className="peek">
+    if (peekText && track) {
+      contentKey = 'peek-live'
+      content = (
+        <div className="live peek-live">
           <Art track={track} size={22} />
-          <span className="peek-text lyric-line" key={lyricIdx}>{lyricText}</span>
+          <LiveText text={peekText} k={lyricText ? lyricIdx : 'title'} />
+          {settings.idleBars && <Bars active hue={track.hue} />}
         </div>
-      ) : (
+      )
+    } else {
+      contentKey = 'peek-clock'
+      content = (
         <div className="peek center">
           <span className="peek-text">
-            {playing && track
-              ? `${track.title} · ${track.artist}`
-              : [
-                  clock,
-                  d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }),
-                  battery !== null ? `${battery}%` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
         </div>
       )
+    }
+  } else if (live && track) {
+    contentKey = 'idle-live'
+    content = (
+      <div className="live">
+        <Art track={track} size={22} />
+        <LiveText text={live} k={idleLyric ? lyricIdx : live} />
+        {(unreadCount > 0 || privacy.camera || privacy.mic) && (
+          <span className="live-dots">
+            {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
+            {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
+            {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
+          </span>
+        )}
+        {settings.idleBars && <Bars active hue={track.hue} />}
+      </div>
+    )
   } else {
-    contentKey = idleLyric ? `idle-lyric-${lyricIdx}` : idleExtra ? 'idle-extra' : 'idle'
+    contentKey = idleExtra ? 'idle-extra' : 'idle'
     content = (
       <div className={`idle ${idleText ? 'lyric-idle' : 'idle-grid'}`}>
         {idleText ? (
