@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { play } from 'cuelume'
 
 type HSV = { h: number; s: number; v: number }
 
@@ -68,6 +69,7 @@ export function ColorPicker({ value, onAdd }: Props) {
           className="cp-hex"
           value={text}
           spellCheck={false}
+          data-cuelume-type
           onChange={(e) => {
             setText(e.target.value)
             const parsed = hexToHsv(e.target.value)
@@ -75,10 +77,13 @@ export function ColorPicker({ value, onAdd }: Props) {
           }}
           onKeyDown={(e) => {
             e.stopPropagation()
-            if (e.key === 'Enter') onAdd(hex)
+            if (e.key === 'Enter') {
+              play('tap')
+              onAdd(hex)
+            }
           }}
         />
-        <button className="cp-add" onClick={() => onAdd(hex)}>
+        <button className="cp-add" data-cuelume-tap onClick={() => onAdd(hex)}>
           Add
         </button>
       </div>

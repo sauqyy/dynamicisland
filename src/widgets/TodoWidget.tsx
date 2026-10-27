@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, Reorder, motion } from 'motion/react'
+import { play } from 'cuelume'
 import type { Todo } from '../types'
 
 interface Props {
@@ -13,6 +14,7 @@ export function TodoWidget({ todos, setTodos }: Props) {
   const add = () => {
     const text = draft.trim()
     if (!text) return
+    play('tap')
     setTodos([...todos, { id: Date.now(), text, done: false }])
     setDraft('')
   }
@@ -23,6 +25,7 @@ export function TodoWidget({ todos, setTodos }: Props) {
         className="todo-input"
         placeholder="Add a task and press Enter"
         value={draft}
+        data-cuelume-type
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation()
@@ -43,6 +46,8 @@ export function TodoWidget({ todos, setTodos }: Props) {
               <motion.button
                 className="check"
                 aria-label="Toggle done"
+                aria-pressed={t.done}
+                data-cuelume-toggle
                 animate={t.done ? { scale: [1, 1.35, 1] } : { scale: 1 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 18 }}
                 onClick={() => setTodos(todos.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))}
@@ -53,6 +58,8 @@ export function TodoWidget({ todos, setTodos }: Props) {
               <button
                 className="x"
                 aria-label="Delete"
+                data-cuelume-close
+                data-cuelume-emphasis="subtle"
                 onClick={() => setTodos(todos.filter((x) => x.id !== t.id))}
               >
                 ×

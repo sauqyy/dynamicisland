@@ -10,6 +10,7 @@ import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, TAB_ANIMS, type Anim, type IdleDis
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
 import { PAGES } from '../types'
+import { disclosureCue, soundTurnedOn } from '../lib/sound'
 
 interface Props {
   settings: Settings
@@ -19,7 +20,7 @@ interface Props {
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} role="switch" aria-checked={on}>
+    <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} role="switch" aria-checked={on} data-cuelume-toggle>
       <span />
     </button>
   )
@@ -47,6 +48,8 @@ function Slider({
         max={limits.max}
         step={limits.step}
         value={value}
+        data-cuelume-select
+        data-cuelume-emphasis="subtle"
         onChange={(e) => onChange(Number(e.target.value))}
       />
       <span className="slider-value">{format(value)}</span>
@@ -117,7 +120,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <span>Show in pill</span>
         <div className="segmented small">
           {(['clock', 'lyrics', 'weather'] as IdleDisplay[]).map((v) => (
-            <button key={v} className={settings.idle === v ? 'active' : ''} onClick={() => update({ idle: v })}>
+            <button key={v} className={settings.idle === v ? 'active' : ''} data-cuelume-select onClick={() => update({ idle: v })}>
               {v}
             </button>
           ))}
@@ -130,6 +133,16 @@ export function SettingsWidget({ settings, update, updater }: Props) {
       <div className="row">
         <span>Message sound</span>
         <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />
+      </div>
+      <div className="row">
+        <span>Interface sounds</span>
+        <Toggle
+          on={settings.uiSounds}
+          onChange={(v) => {
+            update({ uiSounds: v })
+            if (v) soundTurnedOn()
+          }}
+        />
       </div>
       <Slider
         label="Text size"
@@ -150,6 +163,8 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <button
           className="chip"
           disabled={!settings.posX && !settings.posY}
+          data-cuelume-tap
+          data-cuelume-emphasis="subtle"
           onClick={() => update({ posX: 0, posY: 0 })}
         >
           Reset
@@ -164,6 +179,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
               key={p.id}
               className={`chip ${on ? 'on' : ''}`}
               aria-pressed={on}
+              data-cuelume-toggle
               onClick={() =>
                 update({ hiddenPages: on ? [...settings.hiddenPages, p.id] : settings.hiddenPages.filter((h) => h !== p.id) })
               }
@@ -193,6 +209,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
             <button
               key={min}
               className={settings.clipAutoClear === min ? 'active' : ''}
+              data-cuelume-select
               onClick={() => update({ clipAutoClear: min })}
             >
               {label}
@@ -213,7 +230,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <span>Display</span>
         <div className="segmented small">
           {Array.from({ length: monitors + 1 }, (_, i) => (
-            <button key={i} className={settings.monitor === i ? 'active' : ''} onClick={() => update({ monitor: i })}>
+            <button key={i} className={settings.monitor === i ? 'active' : ''} data-cuelume-select onClick={() => update({ monitor: i })}>
               {i === 0 ? 'Main' : i}
             </button>
           ))}
@@ -226,6 +243,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
             key={a}
             className={`chip ${settings.tabAnim === a ? 'on' : ''}`}
             style={{ opacity: settings.tabAnim === a ? 1 : 0.6, textTransform: 'capitalize' }}
+            data-cuelume-select
             onClick={() => {
               update({ tabAnim: a })
               flip()
@@ -252,7 +270,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
             <span className="ac-line short" />
           </motion.div>
         </AnimatePresence>
-        <button className="chip" onClick={flip}>
+        <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={flip}>
           Replay
         </button>
       </div>
@@ -260,7 +278,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <span>Animation</span>
         <div className="segmented small">
           {(['bouncy', 'smooth', 'snappy'] as Anim[]).map((a) => (
-            <button key={a} className={settings.anim === a ? 'active' : ''} onClick={() => update({ anim: a })}>
+            <button key={a} className={settings.anim === a ? 'active' : ''} data-cuelume-select onClick={() => update({ anim: a })}>
               {a}
             </button>
           ))}
@@ -269,7 +287,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
       <div className="size-box">
         <div className="row">
           <b>Island size</b>
-          <button className="chip" onClick={() => update({ ...SIZE_DEFAULTS })}>
+          <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={() => update({ ...SIZE_DEFAULTS })}>
             Reset
           </button>
         </div>
@@ -299,11 +317,11 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <span>Updates</span>
         <span className="update-status">{status}</span>
         {update_.s === 'available' ? (
-          <button className="chip" onClick={() => downloadUpdate(update_.url)}>
+          <button className="chip" data-cuelume-tap onClick={() => downloadUpdate(update_.url)}>
             Update
           </button>
         ) : (
-          <button className="chip" disabled={update_.s === 'checking' || update_.s === 'downloading'} onClick={checkUpdate}>
+          <button className="chip" disabled={update_.s === 'checking' || update_.s === 'downloading'} data-cuelume-tap onClick={checkUpdate}>
             Check
           </button>
         )}
@@ -312,7 +330,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
         <span>Theme</span>
         <div className="segmented small">
           {(['dark', 'light', 'glass', 'auto'] as Theme[]).map((t) => (
-            <button key={t} className={settings.theme === t ? 'active' : ''} onClick={() => update({ theme: t })}>
+            <button key={t} className={settings.theme === t ? 'active' : ''} data-cuelume-select onClick={() => update({ theme: t })}>
               {t}
             </button>
           ))}
@@ -323,7 +341,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
           <span>Glass style</span>
           <div className="segmented small">
             {(['dark', 'light', 'gradient'] as GlassTint[]).map((t) => (
-              <button key={t} className={settings.glassTint === t ? 'active' : ''} onClick={() => update({ glassTint: t })}>
+              <button key={t} className={settings.glassTint === t ? 'active' : ''} data-cuelume-select onClick={() => update({ glassTint: t })}>
                 {t}
               </button>
             ))}
@@ -338,6 +356,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
               key={c}
               aria-label={c}
               className={!settings.accentFromMusic && settings.accent === c ? 'active' : ''}
+              data-cuelume-select
               style={{ background: c }}
               onClick={() => update({ accent: c, accentFromMusic: false })}
             />
@@ -347,6 +366,7 @@ export function SettingsWidget({ settings, update, updater }: Props) {
             className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'filled active'} ${customOpen ? 'open' : ''}`}
             title="Custom colour"
             aria-label="Custom colour"
+            {...disclosureCue(customOpen)}
             style={ACCENTS.includes(settings.accent) ? undefined : ({ '--swatch': settings.accent } as React.CSSProperties)}
             onClick={() => setCustomOpen((o) => !o)}
           />

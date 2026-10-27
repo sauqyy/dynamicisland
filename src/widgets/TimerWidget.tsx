@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { play } from 'cuelume'
 import { fmt } from './MediaWidget'
 import type { TimerState } from '../types'
 
@@ -43,11 +44,15 @@ function CustomTime({ onStart }: { onStart: (minutes: number) => void }) {
       placeholder="0"
       aria-label={label}
       value={value}
+      data-cuelume-type
       onChange={(e) => set(e.target.value.replace(/\D/g, '').slice(0, 3))}
       onBlur={() => Number(value) > max && set(String(max))}
       onKeyDown={(e) => {
         e.stopPropagation()
-        if (e.key === 'Enter') start()
+        if (e.key === 'Enter' && total > 0) {
+          play('tap')
+          start()
+        }
       }}
     />
   )
@@ -57,7 +62,7 @@ function CustomTime({ onStart }: { onStart: (minutes: number) => void }) {
       <span>min</span>
       {field(sec, setSec, 'Seconds', 59)}
       <span>sec</span>
-      <button className="pill-btn" disabled={total <= 0} onClick={start}>
+      <button className="pill-btn" disabled={total <= 0} data-cuelume-tap onClick={start}>
         Start
       </button>
     </div>
@@ -76,14 +81,14 @@ export function TimerWidget({ timer, now, onStart, onCancel }: Props) {
             <Ring fraction={fraction} size={96} stroke={7} />
             <div className="timer-time">{fmt(Math.ceil(remaining))}</div>
           </div>
-          <button className="pill-btn danger" onClick={onCancel}>Cancel</button>
+          <button className="pill-btn danger" data-cuelume-close onClick={onCancel}>Cancel</button>
         </>
       ) : (
         <>
           <div className="timer-label">Start a timer</div>
           <div className="presets">
             {PRESETS.map((m) => (
-              <button key={m} className="pill-btn" onClick={() => onStart(m)}>
+              <button key={m} className="pill-btn" data-cuelume-tap onClick={() => onStart(m)}>
                 {m}m
               </button>
             ))}

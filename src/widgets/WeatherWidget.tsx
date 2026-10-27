@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { play } from 'cuelume'
 import { cachedWeather, describe, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
 import type { Settings } from '../lib/settings'
 
@@ -82,7 +83,7 @@ export function WeatherWidget({ settings, update }: Props) {
       <div className="weather center" onClick={(e) => e.stopPropagation()}>
         <div className="timer-label">{error ?? (loading ? 'Loading weather…' : '')}</div>
         {error && (
-          <button className="pill-btn" onClick={() => setEditing(true)}>
+          <button className="pill-btn" data-cuelume-open onClick={() => setEditing(true)}>
             Change city
           </button>
         )}
@@ -103,7 +104,7 @@ export function WeatherWidget({ settings, update }: Props) {
           <div className="weather-desc">{now.label}</div>
         </div>
         <div className="weather-side">
-          <button className="chip" onClick={() => { setDraft(city); setEditing(true) }}>
+          <button className="chip" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => { setDraft(city); setEditing(true) }}>
             {weather.city}
           </button>
           <small>
@@ -181,6 +182,7 @@ function CityPicker({
           autoFocus
           placeholder="Search a city, e.g. Jakarta"
           value={query}
+          data-cuelume-type
           onChange={(e) => {
             touched.current = true
             setQuery(e.target.value)
@@ -189,12 +191,19 @@ function CityPicker({
             e.stopPropagation()
             if (e.key === 'ArrowDown') {
               e.preventDefault()
+              if (active < hits.length - 1) play('select', { emphasis: 'subtle', direction: 'forward' })
               setActive((a) => Math.min(hits.length - 1, a + 1))
             } else if (e.key === 'ArrowUp') {
               e.preventDefault()
+              if (active > 0) play('select', { emphasis: 'subtle', direction: 'back' })
               setActive((a) => Math.max(0, a - 1))
-            } else if (e.key === 'Enter' && hits[active]) onPick(hits[active])
-            else if (e.key === 'Escape' && canCancel) onCancel()
+            } else if (e.key === 'Enter' && hits[active]) {
+              play('select')
+              onPick(hits[active])
+            } else if (e.key === 'Escape' && canCancel) {
+              play('close', { emphasis: 'subtle' })
+              onCancel()
+            }
           }}
         />
         {(hits.length > 0 || state !== 'idle') && (
@@ -208,6 +217,7 @@ function CityPicker({
                 role="option"
                 aria-selected={i === active}
                 className={i === active ? 'active' : ''}
+                data-cuelume-select
                 onMouseEnter={() => setActive(i)}
                 onClick={() => onPick(h)}
               >
@@ -219,7 +229,7 @@ function CityPicker({
         )}
       </div>
       {canCancel && (
-        <button className="chip" onClick={onCancel}>
+        <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={onCancel}>
           Cancel
         </button>
       )}

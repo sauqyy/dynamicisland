@@ -31,6 +31,7 @@ export function NotesWidget() {
         className="notes-input"
         placeholder="Jot something down…"
         value={text}
+        data-cuelume-type
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => e.stopPropagation()}
       />

@@ -104,6 +104,8 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
       <div
         className="scrub"
         ref={barRef}
+        data-cuelume-select
+        data-cuelume-emphasis="subtle"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
           seekFromEvent(e.clientX)
@@ -118,11 +120,11 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
       </div>
 
       <div className="controls">
-        <button onClick={() => onSkip(-1)} aria-label="Previous">⏮</button>
-        <button className="play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'}>
+        <button onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">⏮</button>
+        <button className="play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
           {playing ? '⏸' : '▶'}
         </button>
-        <button onClick={() => onSkip(1)} aria-label="Next">⏭</button>
+        <button onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">⏭</button>
       </div>
     </div>
   )
