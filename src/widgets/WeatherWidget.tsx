@@ -36,31 +36,6 @@ export function WeatherWidget({ settings, update }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city, fahrenheit])
 
-  const hourlyRef = useRef<HTMLDivElement>(null)
-  const [edges, setEdges] = useState({ left: false, right: false })
-  const updateEdges = () => {
-    const el = hourlyRef.current
-    if (el) setEdges({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 })
-  }
-  useEffect(() => {
-    const el = hourlyRef.current
-    const now = el?.children[weather?.nowHour ?? 0] as HTMLElement | undefined
-    if (el && now) el.scrollLeft = now.offsetLeft - el.offsetLeft - 8
-    updateEdges()
-  }, [weather])
-  // sideways wheel / trackpad scrolling; a plain mouse wheel scrolls the strip too
-  useEffect(() => {
-    const el = hourlyRef.current
-    if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [weather])
-
   const unit = fahrenheit ? '°F' : '°C'
 
   if (editing || !city) {
@@ -92,38 +67,117 @@ export function WeatherWidget({ settings, update }: Props) {
   }
 
   const now = describe(weather.code)
+  const start = weather.nowHour ?? 0
+  const hours = weather.hourly.slice(start, start + HOURS)
+  const temps = weather.hourly.map((h) => h.temp)
+  const hi = Math.max(...temps)
+  const lo = Math.min(...temps)
+  // the next rain in the coming hours (or how long the current rain lasts)
+  const rainingNow = isRain(weather.code)
+  const rainFrom = rainingNow ? -1 : hours.findIndex((h, i) => i > 0 && isRain(h.code))
+  const rainUntil = rainingNow ? hours.findIndex((h, i) => i > 0 && !isRain(h.code)) : -1
+  const rainText = rainingNow
+    ? rainUntil > 0
+      ? `Raining now, easing around ${hours[rainUntil].hour}:00`
+      : 'Raining now, for the next few hours'
+    : rainFrom > 0
+      ? `Rain from ${hours[rainFrom].hour}:00. Bring an umbrella if you head out.`
+      : ''
   return (
-    <div className="weather" onClick={(e) => e.stopPropagation()}>
-      <div className="weather-now">
-        <span className="weather-icon">{now.icon}</span>
-        <div>
-          <div className="weather-temp">
-            {weather.temp}
-            {unit}
-          </div>
-          <div className="weather-desc">{now.label}</div>
-        </div>
-        <div className="weather-side">
-          <button className="chip" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => { setDraft(city); setEditing(true) }}>
-            {weather.city}
-          </button>
-          <small>
-            Feels {weather.feels}° · 💧{weather.humidity}% · 💨{weather.wind}
-          </small>
-        </div>
+    <div className="wx" onClick={(e) => e.stopPropagation()}>
+      <div className="wx-now">
+        <span className="wx-temp">{weather.temp}°</span>
+        <span className="wx-desc">
+          <b>{now.label}</b>
+          <span>
+            H {hi}° · L {lo}° · Feels {weather.feels}°
+          </span>
+          <span>
+            💧{weather.humidity}% · 💨{weather.wind}
+          </span>
+        </span>
+        <button className="chip wx-city" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => { setDraft(city); setEditing(true) }}>
+          {weather.city} · {unit}
+        </button>
       </div>
-      <div
-        className={`hourly ${edges.left ? 'more-left' : ''} ${edges.right ? 'more-right' : ''}`}
-        ref={hourlyRef}
-        onScroll={updateEdges}
-      >
-        {weather.hourly.map((h, i) => (
-          <div key={h.hour} className={`hour ${i === weather.nowHour ? 'now' : ''}`}>
-            <small>{i === weather.nowHour ? 'Now' : `${h.hour}:00`}</small>
-            <span>{describe(h.code).icon}</span>
-            <b>{h.temp}°</b>
-          </div>
-        ))}
+      {rainText && <div className="wx-rain">🌧️ {rainText}</div>}
+      <TempCurve hours={weather.hourly} now={start} />
+    </div>
+  )
+}
+
+/** Hours the rain heads-up looks ahead, and hours visible at once in the curve. */
+const HOURS = 8
+/** Width of one hour in the curve, in px: eight fit across the card. */
+const VISIBLE_COL = 50.5
+const isRain = (code: number) => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95
+
+/** Today's hours as a temperature curve with rainy hours shaded, scrolled so the current hour is first. */
+function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
+  const strip = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = strip.current
+    if (el) el.scrollLeft = (now * el.scrollWidth) / hours.length
+  }, [now, hours.length])
+  // sideways wheel / trackpad scrolling; a plain mouse wheel scrolls the strip too
+  useEffect(() => {
+    const el = strip.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
+  if (hours.length < 2) return null
+  const COL = 50
+  const W = hours.length * COL
+  const H = 58
+  const ts = hours.map((h) => h.temp)
+  const min = Math.min(...ts)
+  const span = Math.max(3, Math.max(...ts) - min)
+  const x = (i: number) => (i + 0.5) * COL
+  const y = (t: number) => 46 - ((t - min) / span) * 28
+  const pts = hours.map((h, i) => [x(i), y(h.temp)])
+  let d = `M${pts[0][0]} ${pts[0][1]}`
+  for (let i = 1; i < pts.length; i++) {
+    const mx = (pts[i - 1][0] + pts[i][0]) / 2
+    d += ` C${mx} ${pts[i - 1][1]} ${mx} ${pts[i][1]} ${pts[i][0]} ${pts[i][1]}`
+  }
+  return (
+    <div className="wx-chart" ref={strip}>
+      <div className="wx-strip" style={{ width: (W * VISIBLE_COL) / COL }}>
+        <svg viewBox={`0 0 ${W} ${H}`} aria-label="Temperature through the day">
+          <defs>
+            <linearGradient id="wx-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--accent)" stopOpacity="0.28" />
+              <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {hours.map((h, i) =>
+            isRain(h.code) ? <rect key={h.hour} x={x(i) - COL / 2 + 3} y={0} width={COL - 6} height={H} rx={9} className="wx-rain-col" /> : null,
+          )}
+          <path d={`${d} L${pts[pts.length - 1][0]} ${H} L${pts[0][0]} ${H}Z`} fill="url(#wx-area)" />
+          <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
+          {pts.map(([px, py], i) => (
+            <g key={hours[i].hour}>
+              <circle cx={px} cy={py} r={i === now ? 3.5 : 2.2} className={i === now ? 'wx-pt now' : 'wx-pt'} />
+              <text x={px} y={py - 9} textAnchor="middle" className="wx-label">
+                {hours[i].temp}°
+              </text>
+            </g>
+          ))}
+        </svg>
+        <div className="wx-cols" style={{ gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` }}>
+          {hours.map((h, i) => (
+            <div key={h.hour} className={isRain(h.code) ? 'rain' : ''}>
+              <span>{describe(h.code).icon}</span>
+              <small>{i === now ? 'Now' : h.hour}</small>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

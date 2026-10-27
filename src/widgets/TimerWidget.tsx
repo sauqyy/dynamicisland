@@ -74,28 +74,32 @@ export function TimerWidget({ timer, now, onStart, onCancel }: Props) {
   const fraction = timer ? remaining / (timer.total / 1000) : 0
 
   return (
-    <div className="timer" onClick={(e) => e.stopPropagation()}>
-      {timer ? (
-        <>
-          <div className="timer-ring">
-            <Ring fraction={fraction} size={96} stroke={7} />
-            <div className="timer-time">{fmt(Math.ceil(remaining))}</div>
-          </div>
-          <button className="pill-btn danger" data-cuelume-close onClick={onCancel}>Cancel</button>
-        </>
-      ) : (
-        <>
-          <div className="timer-label">Start a timer</div>
-          <div className="presets">
-            {PRESETS.map((m) => (
-              <button key={m} className="pill-btn" data-cuelume-tap onClick={() => onStart(m)}>
-                {m}m
-              </button>
-            ))}
-          </div>
-          <CustomTime onStart={onStart} />
-        </>
-      )}
+    <div className="tm" onClick={(e) => e.stopPropagation()}>
+      <div className="dial">
+        <Ring fraction={fraction} size={132} stroke={7} />
+        <div className="dial-t">
+          <b>{timer ? fmt(Math.ceil(remaining)) : '0:00'}</b>
+          <small>{timer ? 'Running' : 'Pick a time'}</small>
+        </div>
+      </div>
+      <div className="tm-side">
+        {timer ? (
+          <button className="tm-btn" data-cuelume-close onClick={onCancel}>
+            Cancel
+          </button>
+        ) : (
+          <>
+            <div className="tm-presets">
+              {PRESETS.map((m) => (
+                <button key={m} className="tm-preset" data-cuelume-tap onClick={() => onStart(m)}>
+                  {m} min
+                </button>
+              ))}
+            </div>
+            <CustomTime onStart={onStart} />
+          </>
+        )}
+      </div>
     </div>
   )
 }

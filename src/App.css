@@ -134,9 +134,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.lyric-line {
-  font-weight: 600;
-}
 
 /* ---------- expanded ---------- */
 .expanded {
@@ -166,31 +163,10 @@
   background: rgb(var(--fg-rgb) / 0.16);
 }
 
-/* ---------- media ---------- */
-.media-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 .art {
   flex: none;
   border-radius: 10px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
-}
-.media-meta {
-  flex: 1;
-  min-width: 0;
-}
-.title {
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.artist {
-  font-size: 12px;
-  opacity: 0.6;
 }
 
 .bars {
@@ -211,44 +187,6 @@
 @keyframes bar {
   from { height: 3px; }
   to { height: 16px; }
-}
-
-.lyrics {
-  position: relative;
-  height: 70px;
-  margin-top: 8px;
-  overflow: hidden;
-  text-align: center;
-  mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent);
-}
-.lyric-stack {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-}
-.lyric {
-  font-size: 12px;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0.35;
-  min-height: 15px;
-}
-.lyric.now {
-  font-size: 16px;
-  font-weight: 700;
-  opacity: 1;
-}
-.lyric.none {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  opacity: 0.5;
 }
 
 .scrub {
@@ -279,26 +217,6 @@
   font-size: 10px;
   opacity: 0.5;
   font-variant-numeric: tabular-nums;
-}
-.controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 22px;
-  margin-top: 2px;
-}
-.controls button {
-  font-size: 18px;
-  width: 40px;
-  height: 36px;
-  border-radius: 18px;
-  transition: transform 0.15s;
-}
-.controls button:active {
-  transform: scale(0.85);
-}
-.controls .play {
-  font-size: 22px;
 }
 
 /* ---------- timer ---------- */
@@ -828,68 +746,6 @@
   align-items: center;
   gap: 12px;
 }
-.weather-now {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.weather-icon {
-  font-size: 52px;
-  line-height: 1;
-}
-.weather-temp {
-  font-size: 38px;
-  font-weight: 700;
-  line-height: 1;
-}
-.weather-desc {
-  font-size: 13px;
-  opacity: 0.7;
-  margin-top: 2px;
-}
-.weather-side {
-  margin-left: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  font-size: 11px;
-}
-.weather-side small {
-  opacity: 0.6;
-}
-.hourly {
-  display: flex;
-  gap: 14px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 10px 12px;
-  border-radius: 16px;
-  background: rgb(var(--fg-rgb) / 0.08);
-}
-.hourly::-webkit-scrollbar {
-  display: none;
-}
-.hour {
-  flex: none;
-  min-width: 34px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font-size: 15px;
-}
-.hour small {
-  font-size: 10px;
-  opacity: 0.6;
-}
-.hour.now small {
-  opacity: 1;
-  font-weight: 700;
-}
-.hour b {
-  font-size: 12px;
-}
 
 .media {
   height: 100%;
@@ -898,26 +754,11 @@
   justify-content: space-between;
   padding-bottom: 6px;
 }
-.media-head {
-  gap: 16px;
-}
-.lyrics {
-  height: 84px;
-  margin-top: 0;
-}
-.lyric {
-  min-height: 18px;
-}
-.lyric.now {
-  font-size: 17px;
-}
+
 .times {
   margin-top: 2px;
 }
-.controls {
-  gap: 36px;
-  margin-top: 6px;
-}
+
 .timer-tab {
   gap: 16px;
 }
@@ -955,12 +796,6 @@
   inset: 56px 18px 36px;
 }
 
-.lyrics {
-  height: 66px;
-}
-.controls {
-  margin-top: 0;
-}
 .media {
   padding-bottom: 2px;
 }
@@ -1148,9 +983,7 @@
 .segmented button.active {
   background: color-mix(in srgb, var(--accent, #4ade80) 38%, transparent);
 }
-.lyric.now {
-  color: var(--accent, #4ade80);
-}
+
 .tabs button.active {
   color: var(--accent, #4ade80);
 }
@@ -2109,20 +1942,8 @@
   width: 58%;
 }
 
-.lyrics {
-  height: 76px;
-  margin: 2px 0;
-  /* fade only the outer edges so the previous and next lines stay readable */
-  mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
-}
-.lyric-stack {
-  gap: 4px;
-}
 .media {
   padding-bottom: 6px;
-}
-.controls {
-  margin-top: 2px;
 }
 
 /* ---------- profile picture: hover it to choose or remove a photo ---------- */
@@ -2559,38 +2380,11 @@ button.ao-text:hover {
 .media > * {
   flex: none;
 }
-.media > .lyrics {
-  flex: 1 1 auto;
-  height: auto;
-  min-height: 26px;
-  container-type: size;
-}
-/* a shorter card (Card height setting) has no room for three lines: keep only the current one */
-@container (max-height: 58px) {
-  .lyric.prev,
-  .lyric.next {
-    display: none;
-  }
-}
 
 /* keep the island on its own GPU layer so the glass filters aren't re-rasterised while it drops in */
 .stage {
   will-change: translate, transform;
   backface-visibility: hidden;
-}
-
-/* a short card: shrink the art and the buttons so the current lyric still fits above the dock */
-@container media (max-height: 140px) {
-  .media-head .art {
-    width: 34px !important;
-    height: 34px !important;
-  }
-  .controls {
-    margin-top: 0;
-  }
-  .controls button {
-    height: 28px;
-  }
 }
 
 /* ---------- read receipts: one faint tick when sent, two strong ticks once read ---------- */
@@ -2632,20 +2426,6 @@ button.ao-text:hover {
 }
 .timer.pomo-run .pill-btn {
   padding: 6px 14px;
-}
-
-/* fade the edges of the hourly strip that still has more to scroll to */
-.hourly.more-left {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px);
-  mask-image: linear-gradient(to right, transparent, #000 36px);
-}
-.hourly.more-right {
-  -webkit-mask-image: linear-gradient(to left, transparent, #000 36px);
-  mask-image: linear-gradient(to left, transparent, #000 36px);
-}
-.hourly.more-left.more-right {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent);
 }
 
 @keyframes update-pulse {
@@ -3204,4 +2984,325 @@ button.ao-text:hover {
   font-size: var(--fs-meta);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Playing ---------- */
+.np-page {
+  display: flex;
+  flex-direction: column;
+}
+.np {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.np > .art {
+  border-radius: 13px;
+}
+.np-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.np-meta b {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-title);
+  font-weight: 600;
+}
+.np-meta span {
+  font-size: var(--fs-body);
+  color: var(--text-2);
+}
+.ly {
+  height: 84px;
+  margin: 12px 0 10px;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+}
+.ly-stack {
+  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ly-line {
+  height: 28px;
+  line-height: 28px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-lyric);
+  font-weight: 600;
+  transform-origin: left center;
+  scale: 0.82;
+  opacity: 0.32;
+  transition:
+    scale 0.45s,
+    opacity 0.45s;
+}
+.ly-line.now {
+  scale: 1;
+  opacity: 1;
+}
+.ly-none {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-body);
+  color: var(--text-3);
+}
+.np-page .scrub {
+  position: relative;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  background: none;
+  cursor: pointer;
+}
+.np-page .scrub::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--pressed);
+}
+.np-page .scrub-fill {
+  position: absolute;
+  left: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--accent);
+}
+.scrub-knob {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--text-1);
+  scale: 0;
+  transition: scale 0.15s;
+}
+.np-page .scrub:hover .scrub-knob {
+  scale: 1;
+}
+.np-page .times {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.np-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  margin-top: 4px;
+}
+.np-controls button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+.np-controls button:hover {
+  background: var(--raised);
+}
+.np-controls button:active {
+  transform: scale(0.92);
+}
+.np-controls .np-play {
+  width: 46px;
+  height: 46px;
+  background: var(--text-1);
+  color: var(--island-bg);
+}
+.np-controls .np-play:hover {
+  background: var(--text-1);
+}
+.root.glass .np-controls .np-play {
+  color: #0a0a0b;
+}
+
+/* ---------- Weather ---------- */
+.wx {
+  display: flex;
+  flex-direction: column;
+}
+.wx-now {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.wx-temp {
+  font-size: var(--fs-temp);
+  font-weight: 300;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.wx-desc {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 3px;
+}
+.wx-desc b {
+  font-size: var(--fs-title);
+  font-weight: 600;
+}
+.wx-desc span {
+  font-size: var(--fs-body);
+  color: var(--text-2);
+}
+.wx-city {
+  margin-left: auto;
+  align-self: flex-start;
+}
+.wx-rain {
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  font-size: var(--fs-body);
+}
+.wx-chart {
+  margin-top: 12px;
+}
+.wx-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.wx-rain-col {
+  fill: var(--info);
+  opacity: 0.12;
+}
+.wx-pt {
+  fill: var(--accent);
+}
+.wx-pt.now {
+  fill: var(--text-1);
+}
+.wx-label {
+  fill: var(--text-1);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.wx-cols {
+  display: grid;
+  text-align: center;
+}
+.wx-cols div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+.wx-cols small {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.wx-cols .rain small {
+  color: var(--info);
+}
+
+/* ---------- Timer ---------- */
+.timer-tab {
+  align-items: stretch;
+}
+.timer-tab > .segmented {
+  align-self: flex-start;
+  margin-bottom: 14px;
+}
+.tm {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+}
+.dial {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+}
+.dial .ring {
+  position: absolute;
+  inset: 0;
+}
+.dial .ring-bg {
+  stroke: var(--raised);
+}
+.dial-t {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.dial-t b {
+  font-family: var(--font-mono);
+  font-size: var(--fs-timer);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.dial-t small {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.tm-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.tm-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.tm-preset,
+.tm-btn {
+  height: 40px;
+  border-radius: var(--r-tile);
+  background: var(--raised);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.15s;
+}
+.tm-preset:hover,
+.tm-btn:hover {
+  background: var(--pressed);
+}
+.tm-side .timer-custom {
+  justify-content: flex-start;
+  margin: 0;
+}
+.wx-chart {
+  overflow-x: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(90deg, #000 92%, transparent);
+}
+.wx-chart::-webkit-scrollbar {
+  display: none;
+}
+.wx-strip {
+  padding-top: 12px;
 }
