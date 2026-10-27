@@ -7,6 +7,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.5.0',
+    title: 'Group voice chat',
+    items: [
+      'Join a group voice chat from the group chat (up to 6 people per group).',
+      'Hover the island while a call rings to see who is calling, with Answer and Decline.',
+      'During a call the island becomes a pill with the timer, mute, deafen and end call.',
+    ],
+  },
+  {
     version: '0.4.2',
     title: 'Groups and calls',
     items: [
