@@ -905,7 +905,7 @@ export default function App() {
                     dragElastic: 0.45,
                     onPointerDown: (e: React.PointerEvent) => {
                       // let inputs, sliders and buttons keep their own dragging
-                      if (!(e.target as HTMLElement).closest('input, textarea, button, a, .scrub, [draggable="true"], .todo-item')) pageDrag.start(e)
+                      if (!(e.target as HTMLElement).closest('input, textarea, button, a, .scrub, .wx-chart, [draggable="true"], .todo-item')) pageDrag.start(e)
                     },
                     onDragEnd: (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
                       if (info.offset.x < -70 || info.velocity.x < -450) go(1)

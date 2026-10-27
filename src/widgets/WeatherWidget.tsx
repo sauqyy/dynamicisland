@@ -71,7 +71,8 @@ export function WeatherWidget({ settings, update }: Props) {
   const now = describe(weather.code)
   const start = weather.nowHour ?? 0
   const hours = weather.hourly.slice(start, start + HOURS)
-  const temps = weather.hourly.map((h) => h.temp)
+  // today's high and low; the strip also holds tomorrow
+  const temps = weather.hourly.slice(0, 24).map((h) => h.temp)
   const hi = Math.max(...temps)
   const lo = Math.min(...temps)
   // the next rain in the coming hours (or how long the current rain lasts)
@@ -127,6 +128,8 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
     const el = strip.current
     if (el) el.scrollLeft = (now * el.scrollWidth) / hours.length
   }, [now, hours.length])
+  // drag the strip sideways with the mouse, like a touch screen
+  const drag = useRef<{ x: number; left: number } | null>(null)
   // sideways wheel / trackpad scrolling; a plain mouse wheel scrolls the strip too
   useEffect(() => {
     const el = strip.current
@@ -154,8 +157,31 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
     const mx = (pts[i - 1][0] + pts[i][0]) / 2
     d += ` C${mx} ${pts[i - 1][1]} ${mx} ${pts[i][1]} ${pts[i][0]} ${pts[i][1]}`
   }
+  const tomorrow = new Date(Date.now() + 86_400_000).toLocaleDateString([], { weekday: 'short' })
   return (
-    <div className="wx-chart" ref={strip}>
+    <div
+      className="wx-chart"
+      ref={strip}
+      onPointerDown={(e) => {
+        // keep the island and the page swipe from taking this drag
+        e.stopPropagation()
+        if (e.button !== 0) return
+        drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft }
+        e.currentTarget.setPointerCapture(e.pointerId)
+        e.currentTarget.classList.add('dragging')
+      }}
+      onPointerMove={(e) => {
+        if (drag.current) e.currentTarget.scrollLeft = drag.current.left - (e.clientX - drag.current.x)
+      }}
+      onPointerUp={(e) => {
+        drag.current = null
+        e.currentTarget.classList.remove('dragging')
+      }}
+      onPointerCancel={(e) => {
+        drag.current = null
+        e.currentTarget.classList.remove('dragging')
+      }}
+    >
       <div className="wx-strip" style={{ width: (W * VISIBLE_COL) / COL }}>
         <svg viewBox={`0 0 ${W} ${H}`} aria-label="Temperature through the day">
           <defs>
@@ -165,12 +191,12 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
             </linearGradient>
           </defs>
           {hours.map((h, i) =>
-            isRain(h.code) ? <rect key={h.hour} x={x(i) - COL / 2 + 3} y={0} width={COL - 6} height={H} rx={9} className="wx-rain-col" /> : null,
+            isRain(h.code) ? <rect key={i} x={x(i) - COL / 2 + 3} y={0} width={COL - 6} height={H} rx={9} className="wx-rain-col" /> : null,
           )}
           <path d={`${d} L${pts[pts.length - 1][0]} ${H} L${pts[0][0]} ${H}Z`} fill="url(#wx-area)" />
           <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
           {pts.map(([px, py], i) => (
-            <g key={hours[i].hour}>
+            <g key={i}>
               <circle cx={px} cy={py} r={i === now ? 3.5 : 2.2} className={i === now ? 'wx-pt now' : 'wx-pt'} />
               <text x={px} y={py - 9} textAnchor="middle" className="wx-label">
                 {hours[i].temp}°
@@ -180,9 +206,9 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
         </svg>
         <div className="wx-cols" style={{ gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` }}>
           {hours.map((h, i) => (
-            <div key={h.hour} className={isRain(h.code) ? 'rain' : ''}>
+            <div key={i} className={isRain(h.code) ? 'rain' : ''}>
               <WeatherIcon code={h.code} night={isNight(Number(h.hour))} size={16} />
-              <small>{i === now ? 'Now' : h.hour}</small>
+              <small>{i === now ? 'Now' : i >= 24 && h.hour === '00' ? tomorrow : h.hour}</small>
             </div>
           ))}
         </div>
