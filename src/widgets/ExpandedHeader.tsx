@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { play } from 'cuelume'
+import { disclosureCue } from '../lib/sound'
 import { Ring } from './TimerWidget'
 import { Bars } from './MediaWidget'
 import { Avatar } from './Avatar'
@@ -54,6 +56,9 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
         aria-label="Profile"
         aria-expanded={open}
         title={profile ? `@${profile.username}` : 'Sign in'}
+        // signed out it goes to the Profile page, which sounds as a page change
+        {...(profile ? disclosureCue(open) : {})}
+        data-cuelume-emphasis="subtle"
         onClick={() => (profile ? setOpen((o) => !o) : onProfile())}
       >
         {profile ? <Avatar profile={profile} size={22} presence={current ?? undefined} /> : <span className="avatar ghost">👤</span>}
@@ -75,10 +80,12 @@ function ProfileMenu({ profile, active, onProfile, onPresence }: { profile: Prof
                 data-p={o.id}
                 aria-checked={o.id === current}
                 className={o.id === current ? 'active' : ''}
+                data-cuelume-select
                 onMouseEnter={() => setHint(o.hint)}
                 onMouseLeave={() => setHint(null)}
                 onClick={async () => {
                   const e = await onPresence(o.id)
+                  if (e) play('error', { emphasis: 'subtle' })
                   setErr(e)
                   if (!e) setOpen(false)
                 }}

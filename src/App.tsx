@@ -40,6 +40,8 @@ import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
 import { useAutoIdle } from './lib/useAutoIdle'
 import { useHeartbeat } from './lib/useHeartbeat'
+import { play, type PlayOptions, type SoundName } from 'cuelume'
+import { useSoundSetup } from './lib/sound'
 import { cachedWeather, describe as describeWeather } from './lib/weather'
 import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
@@ -101,6 +103,7 @@ function clockText(d: Date, clock24: boolean) {
 export default function App() {
   const { track, playing, position, toggle, seek, skip } = useMedia()
   const { settings, update } = useSettings()
+  useSoundSetup(settings.uiSounds)
   const [hidden, setHidden] = useState(false)
   const updater = useUpdater()
   const [pomo, setPomo] = useState<PomodoroState | null>(null)
@@ -227,8 +230,9 @@ export default function App() {
     return () => clearInterval(id)
   }, [timer])
 
-  const pushAlert = useCallback((a: Omit<IslandAlert, 'id'>) => {
+  const pushAlert = useCallback((a: Omit<IslandAlert, 'id'>, cue?: SoundName, opts?: PlayOptions) => {
     setAlert({ ...a, id: ++alertId.current })
+    if (cue) play(cue, opts)
   }, [])
 
   // tell the user once per version when the automatic check finds an update; the cog keeps a dot until it is installed
@@ -236,7 +240,7 @@ export default function App() {
   useEffect(() => {
     if (updater.state.s !== 'available' || alertedUpdate.current === updater.state.version) return
     alertedUpdate.current = updater.state.version
-    pushAlert({ icon: '⬆️', text: 'Update available', sub: `v${updater.state.version} · open Settings to install` })
+    pushAlert({ icon: '⬆️', text: 'Update available', sub: `v${updater.state.version} · open Settings to install` }, 'ready')
   }, [updater.state, pushAlert])
 
   const playMessageSound = () => {
@@ -276,6 +280,7 @@ export default function App() {
         next.phase === 'focus'
           ? { icon: '🎯', text: 'Focus time', sub: `Session ${next.done + 1}` }
           : { icon: '☕', text: next.phase === 'long' ? 'Long break' : 'Break time', sub: `${next.done} done` },
+        'attention',
       )
     },
     [pushAlert],
@@ -287,7 +292,7 @@ export default function App() {
       advancePomo(pomo)
     } else {
       setTimer(null)
-      pushAlert({ icon: '⏰', text: 'Timer done' })
+      pushAlert({ icon: '⏰', text: 'Timer done' }, 'attention')
     }
   }, [now, timer, pomo, pushAlert, advancePomo])
 
@@ -308,21 +313,23 @@ export default function App() {
             b.charging
               ? { icon: '⚡', text: 'Charging', sub: `${b.percent}%`, value: b.percent }
               : { icon: '🔋', text: 'On battery', sub: `${b.percent}%`, value: b.percent },
+            'toggle',
+            { emphasis: 'subtle', direction: b.charging ? 'forward' : 'back' },
           )
         }
         wasCharging = b.charging
         if (!b.charging && b.percent <= LOW_BATTERY && !warned) {
           warned = true
-          pushAlert({ icon: '🪫', text: 'Low battery', sub: `${b.percent}%`, value: b.percent })
+          pushAlert({ icon: '🪫', text: 'Low battery', sub: `${b.percent}%`, value: b.percent }, 'warning')
         } else if (b.charging || b.percent > LOW_BATTERY + 5) warned = false
       }),
       listen<{ caps: boolean; num: boolean }>('lockkeys', (e) => {
         const { caps, num } = e.payload
         // report whichever key just changed
         if (caps !== lockState.caps) {
-          pushAlert({ icon: caps ? '🔠' : '🔡', text: caps ? 'Caps Lock on' : 'Caps Lock off' })
+          pushAlert({ icon: caps ? '🔠' : '🔡', text: caps ? 'Caps Lock on' : 'Caps Lock off' }, 'toggle', { emphasis: 'subtle', direction: caps ? 'forward' : 'back' })
         } else if (num !== lockState.num) {
-          pushAlert({ icon: '🔢', text: num ? 'Num Lock on' : 'Num Lock off' })
+          pushAlert({ icon: '🔢', text: num ? 'Num Lock on' : 'Num Lock off' }, 'toggle', { emphasis: 'subtle', direction: num ? 'forward' : 'back' })
         }
         lockState = { caps, num }
       }),
@@ -330,9 +337,9 @@ export default function App() {
         const p = e.payload
         setPrivacy(p)
         if (p.camera && p.camera !== lastPrivacy.camera) {
-          pushAlert({ icon: '📷', text: 'Camera in use', sub: p.camera })
+          pushAlert({ icon: '📷', text: 'Camera in use', sub: p.camera }, 'warning', { emphasis: 'subtle' })
         } else if (p.mic && p.mic !== lastPrivacy.mic) {
-          pushAlert({ icon: '🎙️', text: 'Microphone in use', sub: p.mic })
+          pushAlert({ icon: '🎙️', text: 'Microphone in use', sub: p.mic }, 'warning', { emphasis: 'subtle' })
         }
         lastPrivacy = p
       }),
@@ -363,12 +370,16 @@ export default function App() {
   // in-place update: progress shows in the island itself
   useEffect(() => {
     if (!IS_TAURI) return
+    let started = false
     const off = listen<{ stage: string; percent: number }>('update-progress', (e) => {
       if (e.payload.stage === 'failed') {
+        started = false
         setUpdating(null)
-        pushAlert({ icon: '⚠️', text: 'Update failed', sub: 'Try again from Settings' })
+        pushAlert({ icon: '⚠️', text: 'Update failed', sub: 'Try again from Settings' }, 'error')
       } else {
         setExpanded(false)
+        if (!started) play('loading')
+        started = true
         setUpdating(e.payload)
       }
     })
@@ -409,6 +420,7 @@ export default function App() {
         setDragging(false)
       } else if (ev.type === 'drop') {
         setDragging(false)
+        play('tap', { emphasis: 'strong' })
         const items = await describePaths(ev.paths).catch(() => [] as FileItem[])
         if (tabRef.current === 'apps') addApps(items)
         else addShelf(items)
@@ -423,6 +435,7 @@ export default function App() {
   const onBrowserDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
+    play('tap', { emphasis: 'strong' })
     const items: FileItem[] = [...e.dataTransfer.files].map((f) => ({
       id: `${f.name}#${Date.now()}`,
       path: f.name,
@@ -581,6 +594,15 @@ export default function App() {
     prevIdx.current = pageIdx
   }
 
+  // the card opening and closing, and every page change inside it (arrows, dock, keys, swipes)
+  const soundState = useRef({ expanded, tab })
+  useEffect(() => {
+    const was = soundState.current
+    if (expanded !== was.expanded) play(expanded ? 'open' : 'close', { emphasis: expanded ? 'normal' : 'subtle' })
+    else if (expanded && tab !== was.tab) play('navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
+    soundState.current = { expanded, tab }
+  }, [expanded, tab])
+
   const startTimer = (minutes: number) => {
     setPomo(null)
     setTimer({ endsAt: Date.now() + minutes * 60_000, total: minutes * 60_000 })
@@ -668,6 +690,7 @@ export default function App() {
           if (!g.active) {
             if (Math.hypot(dx, dy) < 5) return
             g.active = true
+            play('select')
             setMoving(true)
             invoke('set_dragging', { on: true }).catch(() => {})
           }
@@ -684,6 +707,7 @@ export default function App() {
           const g = dragRef.current
           dragRef.current = null
           if (!g?.active) return
+          play('tap', { emphasis: 'strong' })
           setMoving(false)
           invoke('set_dragging', { on: false }).catch(() => {})
           justDragged.current = true
@@ -694,6 +718,7 @@ export default function App() {
         // double-click the pill to send it back to the centre top
         onDoubleClick: () => {
           if (mode === 'expanded' || (!posRef.current.x && !posRef.current.y)) return
+          play('navigate', { emphasis: 'subtle', direction: 'back' })
           setExpanded(false)
           const m = motionRef.current
           m.magX = m.magY = true
@@ -712,16 +737,18 @@ export default function App() {
     const page = PAGES.find((p) => p.id === tab)!
     const action =
       tab === 'shelf' && shelf.items.length ? (
-        <button className="chip" onClick={shelf.clear}>Clear</button>
+        <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={shelf.clear}>Clear</button>
       ) : tab === 'clipboard' ? (
         <>
           <button
             className={`chip ${settings.clipPaused ? 'on' : ''}`}
+            aria-pressed={settings.clipPaused}
+            data-cuelume-toggle
             onClick={() => update({ clipPaused: !settings.clipPaused })}
           >
             {settings.clipPaused ? 'Resume' : 'Pause'}
           </button>
-          {clipboard.items.length > 0 && <button className="chip" onClick={clipboard.clear}>Clear</button>}
+          {clipboard.items.length > 0 && <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={clipboard.clear}>Clear</button>}
         </>
       ) : null
     content = (
@@ -820,7 +847,7 @@ export default function App() {
                 onRemove={clipboard.remove}
                 onCopy={(item) => {
                   clipboard.copy(item)
-                  pushAlert({ icon: '📋', text: 'Copied' })
+                  pushAlert({ icon: '📋', text: 'Copied' }, 'success', { emphasis: 'subtle' })
                 }}
               />
             )}
@@ -879,7 +906,7 @@ export default function App() {
                 <li key={t}>{t}</li>
               ))}
             </ul>
-            <button className="pill-btn" onClick={() => setNotes(null)}>
+            <button className="pill-btn" data-cuelume-close onClick={() => setNotes(null)}>
               Got it
             </button>
           </div>
@@ -1043,8 +1070,8 @@ export default function App() {
           >
             ⠿ Browser demo
           </b>
-          <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 })}>Plug in charger</button>
-          <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 })}>Low battery</button>
+          <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'forward' })}>Plug in charger</button>
+          <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 }, 'warning')}>Low battery</button>
           <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
           <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
           <button onClick={() => startTimer(0.25)}>15 s timer</button>
@@ -1064,7 +1091,7 @@ export default function App() {
           >
             Message
           </button>
-          <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' })}>
+          <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>
             Update alert
           </button>
           <button

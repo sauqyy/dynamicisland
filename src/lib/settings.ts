@@ -33,6 +33,8 @@ export interface Settings {
   idleBars: boolean
   /** play a sound when a chat message arrives */
   messageSound: boolean
+  /** small sounds for clicks, typing, pages and alerts */
+  uiSounds: boolean
   /** font size of the idle pill text in px */
   clockSize: number
   /** seconds the lyrics run ahead of the player; the fade-in and Windows' position lag make them feel late */
@@ -96,6 +98,7 @@ const DEFAULTS: Settings = {
   idle: 'lyrics',
   idleBars: true,
   messageSound: true,
+  uiSounds: true,
   clockSize: 15,
   lyricOffset: 0.35,
   hiddenPages: [],

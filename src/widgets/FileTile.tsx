@@ -35,6 +35,7 @@ export function FileTile({ item, onRemove, draggable = true, showMeta = true }: 
     <div
       className="tile"
       title={item.path}
+      data-cuelume-tap
       onPointerDown={(e) => {
         if ((e.target as HTMLElement).closest('.tile-x')) return
         down.current = { x: e.clientX, y: e.clientY }
@@ -54,7 +55,7 @@ export function FileTile({ item, onRemove, draggable = true, showMeta = true }: 
       }}
       onPointerLeave={() => (down.current = null)}
     >
-      <button className="tile-x" aria-label="Remove" onClick={() => onRemove(item.id)}>
+      <button className="tile-x" aria-label="Remove" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => onRemove(item.id)}>
         ×
       </button>
       <div className="tile-icon">

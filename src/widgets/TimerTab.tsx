@@ -46,10 +46,16 @@ function Stopwatch({ sw, setSw }: StopwatchProps) {
     <div className="stopwatch">
       <div className="sw-time">{fmtMs(total)}</div>
       <div className="presets">
-        <button className="pill-btn" onClick={lapOrReset} disabled={!sw.running && total === 0}>
+        <button
+          className="pill-btn"
+          onClick={lapOrReset}
+          disabled={!sw.running && total === 0}
+          {...(sw.running ? { 'data-cuelume-tap': '' } : { 'data-cuelume-close': '' })}
+          data-cuelume-emphasis="subtle"
+        >
           {sw.running ? 'Lap' : 'Reset'}
         </button>
-        <button className="pill-btn" onClick={toggle}>
+        <button className="pill-btn" onClick={toggle} aria-pressed={sw.running} data-cuelume-toggle>
           {sw.running ? 'Stop' : 'Start'}
         </button>
       </div>
@@ -108,7 +114,7 @@ function Pomodoro({
     return (
       <div className="timer">
         <div className="timer-label">25 min focus · 5 min break · long break every 4</div>
-        <button className="pill-btn" onClick={onStart}>Start focus</button>
+        <button className="pill-btn" data-cuelume-tap onClick={onStart}>Start focus</button>
       </div>
     )
   }
@@ -126,8 +132,8 @@ function Pomodoro({
           {PHASE_LABEL[pomo.phase]} · {pomo.done} done
         </div>
         <div className="presets">
-          <button className="pill-btn" onClick={onSkip}>Skip</button>
-          <button className="pill-btn danger" onClick={onStop}>Stop</button>
+          <button className="pill-btn" data-cuelume-navigate data-cuelume-emphasis="subtle" onClick={onSkip}>Skip</button>
+          <button className="pill-btn danger" data-cuelume-close onClick={onStop}>Stop</button>
         </div>
       </div>
     </div>
@@ -169,7 +175,7 @@ export function TimerTab({
     <div className="timer-tab" onClick={(e) => e.stopPropagation()}>
       <div className="segmented">
         {(['timer', 'pomodoro', 'stopwatch'] as const).map((m) => (
-          <button key={m} className={m === mode ? 'active' : ''} onClick={() => setMode(m)}>
+          <button key={m} className={m === mode ? 'active' : ''} data-cuelume-select onClick={() => setMode(m)}>
             {MODE_LABEL[m]}
           </button>
         ))}

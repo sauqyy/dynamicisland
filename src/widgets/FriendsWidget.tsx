@@ -5,6 +5,8 @@ import type { Friend, Social } from '../lib/useSocial'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { shownPresence } from '../lib/presence'
 import { Avatar } from './Avatar'
+import { play } from 'cuelume'
+import { disclosureCue } from '../lib/sound'
 
 interface Props {
   auth: Auth
@@ -90,8 +92,19 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
     end.current?.scrollIntoView({ block: 'end' })
   }, [list?.length])
 
+  // a new message from them while the chat is open
+  const lastId = useRef<number | null>(null)
+  const last = list?.[list.length - 1]
+  useEffect(() => {
+    if (!last) return
+    if (lastId.current !== null && last.id !== lastId.current && last.sender !== me) play('ready', { emphasis: 'subtle' })
+    lastId.current = last.id
+  }, [last, me])
+
   const send = async (kind: 'text' | 'activity' | 'note', body: string) => {
-    setErr(await social.send(friend.profile.id, kind, body))
+    const e = await social.send(friend.profile.id, kind, body)
+    if (e) play('error')
+    setErr(e)
     setSharing(false)
   }
   const note = noteText()
@@ -99,7 +112,7 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
   return (
     <div className="chat">
       <div className="chat-head">
-        <button className="chip" onClick={onBack}>
+        <button className="chip" onClick={() => { play('navigate', { direction: 'back' }); onBack() }}>
           ‹ Back
         </button>
         <Avatar profile={friend.profile} size={22} presence={shownPresence(friend.profile)} />
@@ -109,6 +122,8 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
         {onFullscreen && (
           <button
             className="chip chat-full"
+            aria-pressed={Boolean(fullscreen)}
+            data-cuelume-toggle
             title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             onClick={() => onFullscreen(!fullscreen)}
@@ -141,10 +156,10 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
       {err && <div className="form-msg">{err}</div>}
       {sharing && (
       <div className="chat-share">
-        <button className="chip" disabled={!activityText} title={activityText || 'Nothing to share right now'} onClick={() => send('activity', activityText)}>
+        <button className="chip" disabled={!activityText} data-cuelume-tap title={activityText || 'Nothing to share right now'} onClick={() => send('activity', activityText)}>
           Share activity
         </button>
-        <button className="chip" disabled={!note} title={note ? 'Send your notes' : 'Your notes are empty'} onClick={() => send('note', note)}>
+        <button className="chip" disabled={!note} data-cuelume-tap title={note ? 'Send your notes' : 'Your notes are empty'} onClick={() => send('note', note)}>
           Share note
         </button>
       </div>
@@ -158,18 +173,19 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
           setDraft('')
         }}
       >
-        <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" onClick={() => setSharing((v) => !v)}>
+        <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" {...disclosureCue(sharing)} data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
           +
         </button>
         <input
           className="todo-input"
           placeholder="Message…"
           value={draft}
+          data-cuelume-type
           maxLength={2000}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
         />
-        <button className="pill-btn" type="submit" disabled={!draft.trim()}>
+        <button className="pill-btn" type="submit" disabled={!draft.trim()} data-cuelume-tap>
           Send
         </button>
       </form>
@@ -236,6 +252,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
             <button
               key={f.friendshipId}
               className={`fs-contact ${f.profile.id === friend.profile.id ? 'active' : ''}`}
+              data-cuelume-select
               onClick={() => setChatWith(f.profile.id)}
             >
               <Avatar profile={f.profile} size={34} presence={shownPresence(f.profile)} />
@@ -254,6 +271,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
 
   const add = async () => {
     const err = await social.addFriend(username)
+    play(err ? 'error' : 'success', { emphasis: 'subtle' })
     setMsg(err ?? 'Request sent')
     if (!err) setUsername('')
   }
@@ -271,10 +289,11 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
           className="todo-input"
           placeholder="Add a friend by @username"
           value={username}
+          data-cuelume-type
           onChange={(e) => setUsername(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
         />
-        <button className="pill-btn" type="submit" disabled={!username.trim()}>
+        <button className="pill-btn" type="submit" disabled={!username.trim()} data-cuelume-tap>
           Add
         </button>
       </form>
@@ -289,17 +308,17 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
               <span className="handle">@{r.profile.username}</span> wants to be friends
             </small>
           </div>
-          <button className="chip on" onClick={() => social.accept(r.friendshipId)}>
+          <button className="chip on" data-cuelume-tap onClick={() => social.accept(r.friendshipId)}>
             Accept
           </button>
-          <button className="chip" onClick={() => social.remove(r.friendshipId)}>
+          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
             Decline
           </button>
         </div>
       ))}
 
       {social.friends.map((f) => (
-        <div key={f.friendshipId} className="friend-row" onClick={() => setChatWith(f.profile.id)}>
+        <div key={f.friendshipId} className="friend-row" data-cuelume-navigate onClick={() => setChatWith(f.profile.id)}>
           <Avatar profile={f.profile} size={30} presence={shownPresence(f.profile)} />
           <div className="friend-meta">
             <b>{f.profile.display_name || `@${f.profile.username}`}</b>
@@ -312,6 +331,8 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
           <button
             className="x"
             aria-label="Remove friend"
+            data-cuelume-close
+            data-cuelume-emphasis="subtle"
             title="Remove friend"
             onClick={(e) => {
               e.stopPropagation()
@@ -332,7 +353,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
               <span className="handle">@{r.profile.username}</span> · request sent
             </small>
           </div>
-          <button className="chip" onClick={() => social.remove(r.friendshipId)}>
+          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
             Cancel
           </button>
         </div>

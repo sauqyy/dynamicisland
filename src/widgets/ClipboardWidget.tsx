@@ -22,7 +22,7 @@ export function ClipboardWidget({ items, paused, mask, onCopy, onRemove }: Props
             >
               {item.image ? <img className="clip-img" src={item.image} alt="Copied image" /> : item.text.replace(/\s+/g, ' ')}
             </button>
-            <button className="x" aria-label="Remove" onClick={() => onRemove(item.text)}>
+            <button className="x" aria-label="Remove" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => onRemove(item.text)}>
               ×
             </button>
           </div>

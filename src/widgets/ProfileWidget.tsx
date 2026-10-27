@@ -6,6 +6,8 @@ import { squarePhoto } from '../lib/photo'
 import { presenceOf } from '../lib/presence'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { Avatar } from './Avatar'
+import { play } from 'cuelume'
+import { disclosureCue } from '../lib/sound'
 
 const EMOJIS = ['🙂', '😎', '🤖', '🦊', '🐼', '🐸', '🦄', '🐙', '🌵', '🚀', '🎧', '🔥', '🌙', '🍕', '👾', '🐱']
 
@@ -19,7 +21,7 @@ interface Props {
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} role="switch" aria-checked={on}>
+    <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} role="switch" aria-checked={on} data-cuelume-toggle>
       <span />
     </button>
   )
@@ -56,6 +58,7 @@ function StatusField({ value, onChange }: { value: string; onChange: (v: string)
         className="todo-input"
         placeholder="e.g. studying 📚"
         value={value}
+        data-cuelume-type
         maxLength={80}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
@@ -63,7 +66,7 @@ function StatusField({ value, onChange }: { value: string; onChange: (v: string)
           if (e.key === 'Escape') setOpen(false)
         }}
       />
-      <button className={`status-toggle ${open ? 'open' : ''}`} aria-label="Choose a status" title="Templates" onClick={() => setOpen((o) => !o)}>
+      <button className={`status-toggle ${open ? 'open' : ''}`} aria-label="Choose a status" title="Templates" {...disclosureCue(open)} data-cuelume-emphasis="subtle" onClick={() => setOpen((o) => !o)}>
         ▾
       </button>
       {open && (
@@ -74,6 +77,7 @@ function StatusField({ value, onChange }: { value: string; onChange: (v: string)
               role="option"
               aria-selected={t === value}
               className={t === value ? 'active' : ''}
+              data-cuelume-select
               onClick={() => {
                 onChange(t)
                 setOpen(false)
@@ -85,6 +89,8 @@ function StatusField({ value, onChange }: { value: string; onChange: (v: string)
           {value && (
             <button
               className="status-clear"
+              data-cuelume-close
+              data-cuelume-emphasis="subtle"
               onClick={() => {
                 onChange('')
                 setOpen(false)
@@ -116,7 +122,7 @@ function SignIn({ auth }: { auth: Auth }) {
 
   return (
     <div className="profile-auth">
-      <button className="google-btn" disabled={busy} onClick={() => run(auth.signInWithGoogle)}>
+      <button className="google-btn" disabled={busy} data-cuelume-tap onClick={() => run(auth.signInWithGoogle)}>
         <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
           <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z" />
           <path fill="#4285F4" d="M46.5 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.4z" />
@@ -131,6 +137,7 @@ function SignIn({ auth }: { auth: Auth }) {
         type="email"
         placeholder="Email"
         value={email}
+        data-cuelume-type
         onChange={(e) => setEmail(e.target.value)}
         onKeyDown={(e) => e.stopPropagation()}
       />
@@ -142,15 +149,18 @@ function SignIn({ auth }: { auth: Auth }) {
         onChange={(e) => setPassword(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation()
-          if (e.key === 'Enter' && ready) run(() => auth.signIn(email, password))
+          if (e.key === 'Enter' && ready) {
+            play('tap')
+            run(() => auth.signIn(email, password))
+          }
         }}
       />
       {tooShort && <div className="form-warn">Password must be at least 6 characters ({password.length}/6)</div>}
       <div className="presets">
-        <button className="pill-btn" disabled={!ready || busy} onClick={() => run(() => auth.signIn(email, password))}>
+        <button className="pill-btn" disabled={!ready || busy} data-cuelume-tap onClick={() => run(() => auth.signIn(email, password))}>
           Sign in
         </button>
-        <button className="pill-btn" disabled={!ready || busy} onClick={() => run(() => auth.signUp(email, password))}>
+        <button className="pill-btn" disabled={!ready || busy} data-cuelume-tap onClick={() => run(() => auth.signUp(email, password))}>
           Create account
         </button>
       </div>
@@ -189,6 +199,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
       setPhoto(await squarePhoto(file))
       setMsg(null)
     } catch {
+      play('error', { emphasis: 'subtle' })
       setMsg("That file couldn't be read as an image")
     }
   }
@@ -203,6 +214,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
       avatar_color: color,
       avatar_url: photo,
     })
+    play(err ? 'error' : 'success', { emphasis: 'subtle' })
     setMsg(err ?? 'Saved')
     setBusy(false)
   }
@@ -213,17 +225,17 @@ function Editor({ auth, settings, update, onHold }: Props) {
         <div className="avatar-edit">
           <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={92} presence={p ? presenceOf(p) : undefined} />
           <div className="avatar-overlay">
-            <button className="ao-text" onClick={openPicker}>
+            <button className="ao-text" data-cuelume-open onClick={openPicker}>
               Choose photo
             </button>
-            <button className="ao-pen" aria-label="Choose photo" onClick={openPicker}>
+            <button className="ao-pen" aria-label="Choose photo" data-cuelume-open onClick={openPicker}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
                 <path d="m14.5 5.5 3 3" />
               </svg>
             </button>
             {photo ? (
-              <button className="ao-text" onClick={() => setPhoto(null)}>
+              <button className="ao-text" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setPhoto(null)}>
                 Remove photo
               </button>
             ) : (
@@ -248,7 +260,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
           <small>{auth.user?.email}</small>
         </div>
         {p && (
-          <button className="chip" onClick={auth.signOut}>
+          <button className="chip" data-cuelume-close onClick={auth.signOut}>
             Sign out
           </button>
         )}
@@ -261,14 +273,14 @@ function Editor({ auth, settings, update, onHold }: Props) {
         <small>{photo ? 'Hover your picture to change or remove the photo. It replaces the emoji.' : 'Hover your picture to add a photo, or pick an emoji and a colour:'}</small>
         <div className="emoji-grid">
           {EMOJIS.map((e) => (
-            <button key={e} className={e === emoji ? 'active' : ''} onClick={() => setEmoji(e)}>
+            <button key={e} className={e === emoji ? 'active' : ''} data-cuelume-select onClick={() => setEmoji(e)}>
               {e}
             </button>
           ))}
         </div>
         <div className="swatches">
           {ACCENTS.map((c) => (
-            <button key={c} aria-label={c} className={c === color ? 'active' : ''} style={{ background: c }} onClick={() => setColor(c)} />
+            <button key={c} aria-label={c} className={c === color ? 'active' : ''} data-cuelume-select style={{ background: c }} onClick={() => setColor(c)} />
           ))}
         </div>
       </div>
@@ -281,6 +293,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
             className="todo-input"
             placeholder="yourname"
             value={username}
+            data-cuelume-type
             maxLength={20}
             onChange={(e) => setUsername(e.target.value.replace(/^@/, '').replace(/[^A-Za-z0-9_]/g, ''))}
             onKeyDown={(e) => e.stopPropagation()}
@@ -295,6 +308,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
           className="todo-input"
           placeholder="Shown to your friends"
           value={name}
+          data-cuelume-type
           maxLength={40}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
@@ -307,7 +321,7 @@ function Editor({ auth, settings, update, onHold }: Props) {
       </div>
 
       <div className="profile-actions">
-        <button className="pill-btn" disabled={!valid || !dirty || busy} onClick={save}>
+        <button className="pill-btn" disabled={!valid || !dirty || busy} data-cuelume-tap onClick={save}>
           {p ? 'Save profile' : 'Create profile'}
         </button>
         {msg && <span className="form-msg">{msg}</span>}
