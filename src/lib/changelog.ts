@@ -7,6 +7,16 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.4.2',
+    title: 'Groups and calls',
+    items: [
+      'Pick an icon and colour for a group, and rename it from Info.',
+      'Groups have fullscreen chat, with your groups listed under your friends.',
+      'Deafen button in calls, new mute and hang-up icons, and the island glows while someone is calling.',
+      'The page arrows are gone to give pages more room.',
+    ],
+  },
+  {
     version: '0.4.1',
     title: 'Call button',
     items: ['The call button next to Send is now a phone handset.'],
