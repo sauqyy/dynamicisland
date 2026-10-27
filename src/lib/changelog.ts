@@ -7,6 +7,14 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.3.12',
+    title: 'Sound effects',
+    items: [
+      'The island now makes small sounds as you use it: a tap when it opens, a soft close when it shuts, and a cue for each alert.',
+      'Pick a sound pack in Settings (Mech, Basic, Bubble or Press), or mute it.',
+    ],
+  },
+  {
     version: '0.3.11',
     title: 'Offline status, brightness',
     items: [
