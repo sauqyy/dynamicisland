@@ -2,19 +2,38 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { BACKEND_READY, type Message } from '../lib/supabase'
 import type { Auth } from '../lib/useAuth'
 import type { Friend, Social } from '../lib/useSocial'
+import type { Groups } from '../lib/useGroups'
+import type { Call } from '../lib/useCall'
+import { CallBar } from './CallBar'
+import { GroupChat, GroupIcon, GroupsPanel } from './GroupsWidget'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { shownPresence } from '../lib/presence'
 import { Avatar } from './Avatar'
 import { play } from 'cuelume'
 import { disclosureCue } from '../lib/sound'
 
+export interface OpenChat {
+  friend: string | null
+  group: string | null
+}
+
 interface Props {
   auth: Auth
   social: Social
+  /** 1:1 voice calls; missing in the demo */
+  call?: Call
+  /** group chats; missing in the demo */
+  groups?: Groups
+  /** which page of the Social group this is */
+  section?: 'friends' | 'groups'
   /** what the user is doing right now, e.g. "🎵 Song – Artist", empty when idle */
   activityText: string
   onGoProfile: () => void
   /** set by clicking a message alert: open this friend's chat */
+  /** the open chat, kept by the app so it survives switching between the Friends and Groups pages */
+  chat: OpenChat
+  /** change the open chat; `page` also moves to that page of the Social group */
+  onChat: (chat: OpenChat, page?: 'friends' | 'groups') => void
   openChatId?: string | null
   onChatOpened?: () => void
   /** chat only: the card is fullscreen, and the button to toggle it */
@@ -22,16 +41,16 @@ interface Props {
   onFullscreen?: (on: boolean) => void
 }
 
-function timeLabel(iso: string) {
+export function timeLabel(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function dayStart(d: Date) {
+export function dayStart(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 }
 
 /** "Today", "Yesterday", the weekday for the past week, otherwise the date. */
-function dayLabel(iso: string) {
+export function dayLabel(iso: string) {
   const d = new Date(iso)
   const days = Math.round((dayStart(new Date()) - dayStart(d)) / 86_400_000)
   if (days <= 0) return 'Today'
@@ -41,7 +60,7 @@ function dayLabel(iso: string) {
   return d.toLocaleDateString([], { day: 'numeric', month: 'long', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
-function noteText() {
+export function noteText() {
   try {
     return (localStorage.getItem('di.notes') ?? '').trim()
   } catch {
@@ -73,7 +92,7 @@ function Bubble({ m, mine }: { m: Message; mine: boolean }) {
   )
 }
 
-function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
+function Chat({ friend, me, social, call, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; call?: Call; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -134,6 +153,7 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
           </button>
         )}
       </div>
+      {call && <CallBar call={call} friend={friend} />}
       <div className="chat-list">
         {!list ? (
           <div className="empty">Loading…</div>
@@ -185,6 +205,21 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}
         />
+        {call && (
+          <button
+            type="button"
+            className="chip chat-call"
+            disabled={call.state.phase !== 'idle' || shownPresence(friend.profile) === 'offline'}
+            data-cuelume-tap
+            title={shownPresence(friend.profile) === 'offline' ? 'Offline' : 'Voice call'}
+            aria-label="Voice call"
+            onClick={() => call.start(friend.profile.id)}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z" />
+            </svg>
+          </button>
+        )}
         <button className="pill-btn" type="submit" disabled={!draft.trim()} data-cuelume-tap>
           Send
         </button>
@@ -193,18 +228,17 @@ function Chat({ friend, me, social, activityText, onBack, fullscreen, onFullscre
   )
 }
 
-export function FriendsWidget({ auth, social, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
+export function FriendsWidget({ auth, social, call, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
   const [username, setUsername] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
-  const [chatWith, setChatWith] = useState<string | null>(null)
 
   useEffect(() => {
     if (openChatId && social.friends.some((f) => f.profile.id === openChatId)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setChatWith(openChatId)
+      onChat({ friend: openChatId, group: null })
       onChatOpened?.()
     }
-  }, [openChatId, social.friends, onChatOpened])
+  }, [openChatId, social.friends, onChatOpened, onChat])
 
   if (!(BACKEND_READY || DEMO_SOCIAL) || !auth.user || !auth.profile) {
     return (
@@ -220,40 +254,42 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
     )
   }
 
-  const friend = social.friends.find((f) => f.profile.id === chatWith)
-  if (friend) {
-    const chat = (
-      <Chat
-        key={friend.profile.id}
-        friend={friend}
-        me={auth.user.id}
-        social={social}
-        activityText={activityText}
-        onBack={() => {
-          onFullscreen?.(false)
-          setChatWith(null)
-        }}
-        fullscreen={fullscreen}
-        onFullscreen={onFullscreen}
-      />
-    )
+  // a friend's chat belongs to the Friends page, a group's to the Groups page
+  const friend = section === 'friends' ? social.friends.find((f) => f.profile.id === open.friend) : undefined
+  const group = section === 'groups' ? groups?.groups.find((g) => g.id === open.group) : undefined
+  const openFriend = (id: string) => {
+    onChat({ friend: id, group: null }, 'friends')
+  }
+  const openGroup = (id: string) => {
+    onChat({ friend: null, group: id }, 'groups')
+  }
+  const back = () => {
+    onFullscreen?.(false)
+    onChat({ friend: null, group: null })
+  }
+  const chatView = friend ? (
+    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+  ) : group && groups ? (
+    <GroupChat key={group.id} group={group} me={auth.user.id} groups={groups} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+  ) : null
+  if (chatView) {
     if (!fullscreen) {
       return (
         <div className="friends" onClick={(e) => e.stopPropagation()}>
-          {chat}
+          {chatView}
         </div>
       )
     }
-    // fullscreen: the contacts down the left, the open chat filling the right
+    // fullscreen: friends down the left with the group chats below them, the open chat filling the right
     return (
       <div className="friends fs-split" onClick={(e) => e.stopPropagation()}>
         <div className="fs-contacts">
           {social.friends.map((f) => (
             <button
               key={f.friendshipId}
-              className={`fs-contact ${f.profile.id === friend.profile.id ? 'active' : ''}`}
+              className={`fs-contact ${f.profile.id === friend?.profile.id ? 'active' : ''}`}
               data-cuelume-select
-              onClick={() => setChatWith(f.profile.id)}
+              onClick={() => openFriend(f.profile.id)}
             >
               <Avatar profile={f.profile} size={34} presence={shownPresence(f.profile)} />
               <span className="friend-meta">
@@ -263,10 +299,25 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
               {social.unread[f.profile.id] > 0 && <span className="badge">{social.unread[f.profile.id]}</span>}
             </button>
           ))}
+          {groups && groups.groups.length > 0 && <div className="fs-section">Groups</div>}
+          {groups?.groups.map((g) => (
+            <button key={g.id} className={`fs-contact ${g.id === group?.id ? 'active' : ''}`} data-cuelume-select onClick={() => openGroup(g.id)}>
+              <GroupIcon group={g} size={34} />
+              <span className="friend-meta">
+                <b>{g.name}</b>
+                <small>{g.members.length} {g.members.length === 1 ? 'member' : 'members'}</small>
+              </span>
+              {groups.unread[g.id] > 0 && <span className="badge">{groups.unread[g.id]}</span>}
+            </button>
+          ))}
         </div>
-        {chat}
+        {chatView}
       </div>
     )
+  }
+
+  if (groups && section === 'groups') {
+    return <GroupsPanel me={auth.user.id} groups={groups} onOpen={openGroup} />
   }
 
   const add = async () => {
@@ -298,6 +349,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
         </button>
       </form>
       {msg && <div className="form-msg">{msg}</div>}
+      {call && social.friends.map((f) => <CallBar key={f.friendshipId} call={call} friend={f} />)}
 
       {social.incoming.map((r) => (
         <div key={r.friendshipId} className="friend-row request">
@@ -318,7 +370,7 @@ export function FriendsWidget({ auth, social, activityText, onGoProfile, openCha
       ))}
 
       {social.friends.map((f) => (
-        <div key={f.friendshipId} className="friend-row" data-cuelume-navigate onClick={() => setChatWith(f.profile.id)}>
+        <div key={f.friendshipId} className="friend-row" data-cuelume-navigate onClick={() => openFriend(f.profile.id)}>
           <Avatar profile={f.profile} size={30} presence={shownPresence(f.profile)} />
           <div className="friend-meta">
             <b>{f.profile.display_name || `@${f.profile.username}`}</b>

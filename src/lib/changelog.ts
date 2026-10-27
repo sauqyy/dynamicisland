@@ -7,7 +7,7 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
-    version: '0.4.0',
+    version: '0.5.0',
     title: 'A new look',
     items: [
       'The pages now sit in one bar at the bottom of the card. Tap a group to open it, then pick a page.',
@@ -15,6 +15,21 @@ export const CHANGELOG: Release[] = [
       'While music plays, the pill shows the cover, the current lyric and the equalizer.',
       'Charging, battery and downloads show their progress along the bottom edge of the island.',
       'Playing, Weather and Timer are redesigned, and Settings is grouped into sections.',
+    ],
+  },
+  {
+    version: '0.4.1',
+    title: 'Call button',
+    items: ['The call button next to Send is now a phone handset.'],
+  },
+  {
+    version: '0.4.0',
+    title: 'Group chats, voice calls',
+    items: [
+      'Create group chats with your friends from the new Groups page.',
+      'Call a friend with the button next to Send in their chat. Audio goes straight between your apps.',
+      'Sound volume slider and a keyboard sounds switch in Settings.',
+      'Opening the app a second time no longer starts a second island.',
     ],
   },
   {

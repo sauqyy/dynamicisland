@@ -10,6 +10,7 @@ export type Tab =
   | 'shelf'
   | 'apps'
   | 'friends'
+  | 'groups'
   | 'profile'
   | 'settings'
 
@@ -23,6 +24,7 @@ export const PAGES: { id: Tab; title: string }[] = [
   { id: 'shelf', title: 'Shelf' },
   { id: 'apps', title: 'Apps' },
   { id: 'friends', title: 'Friends' },
+  { id: 'groups', title: 'Groups' },
   { id: 'profile', title: 'Profile' },
   { id: 'settings', title: 'Settings' },
 ]
@@ -32,7 +34,7 @@ export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[]
   { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
   { id: 'tools', title: 'Tools', icon: '🛠️', pages: ['todo', 'notes', 'clipboard'] },
   { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps'] },
-  { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'profile'] },
+  { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'groups', 'profile'] },
   { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
 ]
 
@@ -47,6 +49,7 @@ export const SHORT: Record<Tab, string> = {
   shelf: 'Shelf',
   apps: 'Apps',
   friends: 'Friends',
+  groups: 'Groups',
   profile: 'Profile',
   settings: 'Settings',
 }
