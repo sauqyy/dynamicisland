@@ -80,6 +80,14 @@ function loadTab(): Tab {
   return 'media'
 }
 
+/** The open card's height follows its page, within these bounds (design px). */
+const CARD_MIN = 200
+const CARD_MAX = STAGE.h - 14
+/** Rail row above the page, and the page area's padding below it. */
+const CARD_TOP = 58
+const CARD_PAD = 20
+const ACTIONS_H = 34
+
 /** Pill width that fits a line of text, up to what the stage can hold. */
 const textWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(300, text.length * 7.2 + 80))
 
@@ -155,6 +163,17 @@ export default function App() {
   const [now, setNow] = useState(() => Date.now())
   const [todos, setTodos] = useState<Todo[]>(loadTodos)
   const [battery, setBattery] = useState<number | null>(null)
+  // natural height of the page on show, measured as it renders
+  const [pageH, setPageH] = useState(240)
+  const fitObserver = useRef<ResizeObserver | null>(null)
+  const fitRef = useCallback((el: HTMLDivElement | null) => {
+    // the page that is leaving reports null; the one arriving takes over the observer
+    if (!el) return
+    fitObserver.current?.disconnect()
+    fitObserver.current = new ResizeObserver(() => setPageH(el.offsetHeight))
+    fitObserver.current.observe(el)
+    setPageH(el.offsetHeight)
+  }, [])
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
@@ -534,8 +553,11 @@ export default function App() {
 
   const mode = updating ? 'alert' : expanded ? 'expanded' : alert ? 'alert' : hovered ? 'peek' : 'idle'
 
-  // every page uses the same card size so the navigation arrows never move
-  const expandedHeight = settings.cardH
+  // the card fits the page it shows; a page taller than the card scrolls inside it
+  const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
+  const expandedHeight = notes
+    ? CARD_MAX
+    : Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
 
   // grow the pill to fit the lyric line, up to what the stage can hold
   const lyricW = textWidth(lyricText)
@@ -545,7 +567,7 @@ export default function App() {
     switch (mode) {
       case 'expanded':
         if (fs) return { w: fs.w / settings.scale, h: fs.h / settings.scale, r: 0 }
-        return { w: settings.cardW, h: expandedHeight, r: 44 }
+        return { w: settings.cardW, h: expandedHeight, r: 32 }
       case 'alert':
         return { w: 320, h: 60, r: 26 }
       case 'peek':
@@ -802,6 +824,7 @@ export default function App() {
                   }
                 : {})}
             >
+            <div className="page-fit" ref={fitRef}>
             {tab === 'media' && (
               <MediaWidget
                 track={track}
@@ -869,6 +892,7 @@ export default function App() {
             )}
             {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
             {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
+            </div>
             </motion.div>
           </AnimatePresence>
         </div>

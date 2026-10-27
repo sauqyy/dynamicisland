@@ -323,13 +323,6 @@ export function SettingsWidget({ settings, update, updater }: Props) {
           format={(v) => `${v}`}
           onChange={(cardW) => update({ cardW })}
         />
-        <Slider
-          label="Card height"
-          value={settings.cardH}
-          limits={SIZE_LIMITS.cardH}
-          format={(v) => `${v}`}
-          onChange={(cardH) => update({ cardH })}
-        />
       </div>
       <div className="row">
         <span>Updates</span>

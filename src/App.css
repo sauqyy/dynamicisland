@@ -3060,3 +3060,27 @@ button.ao-text:hover {
     transition: none;
   }
 }
+
+/* the card is as tall as its page; a page taller than the card scrolls */
+.xbody > .page {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pressed) transparent;
+}
+.page-fit {
+  display: flex;
+  flex-direction: column;
+}
+.expanded:not(.fs) .chat {
+  height: 300px;
+}
+.expanded.fs .page-fit {
+  height: 100%;
+}
+/* leave room under the search box for the suggestions, which float over the page */
+.page-fit > .city-picker {
+  min-height: 200px;
+  justify-content: flex-start;
+  padding-top: 10px;
+}
