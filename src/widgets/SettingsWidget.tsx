@@ -58,13 +58,41 @@ function Slider({
   )
 }
 
+/** A row of mutually exclusive choices. */
+function Segmented<T extends string | number>({ options, value, onPick }: { options: [T, string][]; value: T; onPick: (v: T) => void }) {
+  return (
+    <div className="segmented small">
+      {options.map(([v, label]) => (
+        <button key={String(v)} className={value === v ? 'active' : ''} data-cuelume-select onClick={() => onPick(v)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** One titled card of settings. */
+function Group({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="set-group">
+      <h4>
+        <span>{title}</span>
+        {action}
+      </h4>
+      <div className="set-card">{children}</div>
+    </section>
+  )
+}
+
 const CLEAR_OPTIONS: [number, string][] = [
-  [0, 'off'],
+  [0, 'Off'],
   [1, '1m'],
   [5, '5m'],
   [15, '15m'],
   [60, '1h'],
 ]
+
+const capital = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 export function SettingsWidget({ settings, update, updater }: Props) {
   const { state: update_, version, check: checkUpdate, install: downloadUpdate } = updater
@@ -107,208 +135,107 @@ export function SettingsWidget({ settings, update, updater }: Props) {
               : version && `v${version}`
 
   return (
-    <div className="settings" onClick={(e) => e.stopPropagation()}>
-      <div className="row">
-        <span>{IS_MAC ? 'Start at login' : 'Start with Windows'}</span>
-        <Toggle on={autostart} onChange={toggleAutostart} />
-      </div>
-      <div className="row">
-        <span>Hide in fullscreen apps</span>
-        <Toggle on={settings.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
-      </div>
-      <div className="group-title">Island</div>
-      <div className="row">
-        <span>Show in pill</span>
-        <div className="segmented small">
-          {(['clock', 'lyrics', 'weather'] as IdleDisplay[]).map((v) => (
-            <button key={v} className={settings.idle === v ? 'active' : ''} data-cuelume-select onClick={() => update({ idle: v })}>
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="row">
-        <span>Equalizer while playing</span>
-        <Toggle on={settings.idleBars} onChange={(v) => update({ idleBars: v })} />
-      </div>
-      <div className="row">
-        <span>Message sound</span>
-        <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />
-      </div>
-      <div className="row">
-        <span>Sound effects</span>
-        {/* these play their own cue: a preview in the pack just picked, or a last one on the way to mute */}
-        <div className="segmented small">
-          <button
-            className={settings.uiSounds ? '' : 'active'}
-            onClick={() => {
-              if (settings.uiSounds) play('close', { emphasis: 'subtle' })
-              update({ uiSounds: false })
-            }}
-          >
-            mute
-          </button>
-          {SOUND_PACKS.map((p) => (
-            <button
-              key={p}
-              className={settings.uiSounds && settings.soundPack === p ? 'active' : ''}
-              onClick={() => {
-                update({ uiSounds: true, soundPack: p })
-                previewPack(p)
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-      <Slider
-        label="Text size"
-        value={settings.clockSize}
-        limits={SIZE_LIMITS.clockSize}
-        format={(v) => `${v}px`}
-        onChange={(clockSize) => update({ clockSize })}
-      />
-      <Slider
-        label="Lyrics timing"
-        value={settings.lyricOffset}
-        limits={SIZE_LIMITS.lyricOffset}
-        format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}s`}
-        onChange={(lyricOffset) => update({ lyricOffset })}
-      />
-      <div className="row">
-        <span>Position (drag the pill)</span>
-        <button
-          className="chip"
-          disabled={!settings.posX && !settings.posY}
-          data-cuelume-tap
-          data-cuelume-emphasis="subtle"
-          onClick={() => update({ posX: 0, posY: 0 })}
-        >
-          Reset
-        </button>
-      </div>
-      <div className="group-title">Pages</div>
-      <div className="page-toggles">
-        {PAGES.filter((p) => p.id !== 'settings').map((p) => {
-          const on = !settings.hiddenPages.includes(p.id)
-          return (
-            <button
-              key={p.id}
-              className={`chip ${on ? 'on' : ''}`}
-              aria-pressed={on}
-              data-cuelume-toggle
-              onClick={() =>
-                update({ hiddenPages: on ? [...settings.hiddenPages, p.id] : settings.hiddenPages.filter((h) => h !== p.id) })
-              }
-            >
-              {p.title}
-            </button>
-          )
-        })}
-      </div>
-      <div className="group-title">Clipboard privacy</div>
-      <div className="row">
-        <span>Pause history</span>
-        <Toggle on={settings.clipPaused} onChange={(v) => update({ clipPaused: v })} />
-      </div>
-      <div className="row">
-        <span>Hide entries until hovered</span>
-        <Toggle on={settings.clipMask} onChange={(v) => update({ clipMask: v })} />
-      </div>
-      <div className="row">
-        <span>Skip passwords and tokens</span>
-        <Toggle on={settings.clipSkipSecrets} onChange={(v) => update({ clipSkipSecrets: v })} />
-      </div>
-      <div className="row">
-        <span>Auto-clear after</span>
-        <div className="segmented small">
-          {CLEAR_OPTIONS.map(([min, label]) => (
-            <button
-              key={min}
-              className={settings.clipAutoClear === min ? 'active' : ''}
-              data-cuelume-select
-              onClick={() => update({ clipAutoClear: min })}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="group-title">General</div>
-      <div className="row">
-        <span>24-hour clock</span>
-        <Toggle on={settings.clock24} onChange={(v) => update({ clock24: v })} />
-      </div>
-      <div className="row">
-        <span>Fahrenheit</span>
-        <Toggle on={settings.fahrenheit} onChange={(v) => update({ fahrenheit: v })} />
-      </div>
-      <div className="row">
-        <span>Display</span>
-        <div className="segmented small">
-          {Array.from({ length: monitors + 1 }, (_, i) => (
-            <button key={i} className={settings.monitor === i ? 'active' : ''} data-cuelume-select onClick={() => update({ monitor: i })}>
-              {i === 0 ? 'Main' : i}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="group-title">Page animation</div>
-      <div className="page-toggles">
-        {TAB_ANIMS.map((a) => (
-          <button
-            key={a}
-            className={`chip ${settings.tabAnim === a ? 'on' : ''}`}
-            style={{ opacity: settings.tabAnim === a ? 1 : 0.6, textTransform: 'capitalize' }}
-            data-cuelume-select
-            onClick={() => {
-              update({ tabAnim: a })
-              flip()
-            }}
-          >
-            {a}
-          </button>
-        ))}
-      </div>
-      <div className="anim-preview" aria-hidden>
-        <AnimatePresence mode="popLayout" initial={false} custom={swap.dir}>
-          <motion.div
-            key={swap.n}
-            className={`anim-card ${swap.n % 2 ? 'b' : 'a'}`}
-            custom={swap.dir}
-            variants={PAGE_VARIANTS[settings.tabAnim]}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            style={{ transformPerspective: 900 }}
-          >
-            <span className="ac-title" />
-            <span className="ac-line" />
-            <span className="ac-line short" />
-          </motion.div>
-        </AnimatePresence>
-        <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={flip}>
-          Replay
-        </button>
-      </div>
-      <div className="row">
-        <span>Animation</span>
-        <div className="segmented small">
-          {(['bouncy', 'smooth', 'snappy'] as Anim[]).map((a) => (
-            <button key={a} className={settings.anim === a ? 'active' : ''} data-cuelume-select onClick={() => update({ anim: a })}>
-              {a}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="size-box">
+    <div className="settings settings2" onClick={(e) => e.stopPropagation()}>
+      <Group title="Appearance">
         <div className="row">
-          <b>Island size</b>
-          <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={() => update({ ...SIZE_DEFAULTS })}>
+          <span>Theme</span>
+          <Segmented<Theme> options={[['dark', 'Dark'], ['light', 'Light'], ['glass', 'Glass'], ['auto', 'Auto']]} value={settings.theme} onPick={(theme) => update({ theme })} />
+        </div>
+        {settings.theme === 'glass' && (
+          <div className="row">
+            <span>Glass style</span>
+            <Segmented<GlassTint> options={[['dark', 'Dark'], ['light', 'Light'], ['gradient', 'Gradient']]} value={settings.glassTint} onPick={(glassTint) => update({ glassTint })} />
+          </div>
+        )}
+        <div className="row">
+          <span>Accent</span>
+          <div className="swatches">
+            {ACCENTS.map((c) => (
+              <button
+                key={c}
+                aria-label={c}
+                className={!settings.accentFromMusic && settings.accent === c ? 'active' : ''}
+                data-cuelume-select
+                style={{ background: c }}
+                onClick={() => update({ accent: c, accentFromMusic: false })}
+              />
+            ))}
+            <button
+              ref={customBtn}
+              className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'filled active'} ${customOpen ? 'open' : ''}`}
+              title="Custom colour"
+              aria-label="Custom colour"
+              {...disclosureCue(customOpen)}
+              style={ACCENTS.includes(settings.accent) ? undefined : ({ '--swatch': settings.accent } as React.CSSProperties)}
+              onClick={() => setCustomOpen((o) => !o)}
+            />
+          </div>
+        </div>
+        {customOpen &&
+          host &&
+          createPortal(
+            <div className="cp-pop" onClick={(e) => { e.stopPropagation(); setCustomOpen(false) }}>
+              <ColorPicker
+                value={settings.accent}
+                onAdd={(c) => {
+                  update({ accent: c, accentFromMusic: false })
+                  setCustomOpen(false)
+                }}
+              />
+            </div>,
+            host,
+          )}
+        <div className="row">
+          <span>Match accent to music</span>
+          <Toggle on={settings.accentFromMusic} onChange={(v) => update({ accentFromMusic: v })} />
+        </div>
+      </Group>
+
+      <Group title="Pill">
+        <div className="row">
+          <span>Show in pill</span>
+          <Segmented<IdleDisplay> options={[['clock', 'Clock'], ['lyrics', 'Lyrics'], ['weather', 'Weather']]} value={settings.idle} onPick={(idle) => update({ idle })} />
+        </div>
+        <div className="row">
+          <span>Equalizer while playing</span>
+          <Toggle on={settings.idleBars} onChange={(v) => update({ idleBars: v })} />
+        </div>
+        <Slider
+          label="Text size"
+          value={settings.clockSize}
+          limits={SIZE_LIMITS.clockSize}
+          format={(v) => `${v}px`}
+          onChange={(clockSize) => update({ clockSize })}
+        />
+        <Slider
+          label="Lyrics timing"
+          value={settings.lyricOffset}
+          limits={SIZE_LIMITS.lyricOffset}
+          format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}s`}
+          onChange={(lyricOffset) => update({ lyricOffset })}
+        />
+        <div className="row">
+          <span>Position (drag the pill)</span>
+          <button
+            className="chip"
+            disabled={!settings.posX && !settings.posY}
+            data-cuelume-tap
+            data-cuelume-emphasis="subtle"
+            onClick={() => update({ posX: 0, posY: 0 })}
+          >
             Reset
           </button>
         </div>
+      </Group>
+
+      <Group
+        title="Size"
+        action={
+          <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={() => update({ ...SIZE_DEFAULTS })}>
+            Reset
+          </button>
+        }
+      >
         <Slider
           label="Scale"
           value={settings.scale}
@@ -323,84 +250,187 @@ export function SettingsWidget({ settings, update, updater }: Props) {
           format={(v) => `${v}`}
           onChange={(cardW) => update({ cardW })}
         />
-      </div>
-      <div className="row">
-        <span>Updates</span>
-        <span className="update-status">{status}</span>
-        {update_.s === 'available' ? (
-          <button className="chip" data-cuelume-tap onClick={() => downloadUpdate(update_.url)}>
-            Update
-          </button>
-        ) : (
-          <button className="chip" disabled={update_.s === 'checking' || update_.s === 'downloading'} data-cuelume-tap onClick={checkUpdate}>
-            Check
-          </button>
-        )}
-      </div>
-      <div className="row">
-        <span>Theme</span>
-        <div className="segmented small">
-          {(['dark', 'light', 'glass', 'auto'] as Theme[]).map((t) => (
-            <button key={t} className={settings.theme === t ? 'active' : ''} data-cuelume-select onClick={() => update({ theme: t })}>
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-      {settings.theme === 'glass' && (
         <div className="row">
-          <span>Glass style</span>
-          <div className="segmented small">
-            {(['dark', 'light', 'gradient'] as GlassTint[]).map((t) => (
-              <button key={t} className={settings.glassTint === t ? 'active' : ''} data-cuelume-select onClick={() => update({ glassTint: t })}>
-                {t}
+          <span>Card height</span>
+          <Segmented<'fit' | 'fixed'>
+            options={[['fit', 'Fits the page'], ['fixed', 'Fixed']]}
+            value={settings.cardFit ? 'fit' : 'fixed'}
+            onPick={(v) => update({ cardFit: v === 'fit' })}
+          />
+        </div>
+        {!settings.cardFit && (
+          <Slider
+            label="Height"
+            value={settings.cardH}
+            limits={SIZE_LIMITS.cardH}
+            format={(v) => `${v}`}
+            onChange={(cardH) => update({ cardH })}
+          />
+        )}
+      </Group>
+
+      <Group title="Motion">
+        <div className="row">
+          <span>Animation</span>
+          <Segmented<Anim> options={[['bouncy', 'Bouncy'], ['smooth', 'Smooth'], ['snappy', 'Snappy']]} value={settings.anim} onPick={(anim) => update({ anim })} />
+        </div>
+        <div className="row stack">
+          <span>Page animation</span>
+          <div className="page-toggles">
+            {TAB_ANIMS.map((a) => (
+              <button
+                key={a}
+                className={`chip ${settings.tabAnim === a ? 'on' : ''}`}
+                data-cuelume-select
+                onClick={() => {
+                  update({ tabAnim: a })
+                  flip()
+                }}
+              >
+                {capital(a)}
               </button>
             ))}
           </div>
         </div>
-      )}
-      <div className="row">
-        <span>Accent</span>
-        <div className="swatches">
-          {ACCENTS.map((c) => (
+        <div className="anim-preview" aria-hidden>
+          <AnimatePresence mode="popLayout" initial={false} custom={swap.dir}>
+            <motion.div
+              key={swap.n}
+              className={`anim-card ${swap.n % 2 ? 'b' : 'a'}`}
+              custom={swap.dir}
+              variants={PAGE_VARIANTS[settings.tabAnim]}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              style={{ transformPerspective: 900 }}
+            >
+              <span className="ac-title" />
+              <span className="ac-line" />
+              <span className="ac-line short" />
+            </motion.div>
+          </AnimatePresence>
+          <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={flip}>
+            Replay
+          </button>
+        </div>
+      </Group>
+
+      <Group title="Sound">
+        <div className="row">
+          <span>Sound effects</span>
+          {/* these play their own cue: a preview in the pack just picked, or a last one on the way to mute */}
+          <div className="segmented small">
             <button
-              key={c}
-              aria-label={c}
-              className={!settings.accentFromMusic && settings.accent === c ? 'active' : ''}
-              data-cuelume-select
-              style={{ background: c }}
-              onClick={() => update({ accent: c, accentFromMusic: false })}
-            />
-          ))}
-          <button
-            ref={customBtn}
-            className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'filled active'} ${customOpen ? 'open' : ''}`}
-            title="Custom colour"
-            aria-label="Custom colour"
-            {...disclosureCue(customOpen)}
-            style={ACCENTS.includes(settings.accent) ? undefined : ({ '--swatch': settings.accent } as React.CSSProperties)}
-            onClick={() => setCustomOpen((o) => !o)}
+              className={settings.uiSounds ? '' : 'active'}
+              onClick={() => {
+                if (settings.uiSounds) play('close', { emphasis: 'subtle' })
+                update({ uiSounds: false })
+              }}
+            >
+              Mute
+            </button>
+            {SOUND_PACKS.map((p) => (
+              <button
+                key={p}
+                className={settings.uiSounds && settings.soundPack === p ? 'active' : ''}
+                onClick={() => {
+                  update({ uiSounds: true, soundPack: p })
+                  previewPack(p)
+                }}
+              >
+                {capital(p)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="row">
+          <span>Message sound</span>
+          <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />
+        </div>
+      </Group>
+
+      <Group title="Pages">
+        <div className="page-toggles">
+          {PAGES.filter((p) => p.id !== 'settings').map((p) => {
+            const on = !settings.hiddenPages.includes(p.id)
+            return (
+              <button
+                key={p.id}
+                className={`chip ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                data-cuelume-toggle
+                onClick={() =>
+                  update({ hiddenPages: on ? [...settings.hiddenPages, p.id] : settings.hiddenPages.filter((h) => h !== p.id) })
+                }
+              >
+                {p.title}
+              </button>
+            )
+          })}
+        </div>
+      </Group>
+
+      <Group title="Clipboard privacy">
+        <div className="row">
+          <span>Pause history</span>
+          <Toggle on={settings.clipPaused} onChange={(v) => update({ clipPaused: v })} />
+        </div>
+        <div className="row">
+          <span>Hide entries until hovered</span>
+          <Toggle on={settings.clipMask} onChange={(v) => update({ clipMask: v })} />
+        </div>
+        <div className="row">
+          <span>Skip passwords and tokens</span>
+          <Toggle on={settings.clipSkipSecrets} onChange={(v) => update({ clipSkipSecrets: v })} />
+        </div>
+        <div className="row">
+          <span>Auto-clear after</span>
+          <Segmented<number> options={CLEAR_OPTIONS} value={settings.clipAutoClear} onPick={(clipAutoClear) => update({ clipAutoClear })} />
+        </div>
+      </Group>
+
+      <Group title="General">
+        <div className="row">
+          <span>{IS_MAC ? 'Start at login' : 'Start with Windows'}</span>
+          <Toggle on={autostart} onChange={toggleAutostart} />
+        </div>
+        <div className="row">
+          <span>Hide in fullscreen apps</span>
+          <Toggle on={settings.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
+        </div>
+        <div className="row">
+          <span>24-hour clock</span>
+          <Toggle on={settings.clock24} onChange={(v) => update({ clock24: v })} />
+        </div>
+        <div className="row">
+          <span>Fahrenheit</span>
+          <Toggle on={settings.fahrenheit} onChange={(v) => update({ fahrenheit: v })} />
+        </div>
+        <div className="row">
+          <span>Display</span>
+          <Segmented<number>
+            options={Array.from({ length: monitors + 1 }, (_, i): [number, string] => [i, i === 0 ? 'Main' : String(i)])}
+            value={settings.monitor}
+            onPick={(monitor) => update({ monitor })}
           />
         </div>
-      </div>
-      {customOpen &&
-        host &&
-        createPortal(
-          <div className="cp-pop" onClick={(e) => { e.stopPropagation(); setCustomOpen(false) }}>
-            <ColorPicker
-              value={settings.accent}
-              onAdd={(c) => {
-                update({ accent: c, accentFromMusic: false })
-                setCustomOpen(false)
-              }}
-            />
-          </div>,
-          host,
-        )}
-      <div className="row">
-        <span>Match accent to music</span>
-        <Toggle on={settings.accentFromMusic} onChange={(v) => update({ accentFromMusic: v })} />
-      </div>
+      </Group>
+
+      <Group title="Updates">
+        <div className="row">
+          <span>Version</span>
+          <span className="update-status">{status}</span>
+          {update_.s === 'available' ? (
+            <button className="chip" data-cuelume-tap onClick={() => downloadUpdate(update_.url)}>
+              Update
+            </button>
+          ) : (
+            <button className="chip" disabled={update_.s === 'checking' || update_.s === 'downloading'} data-cuelume-tap onClick={checkUpdate}>
+              Check
+            </button>
+          )}
+        </div>
+      </Group>
     </div>
   )
 }

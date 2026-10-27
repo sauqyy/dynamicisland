@@ -64,8 +64,11 @@ export interface Settings {
   fahrenheit: boolean
   /** overall size of the island, 1 = default */
   scale: number
-  /** width of the opened card in design px (before scale); its height follows the page */
+  /** size of the opened card in design px (before scale) */
   cardW: number
+  cardH: number
+  /** the card's height follows the page it shows; off = always cardH */
+  cardFit: boolean
 }
 
 export const ACCENTS = ['#4ade80', '#60a5fa', '#c084fc', '#f472b6', '#fb923c', '#facc15', '#f87171', '#2dd4bf']
@@ -82,11 +85,12 @@ export const STAGE = { w: 520, h: 444 }
 export const SIZE_LIMITS = {
   scale: { min: 0.8, max: 1.4, step: 0.05 },
   cardW: { min: 400, max: 490, step: 10 },
+  cardH: { min: 220, max: 430, step: 2 },
   clockSize: { min: 12, max: 22, step: 1 },
   lyricOffset: { min: -1.5, max: 1.5, step: 0.05 },
 }
 
-export const SIZE_DEFAULTS = { scale: 1, cardW: 440 }
+export const SIZE_DEFAULTS = { scale: 1, cardW: 440, cardH: 344, cardFit: true }
 
 const DEFAULTS: Settings = {
   monitor: 0,

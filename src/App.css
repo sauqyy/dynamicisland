@@ -3334,3 +3334,80 @@ button.ao-text:hover {
   opacity: 0;
   pointer-events: none;
 }
+
+/* ---------- Settings: titled cards of rows ---------- */
+.settings.settings2 {
+  height: auto;
+  gap: 14px;
+  overflow: visible;
+  padding: 2px 0 4px;
+}
+.set-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.set-group > h4 {
+  margin: 0;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.set-group > h4 .chip {
+  letter-spacing: 0;
+  text-transform: none;
+}
+.set-card {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 14px;
+  border-radius: 16px;
+  background: var(--raised);
+}
+.settings2 .set-card > .row {
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.settings2 .set-card > .row:last-child {
+  border-bottom: 0;
+}
+.settings2 .set-card > .row > span:first-child {
+  font-weight: 500;
+}
+.settings2 .set-card > .row.stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 0;
+}
+.settings2 .set-card > .page-toggles {
+  padding: 10px 0;
+}
+.settings2 .set-card > .anim-preview {
+  padding: 4px 0 12px;
+}
+.settings2 .chip:not(.on) {
+  opacity: 0.75;
+}
+.settings2 .segmented.small {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.settings2 .update-status {
+  color: var(--text-2);
+}
+.settings2 .segmented button {
+  text-transform: none;
+}
+.settings2 .update-status {
+  margin-left: auto;
+}

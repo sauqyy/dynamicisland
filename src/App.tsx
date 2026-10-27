@@ -585,7 +585,9 @@ export default function App() {
   const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
   const expandedHeight = notes
     ? CARD_MAX
-    : Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
+    : settings.cardFit
+      ? Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
+      : Math.min(CARD_MAX, settings.cardH)
 
   // grow the pill to fit the lyric line, up to what the stage can hold
   const idleW = live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
