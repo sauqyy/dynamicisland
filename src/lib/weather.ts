@@ -6,7 +6,7 @@ export interface Weather {
   code: number
   humidity: number
   wind: number
-  /** every hour of today, midnight to 23:00 */
+  /** every hour of today and tomorrow, from today's midnight */
   hourly: { hour: string; temp: number; code: number }[]
   /** index in `hourly` of the current hour */
   nowHour?: number
@@ -42,7 +42,8 @@ export function cachedWeather(city: string, fahrenheit: boolean): Weather | null
   return null
 }
 
-export const isFresh = (w: Weather) => w.nowHour != null && Date.now() - w.fetchedAt < MAX_AGE
+// a forecast cached before tomorrow's hours were kept is refreshed once
+export const isFresh = (w: Weather) => w.nowHour != null && w.hourly.length > 24 && Date.now() - w.fetchedAt < MAX_AGE
 
 export interface CityHit {
   name: string
@@ -107,7 +108,7 @@ export async function fetchWeather(
 
   const day = f.current.time.slice(0, 10)
   const first = Math.max(0, f.hourly.time.findIndex((t) => t.startsWith(day)))
-  const hourly = f.hourly.time.slice(first, first + 24).map((t, i) => ({
+  const hourly = f.hourly.time.slice(first, first + 48).map((t, i) => ({
     hour: t.slice(11, 13),
     temp: Math.round(f.hourly.temperature_2m[first + i]),
     code: f.hourly.weather_code[first + i],

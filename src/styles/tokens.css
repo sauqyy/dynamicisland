@@ -1,0 +1,46 @@
+/*
+ * Design tokens for the island. Every theme sets --island-bg, --fg and --fg-rgb on .root
+ * (see App.css); the surfaces and text levels below are derived from those, so they follow
+ * dark, light and glass without being redefined per theme.
+ */
+.root {
+  /* surfaces on top of the island */
+  --raised: rgb(var(--fg-rgb) / 0.07);
+  --pressed: rgb(var(--fg-rgb) / 0.12);
+  --line: rgb(var(--fg-rgb) / 0.08);
+  --rim: rgb(var(--fg-rgb) / 0.13);
+
+  /* text levels */
+  --text-1: var(--fg);
+  --text-2: rgb(var(--fg-rgb) / 0.6);
+  --text-3: rgb(var(--fg-rgb) / 0.36);
+
+  /* status colours */
+  --charge: #4ade80;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --info: #60a5fa;
+
+  /* radii */
+  --r-card: 32px;
+  --r-tile: 12px;
+  --r-pill: 999px;
+
+  /* type */
+  --font-ui: 'Geist Variable', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --fs-label: 11px;
+  --fs-meta: 12px;
+  --fs-body: 13px;
+  --fs-title: 15px;
+  --fs-lyric: 17px;
+  --fs-timer: 26px;
+  --fs-temp: 52px;
+
+  font-family: var(--font-ui);
+}
+
+.root.light {
+  --rim: rgb(var(--fg-rgb) / 0.1);
+  --text-3: rgb(var(--fg-rgb) / 0.42);
+}

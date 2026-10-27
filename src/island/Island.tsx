@@ -173,11 +173,10 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
             <stop offset="1" style={{ stopColor: 'var(--glass-b)' }} />
           </linearGradient>
           <linearGradient id="glass-rim" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#fff" stopOpacity="0.95" />
-            <stop offset="0.22" stopColor="#bfe9ff" stopOpacity="0.55" />
-            <stop offset="0.5" stopColor="#fff" stopOpacity="0.12" />
-            <stop offset="0.78" stopColor="#ffc2ea" stopOpacity="0.5" />
-            <stop offset="1" stopColor="#fff" stopOpacity="0.85" />
+            <stop offset="0" stopColor="#fff" stopOpacity="0.7" />
+            <stop offset="0.3" stopColor="#fff" stopOpacity="0.18" />
+            <stop offset="0.6" stopColor="#fff" stopOpacity="0.08" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0.4" />
           </linearGradient>
           <filter id="glass-soft" x="-10%" y="-10%" width="120%" height="120%">
             <feGaussianBlur stdDeviation="5" />
@@ -200,6 +199,8 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
           <motion.path d={d} fill="none" stroke="#fff" strokeWidth="12" strokeOpacity="0.34" filter="url(#glass-soft)" />
         </g>
         <motion.path className="glass-fx glass-rim" d={d} fill="none" stroke="url(#glass-rim)" strokeWidth="1.5" />
+        {/* a hairline edge in every theme, so the island reads the same on light and dark wallpapers */}
+        <motion.path className="island-rim" d={d} fill="none" strokeWidth="1" />
       </svg>
 
       <div className="content-layer">

@@ -1,7 +1,10 @@
 import { useRef } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { Music2, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { currentLineIndex } from '../lib/lyrics'
 import type { Track } from '../types'
+
+/** Height of one lyric line in the Playing page (must match .ly-line in App.css). */
+const LINE = 28
 
 export function fmt(sec: number) {
   const s = Math.max(0, Math.floor(sec))
@@ -50,7 +53,9 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   if (!track) {
     return (
       <div className="media nothing" onClick={(e) => e.stopPropagation()}>
-        <div className="nothing-icon">♫</div>
+        <div className="nothing-icon">
+          <Music2 size={28} strokeWidth={1.7} aria-hidden />
+        </div>
         <div>Nothing playing</div>
         <small>Start a song in Spotify or any media app</small>
       </div>
@@ -60,6 +65,7 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   const lines = track.lyrics
   const idx = lines ? currentLineIndex(lines, position + lyricOffset) : -1
   const canSeek = track.duration > 0
+  const progress = canSeek ? Math.min(100, (position / track.duration) * 100) : 0
 
   const seekFromEvent = (clientX: number) => {
     if (!canSeek) return
@@ -69,35 +75,27 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   }
 
   return (
-    <div className="media" onClick={(e) => e.stopPropagation()}>
-      <div className="media-head">
-        <Art track={track} size={44} />
-        <div className="media-meta">
-          <div className="title">{track.title}</div>
-          <div className="artist">{track.artist}</div>
+    <div className="np-page" onClick={(e) => e.stopPropagation()}>
+      <div className="np">
+        <Art track={track} size={56} />
+        <div className="np-meta">
+          <b>{track.title}</b>
+          <span>{track.artist}</span>
         </div>
       </div>
 
-      <div className="lyrics">
+      {/* a three-line window: the current line in the middle, sliding up as the song goes on */}
+      <div className="ly">
         {lines ? (
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.div
-              key={idx}
-              className="lyric-stack"
-              initial={{ y: 18, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -18, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-            >
-              <div className="lyric prev">{lines[idx - 1]?.text ?? ''}</div>
-              <div className="lyric now">{idx >= 0 ? lines[idx].text || '♪' : '♪'}</div>
-              <div className="lyric next">{lines[idx + 1]?.text ?? ''}</div>
-            </motion.div>
-          </AnimatePresence>
-        ) : (
-          <div className="lyric none">
-            {track.lyricsLoading ? 'Finding lyrics…' : 'No synced lyrics found'}
+          <div className="ly-stack" style={{ transform: `translateY(${(1 - idx) * LINE}px)` }}>
+            {lines.map((l, i) => (
+              <div key={i} className={`ly-line ${i === idx ? 'now' : ''}`}>
+                {l.text || '♪'}
+              </div>
+            ))}
           </div>
+        ) : (
+          <div className="ly-none">{track.lyricsLoading ? 'Finding lyrics…' : 'No synced lyrics found'}</div>
         )}
       </div>
 
@@ -112,19 +110,24 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
         }}
         onPointerMove={(e) => e.buttons === 1 && seekFromEvent(e.clientX)}
       >
-        <div className="scrub-fill" style={{ width: canSeek ? `${Math.min(100, (position / track.duration) * 100)}%` : '0%' }} />
+        <div className="scrub-fill" style={{ width: `${progress}%` }} />
+        <div className="scrub-knob" style={{ left: `${progress}%` }} />
       </div>
       <div className="times">
         <span>{fmt(position)}</span>
         <span>{canSeek ? `-${fmt(track.duration - position)}` : ''}</span>
       </div>
 
-      <div className="controls">
-        <button onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">⏮</button>
-        <button className="play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
-          {playing ? '⏸' : '▶'}
+      <div className="np-controls">
+        <button onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">
+          <SkipBack size={18} fill="currentColor" aria-hidden />
         </button>
-        <button onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">⏭</button>
+        <button className="np-play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
+          {playing ? <Pause size={18} fill="currentColor" aria-hidden /> : <Play size={18} fill="currentColor" aria-hidden />}
+        </button>
+        <button onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">
+          <SkipForward size={18} fill="currentColor" aria-hidden />
+        </button>
       </div>
     </div>
   )

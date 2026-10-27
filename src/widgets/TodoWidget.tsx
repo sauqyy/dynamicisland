@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AnimatePresence, Reorder, motion } from 'motion/react'
 import { play } from 'cuelume'
+import { Check, ListChecks } from 'lucide-react'
 import type { Todo } from '../types'
 
 interface Props {
@@ -52,7 +53,7 @@ export function TodoWidget({ todos, setTodos }: Props) {
                 transition={{ type: 'spring', stiffness: 500, damping: 18 }}
                 onClick={() => setTodos(todos.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)))}
               >
-                {t.done ? '✓' : ''}
+                {t.done ? <Check size={12} strokeWidth={3} aria-hidden /> : null}
               </motion.button>
               <span className="todo-text">{t.text}</span>
               <button
@@ -67,7 +68,10 @@ export function TodoWidget({ todos, setTodos }: Props) {
             </Reorder.Item>
           ))}
         </AnimatePresence>
-        {!todos.length && <div className="empty">Nothing to do 🎉</div>}
+        {!todos.length && <div className="empty">
+            <ListChecks size={20} strokeWidth={1.7} aria-hidden />
+            Nothing to do
+          </div>}
       </Reorder.Group>
     </div>
   )

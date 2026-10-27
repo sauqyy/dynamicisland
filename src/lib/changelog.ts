@@ -7,6 +7,18 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.6.0',
+    title: 'A new look',
+    items: [
+      'The pages now sit in one bar at the bottom of the card. Tap a group to open it, then pick a page.',
+      'The card grows and shrinks to fit each page. Prefer a fixed size? Pick it in Settings, under Size.',
+      'While music plays, the pill shows the cover, the current lyric and the equalizer.',
+      'A new song shows a Now playing alert with its cover. Click it to open Playing.',
+      'Charging, battery and downloads show their progress along the bottom edge of the island.',
+      'Playing, Weather and Timer are redesigned, Settings is grouped into sections, and the icons are cleaner.',
+    ],
+  },
+  {
     version: '0.5.0',
     title: 'Group voice chat',
     items: [

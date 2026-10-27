@@ -16,7 +16,6 @@ import { SettingsWidget } from './widgets/SettingsWidget'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
-import { Dock } from './widgets/Dock'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
@@ -31,7 +30,8 @@ import { useCall } from './lib/useCall'
 import { useGroupVoice } from './lib/useGroupVoice'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { useClipboard } from './lib/useClipboard'
-import { ExpandedHeader } from './widgets/ExpandedHeader'
+import { Rail } from './island/Rail'
+import { AlertIcon, alertTone } from './island/AlertIcon'
 import {
   DEFAULT_APPS,
   DEMO_APPS,
@@ -48,8 +48,9 @@ import { useAutoIdle } from './lib/useAutoIdle'
 import { useHeartbeat } from './lib/useHeartbeat'
 import { play, type PlayOptions, type SoundName } from 'cuelume'
 import { useSoundSetup } from './lib/sound'
-import { cachedWeather, describe as describeWeather } from './lib/weather'
-import { GROUPS, PAGES, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
+import { cachedWeather } from './lib/weather'
+import { WeatherIcon, isNight } from './widgets/WeatherIcon'
+import { GROUPS, PAGES, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
 // loaded once at startup: building a fresh Audio per message re-fetches and re-decodes the file, which is what made the sound lag
@@ -93,8 +94,37 @@ function loadTab(): Tab {
   return 'media'
 }
 
+/** The open card's height follows its page, within these bounds (design px). */
+const CARD_MIN = 200
+const CARD_MAX = STAGE.h - 14
+/** Date and time row above the page, and the page's bottom padding plus the rail row below it. */
+const CARD_TOP = 40
+const CARD_PAD = 62
+const ACTIONS_H = 34
+
 /** Pill width that fits a line of text, up to what the stage can hold. */
 const textWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(300, text.length * 7.2 + 80))
+/** The same with room for the art on the left and the waveform on the right. */
+const liveWidth = (text: string) => Math.min(STAGE.w - 40, Math.max(236, text.length * 7.2 + 104))
+
+/** One line of pill text; a new line rises in as the old one leaves. */
+function LiveText({ text, k }: { text: string; k: string | number }) {
+  return (
+    <span className="live-text">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={k}
+          className="live-line"
+          initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.28 } }}
+          exit={{ opacity: 0, y: -8, filter: 'blur(4px)', transition: { duration: 0.16 } }}
+        >
+          {text}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  )
+}
 
 function stepPage(list: { id: Tab }[], from: Tab, dir: -1 | 1): Tab {
   const i = list.findIndex((p) => p.id === from)
@@ -169,6 +199,17 @@ export default function App() {
   const [now, setNow] = useState(() => Date.now())
   const [todos, setTodos] = useState<Todo[]>(loadTodos)
   const [battery, setBattery] = useState<number | null>(null)
+  // natural height of the page on show, measured as it renders
+  const [pageH, setPageH] = useState(240)
+  const fitObserver = useRef<ResizeObserver | null>(null)
+  const fitRef = useCallback((el: HTMLDivElement | null) => {
+    // the page that is leaving reports null; the one arriving takes over the observer
+    if (!el) return
+    fitObserver.current?.disconnect()
+    fitObserver.current = new ResizeObserver(() => setPageH(el.offsetHeight))
+    fitObserver.current.observe(el)
+    setPageH(el.offsetHeight)
+  }, [])
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
@@ -247,6 +288,17 @@ export default function App() {
     setAlert({ ...a, id: ++alertId.current })
     if (cue) play(cue, opts)
   }, [])
+
+  // a new song (skipped to, or the next one in the queue) shows what is now playing
+  const lastTrackId = useRef(track?.id)
+  useEffect(() => {
+    const was = lastTrackId.current
+    lastTrackId.current = track?.id
+    if (!track || !was || was === track.id) return
+    pushAlert({ icon: '🎵', text: track.title, sub: track.artist, nowPlaying: true })
+    // only a change of song counts, not the art or lyrics arriving for the same one
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.id, pushAlert])
 
   // tell the user once per version when the automatic check finds an update; the cog keeps a dot until it is installed
   const alertedUpdate = useRef('')
@@ -578,15 +630,23 @@ export default function App() {
 
   // other things the pill can show; falls back to the clock when there is nothing to show yet.
   // Re-read when the card closes, which is when the city may have changed.
-  const idleExtra = useMemo(() => {
+  const idleWeather = useMemo(() => {
     if (settings.idle === 'weather' && settings.city) {
       const w = cachedWeather(settings.city, settings.fahrenheit)
-      return w ? `${describeWeather(w.code).icon} ${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` : ''
+      if (w) return { code: w.code, text: `${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` }
     }
-    return ''
+    return null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
+  const idleExtra = idleWeather?.text ?? ''
+  const weatherGlyph = idleWeather && !idleLyric ? <WeatherIcon code={idleWeather.code} night={isNight(new Date(now).getHours())} size={15} /> : null
   const idleText = idleLyric ? lyricText : idleExtra
+  const d = new Date(now)
+  const clock = clockText(d, settings.clock24)
+  // while music plays the pill carries the album art and the waveform around its text:
+  // the lyric line when the pill shows lyrics, otherwise the weather or the clock
+  const live = playing && track ? idleText || clock : ''
+  const peekText = playing && track ? lyricText || `${track.title} · ${track.artist}` : ''
 
   // hovering the island while a call rings shows who is calling, with answer and decline
   const caller = ringing ? social.friends.find((f) => f.profile.id === activeCall.state.peer) : undefined
@@ -613,30 +673,39 @@ export default function App() {
               ? 'peek'
               : 'idle'
 
-  // every page uses the same card size so the navigation arrows never move
-  const expandedHeight = settings.cardH
+  // the card fits the page it shows; a page taller than the card scrolls inside it
+  const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
+  const expandedHeight = notes
+    ? CARD_MAX
+    : settings.cardFit
+      ? Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
+      : Math.min(CARD_MAX, settings.cardH)
 
   // grow the pill to fit the lyric line, up to what the stage can hold
-  const lyricW = textWidth(lyricText)
-  const idleW = idleLyric ? lyricW : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
+  const idleW = live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
+  const peekW = peekText ? Math.max(340, liveWidth(peekText)) : 300
 
   const shape: Shape = useMemo(() => {
     switch (mode) {
       case 'expanded':
         if (fs) return { w: fs.w / settings.scale, h: fs.h / settings.scale, r: 0 }
-        return { w: settings.cardW, h: expandedHeight, r: 44 }
+        return { w: settings.cardW, h: expandedHeight, r: 32 }
       case 'alert':
-        return { w: 320, h: 60, r: 26 }
+        // volume and brightness are a slim level meter; a message has room for the friend and a reply
+        if (!updating && alert?.kind) return { w: 290, h: 40, r: 16 }
+        if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
+        if (!updating && alert?.nowPlaying) return { w: 360, h: 56, r: 24 }
+        return { w: 340, h: 48, r: 22 }
       case 'call':
         return { w: 340, h: 64, r: 28 }
       case 'incall':
         return { w: 250, h: 42, r: 18 }
       case 'peek':
-        return { w: showLyricPeek ? lyricW : 230, h: 40, r: 16 }
+        return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, showLyricPeek, idleW, lyricW])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -676,7 +745,7 @@ export default function App() {
     prevIdx.current = pageIdx
   }
 
-  // the card opening and closing, and every page change inside it (arrows, dock, keys, swipes)
+  // the card opening and closing, and every page change inside it (rail, keys, swipes)
   // jumping between a friend's chat and a group's chat is a chat selection, not a page change
   const isSocial = (t: Tab) => t === 'friends' || t === 'groups'
   const chatSwitch = useRef(false)
@@ -684,9 +753,13 @@ export default function App() {
   const soundState = useRef({ expanded, tab })
   useEffect(() => {
     const was = soundState.current
-    // opening is a press on the island, so it taps; closing lets the card fall shut
+    const groupOf = (t: Tab) => GROUPS.find((g) => g.pages.includes(t))?.id
+    // opening is a press on the island, so it taps; closing lets the card fall shut.
+    // Moving to another group on the rail selects it; moving within a group navigates.
     if (expanded !== was.expanded) play(expanded ? 'tap' : 'close', { emphasis: expanded ? 'normal' : 'subtle' })
-    else if (expanded && tab !== was.tab && !(chatSwitch.current && isSocial(tab) && isSocial(was.tab))) play('navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
+    else if (expanded && tab !== was.tab && !(chatSwitch.current && isSocial(tab) && isSocial(was.tab))) {
+      play(groupOf(tab) !== groupOf(was.tab) ? 'select' : 'navigate', { emphasis: 'subtle', direction: dirRef.current > 0 ? 'forward' : 'back' })
+    }
     soundState.current = { expanded, tab }
   }, [expanded, tab])
 
@@ -706,7 +779,26 @@ export default function App() {
 
   const onSkip = (dir: -1 | 1) => {
     skip(dir)
-    if (!IS_TAURI) pushAlert({ icon: dir > 0 ? '⏭' : '⏮', text: dir > 0 ? 'Next track' : 'Previous track' })
+    // the demo's skip restarts its one song, so it raises the song-change alert itself
+    if (!IS_TAURI && track) pushAlert({ icon: '🎵', text: track.title, sub: track.artist, nowPlaying: true })
+  }
+
+  // browser demo: the lock keys it pretends to toggle, and a fake update download
+  const demoLocks = useRef({ caps: false, num: false })
+  const demoUpdate = useRef(0)
+  const runDemoUpdate = () => {
+    clearInterval(demoUpdate.current)
+    setExpanded(false)
+    play('loading')
+    let percent = 0
+    setUpdating({ stage: 'downloading', percent })
+    demoUpdate.current = window.setInterval(() => {
+      percent = Math.min(100, percent + 7)
+      if (percent < 100) return setUpdating({ stage: 'downloading', percent })
+      clearInterval(demoUpdate.current)
+      setUpdating({ stage: 'installing', percent: 100 })
+      setTimeout(() => setUpdating(null), 1800)
+    }, 160)
   }
 
   // Drag the island to move it. The pill follows the cursor on a spring and sticks to the
@@ -765,7 +857,7 @@ export default function App() {
           const el = e.target as HTMLElement
           if (el.closest('button, input, textarea, a, .scrub, [draggable="true"]')) return
           // inside the open card only the header strip is a handle
-          if (mode === 'expanded' && !el.closest('.xhead')) return
+          if (mode === 'expanded' && !el.closest('.xtop')) return
           dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy: posRef.current.y, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
@@ -814,14 +906,11 @@ export default function App() {
       }
     : undefined
 
-  const d = new Date(now)
-  const clock = clockText(d, settings.clock24)
   let content: React.ReactNode
   let contentKey: string
 
   if (mode === 'expanded') {
     contentKey = 'expanded'
-    const page = PAGES.find((p) => p.id === tab)!
     const action =
       tab === 'shelf' && shelf.items.length ? (
         <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={shelf.clear}>Clear</button>
@@ -840,34 +929,16 @@ export default function App() {
       ) : null
     content = (
       <div className={`expanded ${fs ? 'fs' : ''}`}>
-        <ExpandedHeader
-          title={page.title}
-          timer={timer ? remaining / (timer.total / 1000) : null}
-          date={d}
-          clock={clock}
-          bars={playing && track ? track.hue : null}
-          profile={auth.profile}
-          onProfile={() => setTab('profile')}
-          onPresence={(v) => auth.saveProfile({ presence: v })}
-          profileActive={tab === 'profile'}
-          onSettings={() => setTab('settings')}
-          settingsActive={tab === 'settings'}
-          updateAvailable={updater.state.s === 'available'}
-        />
-        {group && group.pages.length > 1 && (
-          <div className="subtabs" onClick={(e) => e.stopPropagation()}>
-            {group.pages.map((id) => (
-              <button key={id} className={id === tab ? 'active' : ''} onClick={() => setTab(id)}>
-                {id === tab && (
-                  <motion.span layoutId="subtab-ind" className="subtab-ind" style={{ borderRadius: 999 }} transition={{ type: 'spring', stiffness: 380, damping: 38 }} />
-                )}
-                <span className="subtab-label">{SHORT[id]}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <div className={`expanded-body ${action ? 'with-actions' : ''} ${group && group.pages.length > 1 ? 'has-subtabs' : ''}`}>
-          {action && <div className="body-actions">{action}</div>}
+        <div className="xtop">
+          <span className="xtop-date">{d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <span className="xtop-status">
+            {playing && track && <Bars active hue={track.hue} />}
+            {timer && <Ring fraction={remaining / (timer.total / 1000)} size={16} stroke={2.5} />}
+            <b className="xtop-time">{clock}</b>
+          </span>
+        </div>
+        <div className="xbody">
+          {action && <div className="xactions">{action}</div>}
           <AnimatePresence mode="popLayout" initial={false} custom={dirRef.current}>
             <motion.div
               // Friends and Groups share one page, so moving between them (e.g. from a chat) does not animate
@@ -888,7 +959,7 @@ export default function App() {
                     dragElastic: 0.45,
                     onPointerDown: (e: React.PointerEvent) => {
                       // let inputs, sliders and buttons keep their own dragging
-                      if (!(e.target as HTMLElement).closest('input, textarea, button, a, .scrub, [draggable="true"], .todo-item')) pageDrag.start(e)
+                      if (!(e.target as HTMLElement).closest('input, textarea, button, a, .scrub, .wx-chart, [draggable="true"], .todo-item')) pageDrag.start(e)
                     },
                     onDragEnd: (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
                       if (info.offset.x < -70 || info.velocity.x < -450) go(1)
@@ -897,6 +968,7 @@ export default function App() {
                   }
                 : {})}
             >
+            <div className="page-fit" ref={fitRef}>
             {tab === 'media' && (
               <MediaWidget
                 track={track}
@@ -973,17 +1045,22 @@ export default function App() {
             )}
             {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
             {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
+            </div>
             </motion.div>
           </AnimatePresence>
         </div>
-        <Dock
-          groups={groups}
-          activeId={group?.id}
-          onSelect={(id) => {
-            const g = groups.find((x) => x.id === id)!
-            setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
-          }}
-        />
+        <div className="xrail">
+            <Rail
+              groups={groups}
+              tab={tab}
+              onPage={setTab}
+              onGroup={(id) => {
+                const g = groups.find((x) => x.id === id)!
+                setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
+              }}
+              dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+            />
+        </div>
         {notes && (
           <div className="whatsnew" onClick={(e) => e.stopPropagation()}>
             <small>What's new in v{notes.version}</small>
@@ -1009,15 +1086,47 @@ export default function App() {
     contentKey = 'updating'
     const installing = updating.stage === 'installing'
     content = (
-      <div className="alert">
-        <span className="alert-icon">⬇️</span>
-        <div className="alert-text">
-          <span>{installing ? 'Installing' : 'Updating'}</span>
-          <small>{installing ? 'Restarting…' : `${updating.percent}%`}</small>
-        </div>
-        <div className="liquid-bar">
-          <div className="liquid-fill" style={{ width: `${updating.percent}%` }} />
-        </div>
+      <div className="alert2" style={{ ['--c' as string]: 'var(--info)' }}>
+        <span className="al-ic">
+          <AlertIcon icon="⬇️" />
+        </span>
+        <span className="al-tx">
+          <b>{installing ? 'Installing' : 'Updating'}</b>
+          <small>{installing ? 'Restarting…' : 'Downloading the new version'}</small>
+        </span>
+        {!installing && <span className="al-val">{updating.percent}%</span>}
+        <span className="edge" style={{ ['--v' as string]: `${installing ? 100 : updating.percent}%` }} />
+      </div>
+    )
+  } else if (mode === 'alert' && alert?.kind) {
+    // held volume/brightness keys keep one mounted alert so the meter moves instead of fading out and in
+    contentKey = `alert-${alert.kind}`
+    const lit = Math.round(((alert.value ?? 0) / 100) * 16)
+    content = (
+      <div className="alert2 hud">
+        <span className="hud-ic">
+          <AlertIcon icon={alert.icon} size={16} />
+        </span>
+        <span className="hud-ticks" aria-label={`${alert.text} ${alert.value ?? 0}%`}>
+          {Array.from({ length: 16 }, (_, i) => (
+            <i key={i} className={i < lit ? 'on' : ''} />
+          ))}
+        </span>
+        <span className="hud-val">{alert.value ?? 0}</span>
+      </div>
+    )
+  } else if (mode === 'alert' && alert?.nowPlaying && track) {
+    contentKey = `alert-${alert.id}`
+    content = (
+      <div className="alert2 np-alert">
+        <Art track={track} size={36} />
+        <span className="al-tx">
+          <small>Now playing</small>
+          <b>
+            {track.title} · {track.artist}
+          </b>
+        </span>
+        {settings.idleBars && <Bars active={playing} hue={track.hue} />}
       </div>
     )
   } else if (mode === 'call' && caller) {
@@ -1050,52 +1159,75 @@ export default function App() {
       />
     )
   } else if (mode === 'alert' && alert) {
-    // held volume/brightness keys keep one mounted alert so the bar slides instead of fading out and in
-    contentKey = alert.kind ? `alert-${alert.kind}` : `alert-${alert.id}`
+    contentKey = `alert-${alert.id}`
+    const value = alert.value
+    // the percentage is drawn on the right, so a sub line that only repeats it is left out
+    const sub = value !== undefined && alert.sub === `${value}%` ? undefined : alert.sub
     content = (
-      <div className="alert">
-        {alert.avatar ? <Avatar profile={alert.avatar} size={34} /> : <span className="alert-icon">{alert.icon}</span>}
-        <div className="alert-text">
-          <span>{alert.text}</span>
-          {alert.sub && <small>{alert.sub}</small>}
-        </div>
-        {alert.value !== undefined && (
-          <div className="liquid-bar">
-            <div className="liquid-fill" style={{ width: `${alert.value}%` }} />
-          </div>
+      <div className={`alert2 ${alert.avatar ? 'msg-alert' : ''}`} style={{ ['--c' as string]: alertTone(alert.icon) }}>
+        {alert.avatar ? (
+          <Avatar profile={alert.avatar} size={34} />
+        ) : (
+          <span className="al-ic">
+            <AlertIcon icon={alert.icon} />
+          </span>
         )}
+        <span className="al-tx">
+          <b>{alert.text}</b>
+          {sub && <small>{sub}</small>}
+        </span>
+        {value !== undefined && <span className="al-val">{value}%</span>}
+        {alert.chatWith && <span className="al-reply">Reply</span>}
+        {value !== undefined && <span className="edge" style={{ ['--v' as string]: `${value}%` }} />}
       </div>
     )
   } else if (mode === 'peek') {
-    contentKey = showLyricPeek ? 'peek-lyric' : playing && track ? 'peek-track' : 'peek-clock'
-    content =
-      showLyricPeek && track ? (
-        <div className="peek">
+    if (peekText && track) {
+      contentKey = 'peek-live'
+      content = (
+        <div className="live peek-live">
           <Art track={track} size={22} />
-          <span className="peek-text lyric-line" key={lyricIdx}>{lyricText}</span>
+          <LiveText text={peekText} k={lyricText ? lyricIdx : 'title'} />
+          {settings.idleBars && <Bars active hue={track.hue} />}
         </div>
-      ) : (
+      )
+    } else {
+      contentKey = 'peek-clock'
+      content = (
         <div className="peek center">
           <span className="peek-text">
-            {playing && track
-              ? `${track.title} · ${track.artist}`
-              : [
-                  clock,
-                  d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }),
-                  battery !== null ? `${battery}%` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
         </div>
       )
+    }
+  } else if (live && track) {
+    contentKey = 'idle-live'
+    content = (
+      <div className="live">
+        <Art track={track} size={22} />
+        {weatherGlyph}
+        <LiveText text={live} k={idleLyric ? lyricIdx : live} />
+        {(unreadCount > 0 || privacy.camera || privacy.mic) && (
+          <span className="live-dots">
+            {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
+            {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
+            {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
+          </span>
+        )}
+        {settings.idleBars && <Bars active hue={track.hue} />}
+      </div>
+    )
   } else {
-    contentKey = idleLyric ? `idle-lyric-${lyricIdx}` : idleExtra ? 'idle-extra' : 'idle'
+    contentKey = idleExtra ? 'idle-extra' : 'idle'
     content = (
       <div className={`idle ${idleText ? 'lyric-idle' : 'idle-grid'}`}>
         {idleText ? (
           <>
             {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
+            {weatherGlyph}
             <span className="idle-lyric">{idleText}</span>
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
@@ -1151,6 +1283,10 @@ export default function App() {
         onClick={(e) => {
           e.stopPropagation()
           if (justDragged.current) return
+          if (mode === 'alert' && alert?.nowPlaying) {
+            setTab('media')
+            setAlert(null)
+          }
           if (mode === 'alert' && alert?.chatWith) {
             setPendingChat(alert.chatWith)
             setTab('friends')
@@ -1187,41 +1323,109 @@ export default function App() {
           >
             ⠿ Browser demo
           </b>
-          <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'forward' })}>Plug in charger</button>
-          <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 }, 'warning')}>Low battery</button>
-          <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
-          <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
-          <button onClick={() => startTimer(0.25)}>15 s timer</button>
-          {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
-          <button
-            onClick={() => {
-              if (DEMO_SOCIAL) {
-                const { friend, body } = demo.ping()
-                if (auth.profile?.presence !== 'dnd') {
+          <div className="demo-row">
+            <span>Power</span>
+            <button onClick={() => pushAlert({ icon: '⚡', text: 'Charging', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'forward' })}>Plug in charger</button>
+            <button onClick={() => pushAlert({ icon: '🔋', text: 'On battery', sub: '78%', value: 78 }, 'toggle', { emphasis: 'subtle', direction: 'back' })}>Unplug charger</button>
+            <button onClick={() => pushAlert({ icon: '🪫', text: 'Low battery', sub: '15%', value: 15 }, 'warning')}>Low battery</button>
+          </div>
+          <div className="demo-row">
+            <span>Keys</span>
+            <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
+            <button onClick={() => pushAlert({ kind: 'volume', icon: '🔇', text: 'Muted', value: 0 })}>Mute</button>
+            <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
+            <button
+              onClick={() => {
+                const caps = !demoLocks.current.caps
+                demoLocks.current.caps = caps
+                pushAlert({ icon: caps ? '🔠' : '🔡', text: caps ? 'Caps Lock on' : 'Caps Lock off' }, 'toggle', { emphasis: 'subtle', direction: caps ? 'forward' : 'back' })
+              }}
+            >
+              Caps Lock
+            </button>
+            <button
+              onClick={() => {
+                const num = !demoLocks.current.num
+                demoLocks.current.num = num
+                pushAlert({ icon: '🔢', text: num ? 'Num Lock on' : 'Num Lock off' }, 'toggle', { emphasis: 'subtle', direction: num ? 'forward' : 'back' })
+              }}
+            >
+              Num Lock
+            </button>
+          </div>
+          <div className="demo-row">
+            <span>Media</span>
+            <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>
+            <button onClick={() => onSkip(1)}>Next song</button>
+            <button onClick={() => startTimer(0.25)}>15 s timer</button>
+            <button onClick={() => advancePomo(pomo ?? { phase: 'break', done: 0 })}>Pomodoro phase</button>
+          </div>
+          <div className="demo-row">
+            <span>Privacy</span>
+            <button
+              onClick={() => {
+                const on = !privacy.mic
+                setPrivacy((p) => ({ ...p, mic: on ? 'Zoom' : null }))
+                if (on) pushAlert({ icon: '🎙️', text: 'Microphone in use', sub: 'Zoom' }, 'warning', { emphasis: 'subtle' })
+              }}
+            >
+              Mic {privacy.mic ? 'off' : 'on'}
+            </button>
+            <button
+              onClick={() => {
+                const on = !privacy.camera
+                setPrivacy((p) => ({ ...p, camera: on ? 'Zoom' : null }))
+                if (on) pushAlert({ icon: '📷', text: 'Camera in use', sub: 'Zoom' }, 'warning', { emphasis: 'subtle' })
+              }}
+            >
+              Camera {privacy.camera ? 'off' : 'on'}
+            </button>
+            <button onClick={() => pushAlert({ icon: '📋', text: 'Copied' }, 'success', { emphasis: 'subtle' })}>Copied</button>
+          </div>
+          <div className="demo-row">
+            <span>Social</span>
+            <button
+              onClick={() => {
+                if (DEMO_SOCIAL) {
+                  const { friend, body } = demo.ping()
+                  if (auth.profile?.presence !== 'dnd') {
+                    playMessageSound()
+                    pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+                  }
+                } else {
                   playMessageSound()
-                  pushAlert({ icon: '💬', text: friend.profile.display_name, sub: body, avatar: friend.profile, chatWith: friend.profile.id })
+                  pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
                 }
-              } else {
+              }}
+            >
+              Message
+            </button>
+            <button
+              onClick={() => {
                 playMessageSound()
-                pushAlert({ icon: '💬', text: 'Rina', sub: 'Are you free tonight?' })
-              }
-            }}
-          >
-            Message
-          </button>
-          <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>
-            Update alert
-          </button>
-          <button
-            onClick={() => {
-              setNotes(CHANGELOG[0])
-              setExpanded(true)
-            }}
-          >
-            What's new
-          </button>
-          <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
-          <button onClick={toggle}>{playing ? 'Pause' : 'Play'} music</button>
+                pushAlert({ icon: '👥', text: 'Weekend squad', sub: 'Mira: who is up for tonight?' })
+              }}
+            >
+              Group message
+            </button>
+            {/* rings like a real call: the island glows, and hovering it shows the caller with answer and decline */}
+            {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
+          </div>
+          <div className="demo-row">
+            <span>App</span>
+            <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>Update alert</button>
+            <button onClick={runDemoUpdate}>Update download</button>
+            <button onClick={() => pushAlert({ icon: '⚠️', text: 'Update failed', sub: 'Try again from Settings' }, 'error')}>Update failed</button>
+            <button
+              onClick={() => {
+                setNotes(CHANGELOG[0])
+                setExpanded(true)
+              }}
+            >
+              What's new
+            </button>
+            <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
+          </div>
         </div>
       )}
     </div>
