@@ -1,5 +1,5 @@
 -- Dynamic Island group chats: run this once in the Supabase SQL editor, after schema.sql.
--- Everything is re-runnable except the last line (it errors if the tables are already in the realtime publication; ignore that).
+-- Safe to run again: it is how you pick up changes to the functions.
 
 create table if not exists public.groups (
   id uuid primary key default gen_random_uuid(),
@@ -108,13 +108,14 @@ begin
 end $$;
 
 -- the owner adds someone by username; they get an invitation to accept or decline
-create or replace function public.invite_to_group(gid uuid, username text) returns void
+drop function if exists public.invite_to_group(uuid, text);
+create or replace function public.invite_to_group(gid uuid, uname text) returns void
 language plpgsql security definer set search_path = public as $$
 declare target uuid; current_status text;
 begin
   if not public.is_group_owner(gid, auth.uid()) then raise exception 'Only the group owner can add people'; end if;
-  select id into target from public.profiles where profiles.username = lower(trim(both '@' from trim(username)));
-  if target is null then raise exception 'No one is called @%', lower(trim(both '@' from trim(username))); end if;
+  select id into target from public.profiles where profiles.username = lower(trim(both '@' from trim(uname)));
+  if target is null then raise exception 'No one is called @%', lower(trim(both '@' from trim(uname))); end if;
   select status into current_status from public.group_members where group_id = gid and user_id = target;
   if current_status = 'member' then raise exception 'Already in the group'; end if;
   if current_status = 'invited' then raise exception 'Already invited'; end if;
@@ -148,4 +149,15 @@ grant execute on function public.invite_to_group(uuid, text) to authenticated;
 grant execute on function public.respond_group_invite(uuid, boolean) to authenticated;
 grant execute on function public.reset_invite_code(uuid) to authenticated;
 
-alter publication supabase_realtime add table public.groups, public.group_members, public.group_messages;
+do $$
+declare t text;
+begin
+  foreach t in array array['groups', 'group_members', 'group_messages'] loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
+-- make PostgREST see the new functions straight away
+notify pgrst, 'reload schema';

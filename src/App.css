@@ -1111,7 +1111,7 @@
   padding: 18px 36px 0;
 }
 .expanded-body {
-  padding: 12px 64px 0;
+  padding: 12px 24px 0;
 }
 .dots {
   padding: 6px 0 14px;
@@ -1971,7 +1971,7 @@
   inset: 0;
   height: auto;
   margin: 0;
-  padding: 0 64px;
+  padding: 0 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3824,4 +3824,30 @@ button.ao-text:hover {
   50% {
     background: rgb(var(--fg-rgb) / 0.24);
   }
+}
+
+.call-btn {
+  flex: none;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+/* someone is calling: the pill glows in the accent colour until it is answered */
+.stage.ringing .outline-layer {
+  animation: pill-glow 1.3s ease-in-out infinite;
+}
+@keyframes pill-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px var(--accent, #4ade80)) drop-shadow(0 0 6px rgb(0 0 0 / 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px var(--accent, #4ade80)) drop-shadow(0 0 22px var(--accent, #4ade80));
+  }
+}
+
+.call-btn svg {
+  display: block;
 }

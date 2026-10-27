@@ -37,6 +37,8 @@ interface Props {
   offset?: { x: number; y: number }
   /** fullscreen: the offset eases away so the island grows from where it was to fill the screen */
   centered?: boolean
+  /** someone is calling: the pill glows until it is answered */
+  ringing?: boolean
 }
 
 const BUBBLE = 34
@@ -95,7 +97,7 @@ function notchPath(w: number, h: number, r: number, floating: boolean) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false, ringing = false }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -137,7 +139,7 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
   )
 
   return (
-    <motion.div className="stage" style={{ translate: enterT }}>
+    <motion.div className={`stage ${ringing ? 'ringing' : ''}`} style={{ translate: enterT }}>
       <div className="goo-layer">
         {/* Only needed to melt the timer bubble into the pill. Inset a little so the crisp
             outline above is the only thing that defines the visible edge. */}

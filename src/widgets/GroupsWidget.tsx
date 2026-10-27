@@ -61,6 +61,7 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
   const [msg, setMsg] = useState<string | null>(null)
   const isOwner = group.owner === me
   const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(group.name)
   const [emoji, setEmoji] = useState(group.emoji)
   const [color, setColor] = useState(group.color)
   const flash = (e: string | null, ok: string) => {
@@ -85,6 +86,31 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
           </button>
         )}
       </div>
+
+      {isOwner && (
+        <form
+          className="friend-add"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const n = name.trim()
+            if (!n || n === group.name) return
+            flash(await groups.rename(group.id, n), 'Group renamed')
+          }}
+        >
+          <input
+            className="todo-input"
+            placeholder="Group name"
+            value={name}
+            maxLength={40}
+            data-cuelume-type
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+          <button className="pill-btn" type="submit" disabled={!name.trim() || name.trim() === group.name} data-cuelume-tap>
+            Rename
+          </button>
+        </form>
+      )}
 
       {isOwner && (
         <div className="group-icon-edit">
@@ -390,7 +416,7 @@ export function GroupsPanel({ me, groups, onOpen }: Props) {
         </div>
       ))}
 
-      {!groups.groups.length && !groups.invites.length && <div className="empty">No groups yet. Create one or join with an invite code.</div>}
+      {!mode && !groups.groups.length && !groups.invites.length && <div className="empty">No groups yet. Create one or join with an invite code.</div>}
     </div>
   )
 }

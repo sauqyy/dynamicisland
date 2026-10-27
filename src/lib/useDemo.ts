@@ -45,7 +45,7 @@ const seed = (): Record<string, Message[]> => ({
 })
 
 /** In-memory stand-ins for useAuth and useSocial. Messages get a canned reply after a moment. */
-export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: Call; ping: () => { friend: Friend; body: string } } {
+export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: Call; ping: () => { friend: Friend; body: string }; ringCall: () => void } {
   const [profile, setProfile] = useState<Profile>(ME)
   const [messages, setMessages] = useState<Record<string, Message[]>>(seed)
   const [unread, setUnread] = useState<Record<string, number>>({ a: 1, b: 1 })
@@ -193,6 +193,11 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
       if (uid === 'me') setGroupList((l) => l.filter((g) => g.id !== gid))
       else setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, members: g.members.filter((p) => p.id !== uid) } : g)))
     },
+    rename: async (gid, name) => {
+      if (!name.trim()) return 'Give the group a name'
+      setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, name: name.trim() } : g)))
+      return null
+    },
     setIcon: async (gid, emoji, color) => {
       setGroupList((l) => l.map((g) => (g.id === gid ? { ...g, emoji, color } : g)))
       return null
@@ -217,27 +222,37 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
   }
 
   // a scripted call: rings, connects, then runs until ended. No microphone, no audio.
-  const [callState, setCallState] = useState<CallState>({ phase: 'idle', peer: null, muted: false, since: null, error: null })
+  const [callState, setCallState] = useState<CallState>({ phase: 'idle', peer: null, muted: false, deafened: false, since: null, error: null })
   const callTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   const endCall = () => {
     callTimers.current.forEach(clearTimeout)
     callTimers.current = []
-    setCallState({ phase: 'idle', peer: null, muted: false, since: null, error: null })
+    setCallState({ phase: 'idle', peer: null, muted: false, deafened: false, since: null, error: null })
   }
   const call: Call = {
     state: callState,
     start: async (peer) => {
-      setCallState({ phase: 'calling', peer, muted: false, since: null, error: null })
+      setCallState({ phase: 'calling', peer, muted: false, deafened: false, since: null, error: null })
       callTimers.current = [
         setTimeout(() => setCallState((c) => ({ ...c, phase: 'connecting' })), 1500),
         setTimeout(() => setCallState((c) => ({ ...c, phase: 'active', since: Date.now() })), 2500),
       ]
     },
-    accept: async () => {},
+    accept: async () => {
+      setCallState((c) => ({ ...c, phase: 'connecting' }))
+      callTimers.current = [setTimeout(() => setCallState((c) => ({ ...c, phase: 'active', since: Date.now() })), 1200)]
+    },
     decline: endCall,
     hangUp: endCall,
-    toggleMute: () => setCallState((c) => ({ ...c, muted: !c.muted })),
+    toggleMute: () => setCallState((c) => ({ ...c, muted: !c.muted, deafened: c.muted ? false : c.deafened })),
+    toggleDeafen: () => setCallState((c) => ({ ...c, deafened: !c.deafened })),
   }
 
-  return { auth, social, groups, call, ping }
+  /** Simulates a friend calling you right now. */
+  const ringCall = () => {
+    if (callState.phase !== 'idle') return
+    setCallState({ phase: 'incoming', peer: people[0].id, muted: false, deafened: false, since: null, error: null })
+  }
+
+  return { auth, social, groups, call, ping, ringCall }
 }

@@ -920,16 +920,6 @@ export default function App() {
             {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
             </motion.div>
           </AnimatePresence>
-          <button className="nav-arrow left" aria-label="Previous page" onClick={(e) => { e.stopPropagation(); go(-1) }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M14.5 6 8.5 12l6 6" />
-            </svg>
-          </button>
-          <button className="nav-arrow right" aria-label="Next page" onClick={(e) => { e.stopPropagation(); go(1) }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M9.5 6l6 6-6 6" />
-            </svg>
-          </button>
         </div>
         <Dock
           groups={groups}
@@ -1087,6 +1077,7 @@ export default function App() {
         onHover={(h) => !IS_TAURI && setHovered(h)}
         spring={SPRINGS[settings.anim]}
         intro={intro}
+        ringing={(DEMO_SOCIAL ? demo.call : call).state.phase === 'incoming'}
       >
         {content}
       </Island>
@@ -1117,6 +1108,7 @@ export default function App() {
           <button onClick={() => pushAlert({ kind: 'volume', icon: '🔊', text: 'Volume', value: Math.round(Math.random() * 100) })}>Volume change</button>
           <button onClick={() => pushAlert({ kind: 'brightness', icon: '🔆', text: 'Brightness', value: Math.round(Math.random() * 100) })}>Brightness change</button>
           <button onClick={() => startTimer(0.25)}>15 s timer</button>
+          {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
           <button
             onClick={() => {
               if (DEMO_SOCIAL) {
