@@ -10,6 +10,10 @@ export type TabAnim = 'fade' | 'slide' | 'liquid' | 'zoom' | 'stack' | 'flip' | 
 export const TAB_ANIMS: TabAnim[] = ['fade', 'slide', 'liquid', 'zoom', 'stack', 'flip', 'blur', 'rise', 'morph', 'elastic']
 export type Theme = 'dark' | 'light' | 'glass' | 'auto'
 export type IdleDisplay = 'clock' | 'lyrics' | 'weather'
+/** cuelume's themes; 'basic' is the one cuelume calls 'default' */
+export type SoundPack = 'mech' | 'basic' | 'bubble' | 'press'
+
+export const SOUND_PACKS: SoundPack[] = ['mech', 'basic', 'bubble', 'press']
 
 export interface Settings {
   /** 0 = primary monitor, n = n-th monitor */
@@ -35,6 +39,8 @@ export interface Settings {
   messageSound: boolean
   /** small sounds for clicks, typing, pages and alerts */
   uiSounds: boolean
+  /** which material the interface sounds are made of */
+  soundPack: SoundPack
   /** font size of the idle pill text in px */
   clockSize: number
   /** seconds the lyrics run ahead of the player; the fade-in and Windows' position lag make them feel late */
@@ -99,6 +105,7 @@ const DEFAULTS: Settings = {
   idleBars: true,
   messageSound: true,
   uiSounds: true,
+  soundPack: 'mech',
   clockSize: 15,
   lyricOffset: 0.35,
   hiddenPages: [],

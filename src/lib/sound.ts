@@ -1,16 +1,21 @@
 import { useEffect } from 'react'
-import { bind, play, setEnabled, unlock } from 'cuelume'
+import { bind, play, setEnabled, setTheme, unlock, type ThemeName } from 'cuelume'
+import type { SoundPack } from './settings'
 
 /*
  * Interface sounds (cuelume). Most controls are marked in the markup with data-cuelume-* attributes,
  * which one bind() at the root wires up; what is not a click on one control (the card opening, page
- * changes, alerts, keyboard picks) plays from code. Settings can turn them off.
+ * changes, alerts, keyboard picks) plays from code. Settings can turn them off and pick the pack.
  */
 
-/** Wires every marked control and follows the Interface sounds setting. Mounted once, in App. */
-export function useSoundSetup(enabled: boolean) {
+/** Our pack names to cuelume's themes: what cuelume calls 'default' is 'basic' here. */
+export const soundTheme = (pack: SoundPack): ThemeName => (pack === 'basic' ? 'default' : pack)
+
+/** Wires every marked control and follows the Interface sounds settings. Mounted once, in App. */
+export function useSoundSetup(enabled: boolean, pack: SoundPack) {
   useEffect(() => bind(), [])
   useEffect(() => setEnabled(enabled), [enabled])
+  useEffect(() => setTheme(soundTheme(pack)), [pack])
 }
 
 /**

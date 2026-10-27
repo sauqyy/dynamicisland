@@ -6,11 +6,12 @@ import { ColorPicker } from './ColorPicker'
 import { invoke } from '@tauri-apps/api/core'
 import { useUpdater } from '../lib/useUpdater'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
+import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
 import { PAGES } from '../types'
-import { disclosureCue, soundTurnedOn } from '../lib/sound'
+import { play } from 'cuelume'
+import { disclosureCue, soundTheme, soundTurnedOn } from '../lib/sound'
 
 interface Props {
   settings: Settings
@@ -144,6 +145,26 @@ export function SettingsWidget({ settings, update, updater }: Props) {
           }}
         />
       </div>
+      {settings.uiSounds && (
+        <div className="row">
+          <span>Sound pack</span>
+          <div className="segmented small">
+            {SOUND_PACKS.map((p) => (
+              <button
+                key={p}
+                className={settings.soundPack === p ? 'active' : ''}
+                // a preview in the pack just picked, rather than the binding's cue in the old one
+                onClick={() => {
+                  update({ soundPack: p })
+                  play('select', { theme: soundTheme(p) })
+                }}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <Slider
         label="Text size"
         value={settings.clockSize}

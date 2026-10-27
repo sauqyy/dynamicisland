@@ -103,7 +103,7 @@ function clockText(d: Date, clock24: boolean) {
 export default function App() {
   const { track, playing, position, toggle, seek, skip } = useMedia()
   const { settings, update } = useSettings()
-  useSoundSetup(settings.uiSounds)
+  useSoundSetup(settings.uiSounds, settings.soundPack)
   const [hidden, setHidden] = useState(false)
   const updater = useUpdater()
   const [pomo, setPomo] = useState<PomodoroState | null>(null)
