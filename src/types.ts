@@ -80,6 +80,8 @@ export interface IslandAlert {
   avatar?: { avatar_emoji: string; avatar_color: string; avatar_url?: string | null }
   /** clicking the alert opens the chat with this friend */
   chatWith?: string
+  /** a new song started: drawn with the current track's art, opens Playing when clicked */
+  nowPlaying?: boolean
 }
 
 export interface TimerState {

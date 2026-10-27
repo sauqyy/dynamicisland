@@ -3176,7 +3176,7 @@ button.ao-text:hover {
 .wx-chart {
   margin-top: 12px;
 }
-.wx-chart svg {
+.wx-strip > svg {
   display: block;
   width: 100%;
   height: auto;
@@ -3541,3 +3541,19 @@ button.ao-text:hover {
     background: rgb(var(--fg-rgb) / 0.24);
   }
 }
+
+/* song change: the art leads, the waveform closes */
+.alert2.np-alert {
+  padding: 0 16px 0 10px;
+}
+.np-alert > .art {
+  flex: none;
+  border-radius: 9px;
+}
+.np-alert .al-tx small {
+  order: -1;
+}
+.np-alert > .bars {
+  flex: none;
+}
+

@@ -278,6 +278,17 @@ export default function App() {
     if (cue) play(cue, opts)
   }, [])
 
+  // a new song (skipped to, or the next one in the queue) shows what is now playing
+  const lastTrackId = useRef(track?.id)
+  useEffect(() => {
+    const was = lastTrackId.current
+    lastTrackId.current = track?.id
+    if (!track || !was || was === track.id) return
+    pushAlert({ icon: '🎵', text: track.title, sub: track.artist, nowPlaying: true })
+    // only a change of song counts, not the art or lyrics arriving for the same one
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.id, pushAlert])
+
   // tell the user once per version when the automatic check finds an update; the cog keeps a dot until it is installed
   const alertedUpdate = useRef('')
   useEffect(() => {
@@ -630,13 +641,14 @@ export default function App() {
         // volume and brightness are a slim level meter; a message has room for the friend and a reply
         if (!updating && alert?.kind) return { w: 290, h: 40, r: 16 }
         if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
+        if (!updating && alert?.nowPlaying) return { w: 360, h: 56, r: 24 }
         return { w: 340, h: 48, r: 22 }
       case 'peek':
         return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -710,7 +722,8 @@ export default function App() {
 
   const onSkip = (dir: -1 | 1) => {
     skip(dir)
-    if (!IS_TAURI) pushAlert({ icon: dir > 0 ? '⏭' : '⏮', text: dir > 0 ? 'Next track' : 'Previous track' })
+    // the demo's skip restarts its one song, so it raises the song-change alert itself
+    if (!IS_TAURI && track) pushAlert({ icon: '🎵', text: track.title, sub: track.artist, nowPlaying: true })
   }
 
   // Drag the island to move it. The pill follows the cursor on a spring and sticks to the
@@ -1026,6 +1039,20 @@ export default function App() {
         <span className="hud-val">{alert.value ?? 0}</span>
       </div>
     )
+  } else if (mode === 'alert' && alert?.nowPlaying && track) {
+    contentKey = `alert-${alert.id}`
+    content = (
+      <div className="alert2 np-alert">
+        <Art track={track} size={36} />
+        <span className="al-tx">
+          <small>Now playing</small>
+          <b>
+            {track.title} · {track.artist}
+          </b>
+        </span>
+        {settings.idleBars && <Bars active={playing} hue={track.hue} />}
+      </div>
+    )
   } else if (mode === 'alert' && alert) {
     contentKey = `alert-${alert.id}`
     const value = alert.value
@@ -1149,6 +1176,10 @@ export default function App() {
         onClick={(e) => {
           e.stopPropagation()
           if (justDragged.current) return
+          if (mode === 'alert' && alert?.nowPlaying) {
+            setTab('media')
+            setAlert(null)
+          }
           if (mode === 'alert' && alert?.chatWith) {
             setPendingChat(alert.chatWith)
             setTab('friends')
