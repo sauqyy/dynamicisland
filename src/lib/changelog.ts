@@ -13,8 +13,9 @@ export const CHANGELOG: Release[] = [
       'The pages now sit in one bar at the bottom of the card. Tap a group to open it, then pick a page.',
       'The card grows and shrinks to fit each page. Prefer a fixed size? Pick it in Settings, under Size.',
       'While music plays, the pill shows the cover, the current lyric and the equalizer.',
+      'A new song shows a Now playing alert with its cover. Click it to open Playing.',
       'Charging, battery and downloads show their progress along the bottom edge of the island.',
-      'Playing, Weather and Timer are redesigned, and Settings is grouped into sections.',
+      'Playing, Weather and Timer are redesigned, Settings is grouped into sections, and the icons are cleaner.',
     ],
   },
   {
