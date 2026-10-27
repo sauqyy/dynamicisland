@@ -8,7 +8,7 @@ function clock(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-function Timer({ since }: { since: number }) {
+export function Timer({ since }: { since: number }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000)
@@ -19,7 +19,7 @@ function Timer({ since }: { since: number }) {
 
 const icon = { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const
 
-function MicIcon({ off }: { off: boolean }) {
+export function MicIcon({ off }: { off: boolean }) {
   return (
     <svg {...icon}>
       <rect x="9" y="3" width="6" height="11" rx="3" />
@@ -29,7 +29,7 @@ function MicIcon({ off }: { off: boolean }) {
   )
 }
 
-function HeadphonesIcon({ off }: { off: boolean }) {
+export function HeadphonesIcon({ off }: { off: boolean }) {
   return (
     <svg {...icon}>
       <path d="M4 15v-3a8 8 0 0 1 16 0v3" />
@@ -41,7 +41,7 @@ function HeadphonesIcon({ off }: { off: boolean }) {
 }
 
 /** a handset laid on its back, the usual hang-up symbol */
-function HangUpIcon() {
+export function HangUpIcon() {
   return (
     <svg {...icon}>
       <path transform="translate(0 -1.1)" d="M3 13.5c0-1.2 1.1-2 2.4-2.4C9 10 15 10 18.6 11.1c1.3.4 2.4 1.2 2.4 2.4v1.2c0 .7-.6 1.2-1.3 1.1l-2.6-.4c-.6-.1-1.1-.6-1.1-1.2v-.9c-1.9-.6-4.1-.6-6 0v.9c0 .6-.5 1.1-1.1 1.2l-2.6.4C3.6 15.9 3 15.4 3 14.7z" />

@@ -4,6 +4,7 @@ import type { Auth } from '../lib/useAuth'
 import type { Friend, Social } from '../lib/useSocial'
 import type { Groups } from '../lib/useGroups'
 import type { Call } from '../lib/useCall'
+import type { GroupVoice } from '../lib/useGroupVoice'
 import { CallBar } from './CallBar'
 import { GroupChat, GroupIcon, GroupsPanel } from './GroupsWidget'
 import { DEMO_SOCIAL } from '../lib/useDemo'
@@ -22,6 +23,8 @@ interface Props {
   social: Social
   /** 1:1 voice calls; missing in the demo */
   call?: Call
+  /** group voice chat; missing in the demo */
+  voice?: GroupVoice
   /** group chats; missing in the demo */
   groups?: Groups
   /** which page of the Social group this is */
@@ -92,7 +95,7 @@ function Bubble({ m, mine }: { m: Message; mine: boolean }) {
   )
 }
 
-function Chat({ friend, me, social, call, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; call?: Call; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
+function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; call?: Call; voiceBusy?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -209,7 +212,7 @@ function Chat({ friend, me, social, call, activityText, onBack, fullscreen, onFu
           <button
             type="button"
             className="chip chat-call"
-            disabled={call.state.phase !== 'idle' || shownPresence(friend.profile) === 'offline'}
+            disabled={call.state.phase !== 'idle' || voiceBusy || shownPresence(friend.profile) === 'offline'}
             data-cuelume-tap
             title={shownPresence(friend.profile) === 'offline' ? 'Offline' : 'Voice call'}
             aria-label="Voice call"
@@ -228,7 +231,7 @@ function Chat({ friend, me, social, call, activityText, onBack, fullscreen, onFu
   )
 }
 
-export function FriendsWidget({ auth, social, call, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
+export function FriendsWidget({ auth, social, call, voice, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
   const [username, setUsername] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -268,9 +271,9 @@ export function FriendsWidget({ auth, social, call, groups, section = 'friends',
     onChat({ friend: null, group: null })
   }
   const chatView = friend ? (
-    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} voiceBusy={Boolean(voice?.state.groupId)} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
   ) : group && groups ? (
-    <GroupChat key={group.id} group={group} me={auth.user.id} groups={groups} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+    <GroupChat key={group.id} group={group} me={auth.user.id} groups={groups} voice={voice} voiceBlocked={Boolean(call && call.state.phase !== 'idle')} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
   ) : null
   if (chatView) {
     if (!fullscreen) {

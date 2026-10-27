@@ -4,7 +4,11 @@ import type { Message } from '../lib/supabase'
 import { inviteLink, type Group, type GroupMessage, type Groups } from '../lib/useGroups'
 import { disclosureCue } from '../lib/sound'
 import { ACCENTS } from '../lib/settings'
+import type { GroupVoice } from '../lib/useGroupVoice'
+import { MAX_VOICE } from '../lib/useGroupVoice'
 import { Avatar } from './Avatar'
+import { HeadphonesIcon } from './CallBar'
+import { VoiceBar } from './VoiceBar'
 import { dayLabel, dayStart, noteText, timeLabel } from './FriendsWidget'
 
 const ICONS = ['👥', '📚', '🎮', '🎧', '🎨', '💻', '⚽', '🍕', '🎬', '✈️', '🏠', '💼', '🔥', '🌙', '🚀', '🐱']
@@ -196,7 +200,7 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
   )
 }
 
-export function GroupChat({ group, me, groups, activityText, onBack, fullscreen, onFullscreen }: { group: Group; me: string; groups: Groups; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
+export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText, onBack, fullscreen, onFullscreen }: { group: Group; me: string; groups: Groups; voice?: GroupVoice; voiceBlocked?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -255,6 +259,7 @@ export function GroupChat({ group, me, groups, activityText, onBack, fullscreen,
         <GroupInfo group={group} me={me} groups={groups} onLeft={onBack} />
       ) : (
         <>
+          {voice && <VoiceBar voice={voice} group={group} />}
           <div className="chat-list">
             {!list ? (
               <div className="empty">Loading…</div>
@@ -306,6 +311,19 @@ export function GroupChat({ group, me, groups, activityText, onBack, fullscreen,
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
             />
+            {voice && (
+              <button
+                type="button"
+                className="chip chat-call"
+                disabled={Boolean(voice.state.groupId) || voiceBlocked}
+                data-cuelume-tap
+                title={voice.state.groupId ? 'Already in a voice chat' : voiceBlocked ? 'You are on a call' : `Join voice chat (max ${MAX_VOICE})`}
+                aria-label="Join voice chat"
+                onClick={() => voice.join(group.id)}
+              >
+                <HeadphonesIcon off={false} />
+              </button>
+            )}
             <button className="pill-btn" type="submit" disabled={!draft.trim()} data-cuelume-tap>
               Send
             </button>

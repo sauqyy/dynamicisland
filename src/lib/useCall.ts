@@ -24,7 +24,7 @@ const ERROR_MS = 4_000
 
 const TURN_URL = import.meta.env.VITE_TURN_URL as string | undefined
 // STUN only gets most connections through; set VITE_TURN_* (see supabase/README.md) for the strict-NAT rest
-const ICE: RTCConfiguration = {
+export const ICE: RTCConfiguration = {
   iceServers: [
     { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
     ...(TURN_URL
