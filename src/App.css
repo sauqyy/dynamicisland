@@ -3306,3 +3306,31 @@ button.ao-text:hover {
 .wx-strip {
   padding-top: 12px;
 }
+
+/* the rail sits at the bottom of the card, the date and time at the top */
+.xtop {
+  padding: 14px 20px 6px;
+}
+.xtop-date {
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-2);
+}
+.xtop-status .bars {
+  height: 12px;
+}
+.xbody {
+  padding: 2px 18px 8px;
+}
+.xrail {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 4px 14px 14px;
+}
+.expanded.fs .xrail {
+  opacity: 0;
+  pointer-events: none;
+}

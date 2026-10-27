@@ -84,9 +84,9 @@ function loadTab(): Tab {
 /** The open card's height follows its page, within these bounds (design px). */
 const CARD_MIN = 200
 const CARD_MAX = STAGE.h - 14
-/** Rail row above the page, and the page area's padding below it. */
-const CARD_TOP = 58
-const CARD_PAD = 20
+/** Date and time row above the page, and the page's bottom padding plus the rail row below it. */
+const CARD_TOP = 40
+const CARD_PAD = 62
 const ACTIONS_H = 34
 
 /** Pill width that fits a line of text, up to what the stage can hold. */
@@ -808,17 +808,9 @@ export default function App() {
     content = (
       <div className={`expanded ${fs ? 'fs' : ''}`}>
         <div className="xtop">
-          <Rail
-            groups={groups}
-            tab={tab}
-            onPage={setTab}
-            onGroup={(id) => {
-              const g = groups.find((x) => x.id === id)!
-              setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
-            }}
-            dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
-          />
+          <span className="xtop-date">{d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           <span className="xtop-status">
+            {playing && track && <Bars active hue={track.hue} />}
             {timer && <Ring fraction={remaining / (timer.total / 1000)} size={16} stroke={2.5} />}
             <b className="xtop-time">{clock}</b>
           </span>
@@ -924,6 +916,18 @@ export default function App() {
             </div>
             </motion.div>
           </AnimatePresence>
+        </div>
+        <div className="xrail">
+            <Rail
+              groups={groups}
+              tab={tab}
+              onPage={setTab}
+              onGroup={(id) => {
+                const g = groups.find((x) => x.id === id)!
+                setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
+              }}
+              dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+            />
         </div>
         {notes && (
           <div className="whatsnew" onClick={(e) => e.stopPropagation()}>
