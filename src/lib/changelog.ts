@@ -7,6 +7,11 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.4.1',
+    title: 'Call button',
+    items: ['The call button next to Send is now a phone handset.'],
+  },
+  {
     version: '0.4.0',
     title: 'Group chats, voice calls',
     items: [
