@@ -71,7 +71,7 @@ export interface Settings {
   /** size of the opened card in design px (before scale) */
   cardW: number
   cardH: number
-  /** the card's height follows the page it shows; off = always cardH */
+  /** the card's height follows the page it shows; off (the default) = always cardH */
   cardFit: boolean
 }
 
@@ -95,7 +95,7 @@ export const SIZE_LIMITS = {
   soundVolume: { min: 0, max: 1, step: 0.05 },
 }
 
-export const SIZE_DEFAULTS = { scale: 1, cardW: 440, cardH: 344, cardFit: true }
+export const SIZE_DEFAULTS = { scale: 1, cardW: 440, cardH: 344, cardFit: false }
 
 const DEFAULTS: Settings = {
   monitor: 0,
