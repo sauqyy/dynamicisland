@@ -3411,3 +3411,12 @@ button.ao-text:hover {
 .settings2 .update-status {
   margin-left: auto;
 }
+
+/* hairline edge drawn in every theme */
+.island-rim {
+  stroke: var(--rim);
+}
+.root.glass .island-rim,
+.root.fullchat .island-rim {
+  display: none;
+}

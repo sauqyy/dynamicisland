@@ -98,7 +98,7 @@ const DEFAULTS: Settings = {
   anim: 'bouncy',
   clock24: true,
   accent: ACCENTS[0],
-  accentFromMusic: false,
+  accentFromMusic: true,
   theme: 'dark',
   tabAnim: 'slide',
   glassTint: 'dark',

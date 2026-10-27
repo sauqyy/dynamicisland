@@ -27,8 +27,8 @@
   --r-pill: 999px;
 
   /* type */
-  --font-ui: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --font-ui: 'Geist Variable', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   --fs-label: 11px;
   --fs-meta: 12px;
   --fs-body: 13px;
@@ -36,6 +36,8 @@
   --fs-lyric: 17px;
   --fs-timer: 26px;
   --fs-temp: 52px;
+
+  font-family: var(--font-ui);
 }
 
 .root.light {
