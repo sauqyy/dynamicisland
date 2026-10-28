@@ -113,10 +113,14 @@ pub fn forget_token(app: &AppHandle) {
 /// Connects the SSO-verified student's SCELE account; only the resulting token is saved.
 /// SCELE only issues app tokens for a password (its mobile login type is "in app", with no
 /// SSO option), so the password is asked for once, for the account SSO UI already verified.
+/// When SSO UI sent no faculty, this is also what confirms Fasilkom: SCELE is Fasilkom's own
+/// e-learning, so the same account having courses there is the proof.
 #[tauri::command]
 pub async fn scele_login(app: AppHandle, password: String) -> Result<SceleAccount, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let student = crate::sso::saved(&app).filter(|s| s.fasilkom).ok_or_else(|| "Verify your student status first".to_string())?;
+        let mut student = crate::sso::saved(&app)
+            .filter(|s| s.fasilkom || s.needs_scele)
+            .ok_or_else(|| "Verify your student status first".to_string())?;
         let fields = vec![
             ("username".to_string(), student.username.clone()),
             ("password".to_string(), password),
@@ -127,9 +131,20 @@ pub async fn scele_login(app: AppHandle, password: String) -> Result<SceleAccoun
             return Err(v.get("error").and_then(Value::as_str).unwrap_or("Sign-in failed").to_string());
         };
         let info = ws(token, "core_webservice_get_site_info", &json!({}))?;
+        let userid = info.get("userid").and_then(Value::as_i64).unwrap_or(0);
+        if !student.fasilkom {
+            let courses = ws(token, "core_enrol_get_users_courses", &json!({ "userid": userid }))?;
+            if courses.as_array().is_none_or(|c| c.is_empty()) {
+                return Err("This SCELE account has no courses, so Fasilkom couldn't be confirmed".into());
+            }
+            student.fasilkom = true;
+            student.needs_scele = false;
+            student.detail = format!("{} · Fasilkom confirmed by SCELE", student.detail);
+            crate::sso::save(&app, &student)?;
+        }
         let saved = json!({
             "token": token,
-            "userid": info.get("userid").and_then(Value::as_i64).unwrap_or(0),
+            "userid": userid,
             "fullname": info.get("fullname").and_then(Value::as_str).unwrap_or(""),
             "username": info.get("username").and_then(Value::as_str).unwrap_or(""),
         });

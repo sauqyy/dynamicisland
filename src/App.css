@@ -4564,3 +4564,21 @@ button.sc-row:hover {
 .sc-unsure .sc-main b {
   color: var(--text-2);
 }
+/* SSO UI verified the account but not the faculty: confirm it with SCELE */
+.student-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.student-confirm-row {
+  display: flex;
+  gap: 6px;
+}
+.student-confirm > small {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.student-confirm .student-detail {
+  color: var(--text-3);
+  word-break: break-word;
+}
