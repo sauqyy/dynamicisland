@@ -7,6 +7,19 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.6.3',
+    title: 'Better group chats',
+    items: [
+      'Group messages show who sent them, and who has read them. Run the updated groups.sql in Supabase to turn on read receipts.',
+      'Press Shift+Enter for a new line in chats.',
+      'Hover the pill during a group call to see who is in the voice chat.',
+      'Choose your microphone and speaker in Settings, under Calls.',
+      'Deafening also mutes you, and undeafening unmutes you.',
+      'Read messages stay read after you sign out and back in.',
+      'Fixed lyrics sometimes saying none were available, and the chat header scrolling away.',
+    ],
+  },
+  {
     version: '0.6.2',
     title: 'Easier to read lyrics',
     items: [
