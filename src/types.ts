@@ -7,9 +7,6 @@ export type Tab =
   | 'todo'
   | 'notes'
   | 'clipboard'
-  | 'deadlines'
-  | 'classes'
-  | 'inbox'
   | 'shelf'
   | 'apps'
   | 'friends'
@@ -24,9 +21,6 @@ export const PAGES: { id: Tab; title: string }[] = [
   { id: 'todo', title: 'To-do' },
   { id: 'notes', title: 'Notes' },
   { id: 'clipboard', title: 'Clipboard' },
-  { id: 'deadlines', title: 'SCELE Deadlines' },
-  { id: 'classes', title: 'SCELE Classes' },
-  { id: 'inbox', title: 'SCELE Inbox' },
   { id: 'shelf', title: 'Shelf' },
   { id: 'apps', title: 'Apps' },
   { id: 'friends', title: 'Friends' },
@@ -39,7 +33,6 @@ export const PAGES: { id: Tab; title: string }[] = [
 export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[] = [
   { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
   { id: 'tools', title: 'Tools', icon: '🛠️', pages: ['todo', 'notes', 'clipboard'] },
-  { id: 'campus', title: 'Campus', icon: '🎓', pages: ['deadlines', 'classes', 'inbox'] },
   { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps'] },
   { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'groups', 'profile'] },
   { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
@@ -53,9 +46,6 @@ export const SHORT: Record<Tab, string> = {
   todo: 'To-do',
   notes: 'Notes',
   clipboard: 'Clipboard',
-  deadlines: 'Due',
-  classes: 'Classes',
-  inbox: 'Inbox',
   shelf: 'Shelf',
   apps: 'Apps',
   friends: 'Friends',
@@ -92,8 +82,6 @@ export interface IslandAlert {
   chatWith?: string
   /** a new song started: drawn with the current track's art, opens Playing when clicked */
   nowPlaying?: boolean
-  /** clicking the alert opens the card on this page */
-  openTab?: Tab
 }
 
 export interface TimerState {

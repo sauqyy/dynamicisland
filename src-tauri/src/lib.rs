@@ -1,6 +1,4 @@
 mod auth;
-mod scele;
-mod sso;
 #[cfg(windows)]
 mod files;
 #[cfg(windows)]
@@ -367,15 +365,6 @@ pub fn run() {
             set_dragging,
             auth::oauth_wait,
             auth::open_url,
-            scele::scele_login,
-            scele::scele_account,
-            scele::scele_logout,
-            scele::scele_call,
-            scele::scele_file,
-            scele::web_doc,
-            sso::sso_verify,
-            sso::sso_student,
-            sso::sso_forget,
             set_hide_on_fullscreen,
             monitor_count,
             install_update,

@@ -7,45 +7,10 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
-    version: '0.7.4',
-    title: 'Classes from your course timelines',
+    version: '0.7.5',
+    title: 'Back to the general build',
     items: [
-      'Classes now reads each course\'s timeline, from PDFs, slides, Word, Excel or a linked Google Sheet, and finds your class days from it.',
-      'Today and Tomorrow list your classes with their time, room and what each one covers, plus the matching course materials.',
-      'Holidays on the timeline skip the reminder, and you get a heads-up on days when a class has no time listed.',
-      'If a course\'s timeline needs a Google sign-in, Classes tells you which one so you can open it.',
-    ],
-  },
-  {
-    version: '0.7.3',
-    title: 'Your classes, from the syllabus',
-    items: [
-      'Classes now reads your class days from each course\'s syllabus when the course page doesn\'t list them.',
-      'Only this term\'s courses are used, so old courses SCELE still shows are left out.',
-      'Courses you TA are marked TA. Tap TA or Hide on any course in Classes to change it.',
-    ],
-  },
-  {
-    version: '0.7.2',
-    title: 'Verify Student for assistants',
-    items: ['Fasilkom UI students whom SSO UI also lists as staff, such as teaching assistants, can now verify and use Campus.'],
-  },
-  {
-    version: '0.7.1',
-    title: 'Verify Student fixed',
-    items: [
-      'Verify Student now works for Fasilkom UI students even when SSO UI leaves out which faculty you are in.',
-      'If it does, the Profile card asks you to confirm with your SCELE sign-in, which also connects SCELE.',
-    ],
-  },
-  {
-    version: '0.7.0',
-    title: 'Campus for Fasilkom UI',
-    items: [
-      'Fasilkom UI students: tap Verify Student on the Profile page and sign in with SSO UI to unlock Campus.',
-      'Due lists your SCELE deadlines, and the island warns you 24 hours, 3 hours and 1 hour before each one.',
-      'Classes builds your weekly schedule from your SCELE courses and reminds you before class, with that week\'s topic.',
-      'Inbox collects SCELE announcements and new course materials, and the pill shows how much is due today.',
+      'The Campus tools for Fasilkom UI students (Verify Student, Due, Classes and Inbox) moved to their own build, so this version is the same for everyone.',
     ],
   },
   {

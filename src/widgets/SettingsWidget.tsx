@@ -9,7 +9,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { ACCENTS, EQ_STYLES, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
-import { PAGES, type Tab } from '../types'
+import { PAGES } from '../types'
 import { play } from 'cuelume'
 import { disclosureCue, previewPack } from '../lib/sound'
 import { Bars } from './Equalizer'
@@ -20,8 +20,6 @@ interface Props {
   settings: Settings
   update: (patch: Partial<Settings>) => void
   updater: ReturnType<typeof useUpdater>
-  /** pages that are not available right now (Campus before Verify Student), left out of the list */
-  unavailable: Tab[]
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
@@ -148,7 +146,7 @@ function CallAudio() {
   )
 }
 
-export function SettingsWidget({ settings, update, updater, unavailable }: Props) {
+export function SettingsWidget({ settings, update, updater }: Props) {
   const { state: update_, version, check: checkUpdate, install: downloadUpdate } = updater
   const [autostart, setAutostart] = useState(false)
   const [monitors, setMonitors] = useState(1)
@@ -461,7 +459,7 @@ export function SettingsWidget({ settings, update, updater, unavailable }: Props
 
       <Group title="Pages">
         <div className="page-toggles">
-          {PAGES.filter((p) => p.id !== 'settings' && !unavailable.includes(p.id)).map((p) => {
+          {PAGES.filter((p) => p.id !== 'settings').map((p) => {
             const on = !settings.hiddenPages.includes(p.id)
             return (
               <button
