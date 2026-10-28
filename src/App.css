@@ -5267,3 +5267,60 @@ button.sc-row:hover {
   padding: 5px 7px;
   font-size: 12px;
 }
+/* connecting SLCM: the password once, then the hidden window's progress */
+.sc-slcm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.sc-slcm-row {
+  display: flex;
+  gap: 6px;
+}
+.sc-slcm-row .todo-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: var(--fs-meta);
+}
+.sc-slcm .sc-hint {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-slcm .sc-hint b {
+  color: var(--text-2);
+}
+.sc-slcm-cancel {
+  align-self: flex-start;
+}
+.sc-inline-link {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sc-progress {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.sc-progress::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: sc-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc-progress::before {
+    animation: none;
+  }
+}
+.sc-warn {
+  font-size: var(--fs-label);
+  color: var(--warn);
+}

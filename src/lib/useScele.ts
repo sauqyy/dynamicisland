@@ -39,7 +39,7 @@ import {
   type Section,
 } from './scele'
 import { coverage } from './coverage'
-import { matchCourses, slcmConnect, slcmForget, slcmSaved, type SlcmSchedule } from './slcm'
+import { matchCourses, slcmCancel, slcmConnect, slcmForget, slcmSaved, slcmShow, type SlcmSchedule, type SlcmStage } from './slcm'
 import { agendaOn, classDays, parseTimeline, timelineOver, timelineScore, type Timeline } from './timeline'
 
 /** Something added to a course page since the last look. */
@@ -377,7 +377,8 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   const [error, setError] = useState<string | null>(null)
   /** the study plan read from SLCM; undefined while it is looked up */
   const [slcm, setSlcm] = useState<SlcmSchedule | null | undefined>(undefined)
-  const [slcmBusy, setSlcmBusy] = useState(false)
+  /** reading SLCM: how far it has got; null when not reading */
+  const [slcmStage, setSlcmStage] = useState<SlcmStage | null>(null)
   const seen = useRef<Seen>(read(SEEN_KEY, noSeen()))
   const alertRef = useRef(onAlert)
   alertRef.current = onAlert
@@ -726,14 +727,18 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     write(LEAD_KEY, m)
   }, [])
   /** Opens SLCM to read the study plan's class times; resolves false if the window was closed first. */
-  const connectSlcm = useCallback(async () => {
-    setSlcmBusy(true)
+  /**
+   * Reads the study plan from SLCM, signing in with the SSO UI password (used once, not kept);
+   * resolves false if the SLCM window was closed first.
+   */
+  const connectSlcm = useCallback(async (password: string | null) => {
+    setSlcmStage('loading')
     try {
-      const got = await slcmConnect()
+      const got = await slcmConnect(password, setSlcmStage)
       if (got) setSlcm(got)
       return Boolean(got)
     } finally {
-      setSlcmBusy(false)
+      setSlcmStage(null)
     }
   }, [])
   const forgetSlcm = useCallback(() => {
@@ -753,8 +758,11 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     timelines,
     upcoming,
     slcm: slcm ?? null,
-    slcmBusy,
+    slcmStage,
+    slcmBusy: slcmStage !== null,
     connectSlcm,
+    showSlcm: slcmShow,
+    cancelSlcm: slcmCancel,
     forgetSlcm,
     tuned,
     lead,

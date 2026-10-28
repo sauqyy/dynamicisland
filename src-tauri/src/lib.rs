@@ -388,6 +388,10 @@ pub fn run() {
             #[cfg(feature = "campus")]
             slcm::slcm_saved,
             #[cfg(feature = "campus")]
+            slcm::slcm_show,
+            #[cfg(feature = "campus")]
+            slcm::slcm_cancel,
+            #[cfg(feature = "campus")]
             slcm::slcm_forget,
             #[cfg(feature = "campus")]
             sso::sso_verify,
