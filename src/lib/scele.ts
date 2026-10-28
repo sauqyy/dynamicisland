@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { IS_TAURI } from './useMedia'
+import { documentLines, htmlLines, READABLE, type Window } from './timeline'
 
 /** SCELE: Fasilkom UI's Moodle. Rust holds the token and makes the calls (see scele.rs). */
 export const SCELE_URL = 'https://scele.cs.ui.ac.id'
@@ -59,9 +60,11 @@ export interface SceleModule {
   /** 'resource', 'page', 'label', 'assign', … */
   mod: string
   url: string
-  /** plain text of its description (a label's whole content) */
+  /** text of its description (a label's whole content), one line per row or paragraph */
   text?: string
-  files?: { name: string; url: string; mime: string; modified: number }[]
+  files?: { name: string; url: string; mime: string; modified: number; size: number }[]
+  /** web addresses it points to (a URL activity), e.g. a Google Sheet with the timeline */
+  links?: string[]
 }
 
 /** One weekly meeting of a course: found on its SCELE page, or added by the user. */
@@ -70,14 +73,14 @@ export interface ClassSlot {
   courseId: number
   /** 0 = Sunday … 6 = Saturday */
   day: number
-  /** "08:00" */
+  /** "08:00"; '' when the class day is known but its time is not listed */
   start: string
   end: string
   room: string
   /** read from the course page rather than added by hand */
   auto?: boolean
-  /** where a found meeting was read: the course page or its syllabus */
-  source?: 'page' | 'syllabus'
+  /** where a found meeting was read: the course page, a syllabus, or the course timeline's dates */
+  source?: 'page' | 'syllabus' | 'timeline'
   /** a course the user teaches (a TA) rather than takes */
   teaching?: boolean
 }
@@ -125,7 +128,7 @@ export async function fetchCourses(userid: number): Promise<Course[]> {
     start: (c.startdate ?? 0) * 1000,
     end: (c.enddate ?? 0) * 1000,
     url: c.viewurl ?? `${SCELE_URL}/course/view.php?id=${c.id}`,
-    summary: htmlText(c.summary),
+    summary: htmlLines(c.summary),
   }))
 }
 
@@ -194,14 +197,14 @@ export async function fetchContents(courseId: number): Promise<Section[]> {
       url?: string
       visible?: number
       description?: string
-      contents?: { type: string; filename: string; fileurl?: string; mimetype?: string; timemodified?: number }[]
+      contents?: { type: string; filename: string; fileurl?: string; mimetype?: string; timemodified?: number; filesize?: number }[]
     }[]
   }
   const r = await call<Raw[]>('core_course_get_contents', { courseid: courseId })
   return r.map((s) => ({
     num: s.section,
     name: htmlText(s.name),
-    summary: htmlText(s.summary),
+    summary: htmlLines(s.summary),
     modules: (s.modules ?? [])
       .filter((m) => m.visible !== 0)
       .map((m) => ({
@@ -209,10 +212,11 @@ export async function fetchContents(courseId: number): Promise<Section[]> {
         name: htmlText(m.name),
         mod: m.modname,
         url: m.url ?? `${SCELE_URL}/mod/${m.modname}/view.php?id=${m.id}`,
-        text: htmlText(m.description),
+        text: htmlLines(m.description),
         files: (m.contents ?? [])
           .filter((f) => f.type === 'file' && f.fileurl)
-          .map((f) => ({ name: f.filename, url: f.fileurl!, mime: f.mimetype ?? '', modified: f.timemodified ?? 0 })),
+          .map((f) => ({ name: f.filename, url: f.fileurl!, mime: f.mimetype ?? '', modified: f.timemodified ?? 0, size: f.filesize ?? 0 })),
+        links: (m.contents ?? []).filter((f) => f.type === 'url' && f.fileurl).map((f) => f.fileurl!),
       })),
   }))
 }
@@ -272,74 +276,96 @@ export async function fetchMyRoles(courseId: number, userid: number): Promise<st
 /** Teaching rather than taking the course: any role in it, and none of them student. */
 export const isTeachingRole = (roles: string[]) => roles.length > 0 && !roles.includes('student')
 
-// ---------- reading syllabus files ----------
+// ---------- reading the course's documents ----------
 
-/** Files worth reading for the class days: the syllabus (RPS), the schedule, the course outline. */
-const SYLLABUS_RE = /\b(rps|silabus|syllabus|sap|course outline|kontrak kuliah|rencana pembelajaran|jadwal|schedule|timeline|course info|informasi)\b/i
+/** Names of what holds a course's schedule: its timeline, syllabus (RPS), outline or overview. */
+const TIMELINE_RE = /\b(time\s?line|jadwal|schedule|rps|silabus|syllabus|sap|course outline|course overview|overview|course info|informasi|kontrak|rencana|lesson plan|kalender|calendar|tentative|agenda|outline)\b/i
+/** Google documents a course can link to as its timeline (see web_doc in scele.rs). */
+const GOOGLE_DOC = /^https:\/\/(docs\.google\.com\/(spreadsheets|document|presentation)\/|drive\.google\.com\/)/
+/** Sections that hold a course's general information. */
+const INFO_SECTION = /\b(general|umum|info|informasi|overview|course|pengantar|introduction|perkuliahan|silabus|syllabus)\b/i
 
-export function syllabusFiles(sections: Section[]) {
-  return sections
-    .flatMap((s) => s.modules)
-    .filter((m) => SYLLABUS_RE.test(m.name) && m.files?.length)
-    .flatMap((m) => m.files!.filter((f) => /\.(pdf|docx|html?|txt)$/i.test(f.name)).map((f) => ({ ...f, module: m.name })))
-    .slice(0, 4)
+/** A document to read for a course's timeline: a file on its SCELE page, or a link it points to. */
+export interface DocRef {
+  /** what it is cached under: the file and its version, or the link */
+  key: string
+  name: string
+  url: string
+  kind: 'file' | 'link'
+  /** 1: named like a timeline or syllabus; 2: one of the general section's other documents */
+  tier: 1 | 2
+  size: number
+  mime: string
 }
 
-/** Text of a SCELE file (PDF, Word, HTML or plain text), downloaded by Rust with the token. */
-export async function fileText(url: string, name: string): Promise<string> {
-  if (!IS_TAURI) return DEMO_FILES[name] ?? ''
-  const b64 = await invoke<string>('scele_file', { url })
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
-  let text: string
-  if (/\.pdf$/i.test(name)) text = await pdfText(bytes)
-  else if (/\.docx$/i.test(name)) text = await docxText(bytes)
-  else if (/\.html?$/i.test(name)) text = htmlText(new TextDecoder().decode(bytes))
-  else text = new TextDecoder().decode(bytes)
-  return text.replace(/\s+/g, ' ').slice(0, 40_000)
-}
-
-async function pdfText(bytes: Uint8Array): Promise<string> {
-  // loaded only when a syllabus PDF is read, so the island itself stays light
-  const pdfjs = await import('pdfjs-dist')
-  const worker = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
-  pdfjs.GlobalWorkerOptions.workerSrc = worker
-  const doc = await pdfjs.getDocument({ data: bytes }).promise
-  const pages: string[] = []
-  for (let i = 1; i <= Math.min(doc.numPages, 12); i++) {
-    const content = await (await doc.getPage(i)).getTextContent()
-    pages.push(content.items.map((it) => ('str' in it ? it.str : '')).join(' '))
-  }
-  await doc.destroy()
-  return pages.join('\n')
-}
-
-/** word/document.xml out of the .docx zip, unpacked with the browser's own inflate. */
-async function docxText(bytes: Uint8Array): Promise<string> {
-  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  // the central directory lists each entry with its local header's offset
-  let eocd = bytes.length - 22
-  while (eocd > 0 && v.getUint32(eocd, true) !== 0x06054b50) eocd--
-  let p = v.getUint32(eocd + 16, true)
-  const entries = v.getUint16(eocd + 10, true)
-  for (let i = 0; i < entries; i++) {
-    const method = v.getUint16(p + 10, true)
-    const size = v.getUint32(p + 20, true)
-    const nameLen = v.getUint16(p + 28, true)
-    const extra = v.getUint16(p + 30, true) + v.getUint16(p + 32, true)
-    const local = v.getUint32(p + 42, true)
-    const name = new TextDecoder().decode(bytes.subarray(p + 46, p + 46 + nameLen))
-    if (name === 'word/document.xml') {
-      const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true)
-      const raw = bytes.slice(start, start + size)
-      const xml =
-        method === 0
-          ? new TextDecoder().decode(raw)
-          : await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text()
-      return xml.replace(/<\/w:p>/g, '\n').replace(/<w:tab\/>/g, ' ').replace(/<[^>]+>/g, '')
+/**
+ * The documents worth reading for a course's timeline, most likely first: anything named like a
+ * timeline, schedule, syllabus or overview (its files, or the Google Sheet/Doc/Slides/Drive file it
+ * links to), then the other readable documents of the course's general section.
+ */
+export function docCandidates(sections: Section[]): DocRef[] {
+  const out: DocRef[] = []
+  const seen = new Set<string>()
+  const add = (r: DocRef) => {
+    if (!seen.has(r.url)) {
+      seen.add(r.url)
+      out.push(r)
     }
-    p += 46 + nameLen + extra
   }
-  return ''
+  const mods = sections.flatMap((s) => s.modules.map((m) => ({ m, info: s.num === 0 || INFO_SECTION.test(s.name) })))
+  for (const { m } of mods) {
+    if (m.mod === 'label') continue
+    const named = TIMELINE_RE.test(m.name)
+    for (const f of m.files ?? []) {
+      if (!READABLE.test(f.name)) continue
+      if (named || TIMELINE_RE.test(f.name)) {
+        add({ key: `${f.url}@${f.modified}`, name: m.name === f.name ? f.name : `${m.name} · ${f.name}`, url: f.url, kind: 'file', tier: 1, size: f.size, mime: f.mime })
+      }
+    }
+    if (named) for (const l of m.links ?? []) if (GOOGLE_DOC.test(l)) add({ key: `link:${l}`, name: m.name, url: l, kind: 'link', tier: 1, size: 0, mime: '' })
+  }
+  for (const { m, info } of mods) {
+    if (!info || m.mod === 'label') continue
+    for (const f of m.files ?? []) if (READABLE.test(f.name)) add({ key: `${f.url}@${f.modified}`, name: m.name, url: f.url, kind: 'file', tier: 2, size: f.size, mime: f.mime })
+    for (const l of m.links ?? []) if (GOOGLE_DOC.test(l)) add({ key: `link:${l}`, name: m.name, url: l, kind: 'link', tier: 2, size: 0, mime: '' })
+  }
+  return out
+}
+
+const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+
+/**
+ * A document's text, one row per line: SCELE files through Rust with the token, links through
+ * web_doc. Rejects with 'signin' for a link that isn't shared publicly.
+ */
+export async function readDoc(ref: DocRef): Promise<string> {
+  if (!IS_TAURI) {
+    if (DEMO_DOCS[ref.url] === 'signin') throw 'signin'
+    return DEMO_DOCS[ref.url] ?? ''
+  }
+  if (ref.kind === 'link') {
+    const doc = await invoke<{ mime: string; name: string; data: string }>('web_doc', { url: ref.url })
+    return documentLines(fromBase64(doc.data), doc.name, doc.mime)
+  }
+  const file = decodeURIComponent(ref.url.split('?')[0].split('/').pop() ?? ref.name)
+  return documentLines(fromBase64(await invoke<string>('scele_file', { url: ref.url })), file, ref.mime)
+}
+
+/**
+ * The days a course's timeline can be about: its term (Odd runs August to January, Even February
+ * to July), else around its start date, so revision dates and references in a document are ignored.
+ */
+export function termWindow(c: Course): Window {
+  const t = termOf(c)
+  if (t !== null) {
+    const y = Math.floor(t / 3)
+    const kind = t % 3
+    if (kind === 0) return [new Date(y, 6, 15).getTime(), new Date(y + 1, 1, 15).getTime()]
+    if (kind === 1) return [new Date(y + 1, 0, 15).getTime(), new Date(y + 1, 6, 31).getTime()]
+    return [new Date(y + 1, 5, 1).getTime(), new Date(y + 1, 8, 30).getTime()]
+  }
+  const base = c.start || Date.now()
+  return [base - 30 * DAY, base + 220 * DAY]
 }
 
 export function openScele(url: string) {
@@ -490,7 +516,7 @@ export function subjectOf(c: Course): string {
     .replace(/^\s*\[[^\]]*\]\s*/, '')
     .replace(/\((?:\s*[A-Z]{1,2}\d?\s*,?)+\)/g, '')
     .replace(/\b(?:[Kk]elas|KELAS|[Cc]lass|[Kk]ls)\s+[A-Z]{1,2}\d?\b/g, '')
-    .replace(/\b(?:gasal|genap|ganjil|pendek)\b/gi, '')
+    .replace(/\b(?:gasal|genap|ganjil|pendek|odd|even|short|term|semester)\b/gi, '')
     .replace(/\d{4}\s*[/-]\s*\d{4}/g, '')
     .replace(/[^\p{L}\p{N}&]+/gu, ' ')
     .trim()
@@ -511,10 +537,13 @@ export function syllabusLinks(sections: Section[]) {
     .slice(0, 3)
 }
 
+/** A class whose time isn't listed is placed at 07:00–23:59 of its day: reminded in the morning. */
+const UNTIMED = { start: '07:00', end: '23:59' }
+
 /** When a slot next starts, from `now` (today's if it has not ended yet). */
 export function nextMeeting(slot: ClassSlot, now: number): { start: number; end: number } {
-  const [sh, sm] = slot.start.split(':').map(Number)
-  const [eh, em] = slot.end.split(':').map(Number)
+  const [sh, sm] = (slot.start || UNTIMED.start).split(':').map(Number)
+  const [eh, em] = (slot.end || UNTIMED.end).split(':').map(Number)
   const d = new Date(now)
   const ahead = (slot.day - d.getDay() + 7) % 7
   const at = (h: number, m: number, plus: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + plus, h, m).getTime()
@@ -526,6 +555,18 @@ export function nextMeeting(slot: ClassSlot, now: number): { start: number; end:
   }
   return { start, end }
 }
+
+/** A slot's meeting on a given day, if it meets that weekday. */
+export function meetingOn(slot: ClassSlot, day: number): { start: number; end: number } | null {
+  const d = new Date(day)
+  if (d.getDay() !== slot.day) return null
+  const [sh, sm] = (slot.start || UNTIMED.start).split(':').map(Number)
+  const [eh, em] = (slot.end || UNTIMED.end).split(':').map(Number)
+  return { start: new Date(d.getFullYear(), d.getMonth(), d.getDate(), sh, sm).getTime(), end: new Date(d.getFullYear(), d.getMonth(), d.getDate(), eh, em).getTime() }
+}
+
+/** "10:00–11:40", or that the time isn't listed. */
+export const slotTime = (s: Pick<ClassSlot, 'start' | 'end'>) => (s.start ? `${s.start}–${s.end}` : 'time not listed')
 
 /** "in 3h 20m", "in 2 days", "2h ago" */
 export function relTime(t: number, now: number): string {
@@ -543,37 +584,98 @@ export function relTime(t: number, now: number): string {
 
 const DEMO_ACCOUNT: SceleAccount = { userid: 1, fullname: 'Demo Mahasiswa', username: 'demo.mahasiswa' }
 const now0 = Date.now()
-const termStart = now0 - 8 * 7 * DAY
-// named the way SCELE names them, and shaped like a real term: the class times are only in the
-// syllabus files, last term's Calculus 2 is still "in progress", the user TAs this term's Calculus 1,
-// and Databases is enrolled twice to show the "which one is your class" question
-const term = (n: string) => `${n} Odd 2026/2027`
+// Shaped like a real term, named the way SCELE names them, with dates around today: Platform-Based
+// Development keeps its timeline in a linked Google Sheet, Operating Systems in a PDF "Tentative
+// Timeline", Statistics writes its class times in an outline (its sheet needs a Google sign-in),
+// the user TAs Calculus 1, Databases is enrolled twice, and last term's Calculus 2 is still listed.
+const termNow = termAt(now0)
+const T = `${['Odd', 'Even', 'Short'][termNow % 3]} ${Math.floor(termNow / 3)}/${Math.floor(termNow / 3) + 1}`
+const monday0 = new Date(new Date(now0).getFullYear(), new Date(now0).getMonth(), new Date(now0).getDate() - ((new Date(now0).getDay() + 6) % 7) - 8 * 7).getTime()
+const MON_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+/** "Tue, 3 Nov 2026" for weekday `day` of week `w` (1 = eight weeks ago) */
+const on = (w: number, day: number) => {
+  const d = new Date(monday0 + ((w - 1) * 7 + ((day + 6) % 7)) * DAY)
+  return `${WD[d.getDay()]}, ${d.getDate()} ${MON_EN[d.getMonth()]} ${d.getFullYear()}`
+}
+const PBD_TOPICS = ['Course intro & web basics', 'HTML & CSS layout', 'JavaScript fundamentals', 'DOM & events', 'Django models', 'Django views & templates', 'Forms & validation', 'Midterm', 'React components', 'React Hooks & State', 'Fetching data & REST APIs', 'Authentication', 'Deployment & CI', 'Final project presentations']
+const OS_TOPICS = ['Introduction to operating systems', 'Processes', 'Threads & concurrency', 'CPU scheduling', 'Synchronization', 'Deadlocks', 'Main memory', 'Midterm exam', 'Virtual memory', 'File systems', 'Mass storage', 'I/O systems', 'Protection & security', 'Review']
+
+const PBD_SHEET = 'https://docs.google.com/spreadsheets/d/1uT6b3YYEd5AqSNn2lvbAJjgK4tdIN5lF6KUx7Y38M40/edit?gid=982244062#gid=982244062'
+const SP_SHEET = 'https://docs.google.com/spreadsheets/d/1demoSignInOnlySheetXXXXXXXXXXXXXXX/edit'
+const fileUrl = (name: string) => `${SCELE_URL}/webservice/pluginfile.php/demo/${name}`
+const OS_PDF = fileUrl('Tentative-Timeline.pdf')
+const SP_DOC = fileUrl('Course-Outline-SP.docx')
+
+/** What each document says, as its rows come out of the readers. */
+const DEMO_DOCS: Record<string, string> = {
+  [PBD_SHEET]: [
+    'Week | Date | Topic | Notes',
+    ...PBD_TOPICS.flatMap((t, i) =>
+      i === 4
+        ? [`${i + 1} | ${on(i + 1, 2)} | No class - public holiday |`, `${i + 1} | ${on(i + 1, 4)} | ${t} | Lab 4`]
+        : i === 7
+          ? [`${i + 1} | ${on(i + 1, 4)} | UTS (Midterm exam) | 08.00 - 10.00`]
+          : [`${i + 1} | ${on(i + 1, 2)} | ${t} |`, `${i + 1} | ${on(i + 1, 4)} | ${t} (lab) | Lab ${i + 1}`],
+    ),
+  ].join('\n'),
+  [OS_PDF]: [
+    'Operating Systems - Tentative Timeline',
+    'Meeting | Day/Date | Time | Topic',
+    ...OS_TOPICS.flatMap((t, i) => [`${i * 2 + 1} | ${on(i + 1, 1)} | 13.00 - 14.40 | ${t}`, `${i * 2 + 2} | ${on(i + 1, 3)} | 13.00 - 14.40 | ${t} (continued)`]),
+  ].join('\n'),
+  [SP_SHEET]: 'signin',
+  [SP_DOC]: 'Statistics & Probability — Course Outline\nKelas A: Jumat 08.00 - 10.30 R. 2.2301\nKelas B: Jumat 13.00 - 15.30',
+}
+
 const DEMO_COURSES: Course[] = [
-  { id: 101, short: 'PBD', full: term('[KI] Platform-Based Development (A)'), start: termStart, end: 0, url: SCELE_URL, summary: '' },
-  { id: 102, short: 'OS', full: term('[KI] Operating Systems (A)'), start: termStart, end: 0, url: SCELE_URL, summary: '' },
-  { id: 103, short: 'SP', full: term('[KI] Statistics & Probability (A)'), start: termStart, end: 0, url: SCELE_URL, summary: '' },
-  { id: 104, short: 'Calc1', full: term('[KI] Calculus 1 (A)'), start: termStart, end: 0, url: SCELE_URL, summary: 'Lecture: Wednesday 08:00 - 09:40, Room 2.2301' },
-  { id: 105, short: 'DB', full: term('[KI] Databases (A)'), start: termStart, end: 0, url: SCELE_URL, summary: '' },
-  { id: 106, short: 'DB-Reg', full: '[Reg] Basis Data (A,B,C) Gasal 2026/2027', start: termStart, end: 0, url: SCELE_URL, summary: '' },
-  { id: 107, short: 'Calc2-GNP2026', full: '[KI] Calculus 2 (A) Even 2025/2026', start: termStart - 30 * 7 * DAY, end: 0, url: SCELE_URL, summary: 'Senin 13.00 - 14.40 · Selasa 09.00 - 09.50' },
+  { id: 101, short: 'PBD', full: `[KI] Platform-Based Development (A) ${T}`, start: monday0, end: 0, url: SCELE_URL, summary: '' },
+  { id: 102, short: 'OS', full: `[KI] Operating Systems (A) ${T}`, start: monday0, end: 0, url: SCELE_URL, summary: '' },
+  { id: 103, short: 'SP', full: `[KI] Statistics & Probability (A) ${T}`, start: monday0, end: 0, url: SCELE_URL, summary: '' },
+  { id: 104, short: 'Calc1', full: `[KI] Calculus 1 (A) ${T}`, start: monday0, end: 0, url: SCELE_URL, summary: 'Lecture: Wednesday 08:00 - 09:40, Room 2.2301' },
+  { id: 105, short: 'DB', full: `[KI] Databases (A) ${T}`, start: monday0, end: 0, url: SCELE_URL, summary: '' },
+  { id: 106, short: 'DB-Reg', full: `[Reg] Databases (A,B,C) ${T}`, start: monday0, end: 0, url: SCELE_URL, summary: '' },
+  { id: 107, short: 'Calc2-GNP2026', full: '[KI] Calculus 2 (A) Even 2025/2026', start: monday0 - 30 * 7 * DAY, end: 0, url: SCELE_URL, summary: 'Senin 13.00 - 14.40 · Selasa 09.00 - 09.50' },
 ]
 const DEMO_GROUPS: Record<number, string[]> = {}
 const DEMO_ROLES: Record<number, string[]> = { 104: ['teacher'] }
-const file = (name: string) => [{ name, url: `${SCELE_URL}/webservice/pluginfile.php/demo/${name}`, mime: 'application/pdf', modified: 0 }]
-// what the syllabus files say, standing in for the downloaded PDFs
-const DEMO_FILES: Record<string, string> = {
-  'RPS-PBD.pdf': 'Rencana Pembelajaran Semester. Jadwal kuliah: Selasa & Kamis, 10.00 - 11.40, Ruang 2.2402. UTS: Senin 13.00 - 15.00.',
-  'Syllabus-OS.pdf': 'Course Syllabus. Lectures: Monday and Wednesday 13:00 - 14:40 (Room 2.2303). Quiz: Friday 08:00 - 08:30.',
-  'Course-Outline-SP.pdf': 'Kelas A: Jumat 08.00 - 10.30 R. 2.2301 · Kelas B: Jumat 13.00 - 15.30',
-}
-const week = Math.floor((now0 - termStart) / (7 * DAY)) + 1
+const week = Math.floor((now0 - monday0) / (7 * DAY)) + 1
+const mod = (id: number, name: string, extra: Partial<SceleModule> = {}): SceleModule => ({ id, name, mod: 'resource', url: SCELE_URL, ...extra })
 const DEMO_CONTENTS: Record<number, Section[]> = {
   101: [
-    { num: 0, name: 'General', summary: '', modules: [{ id: 1, name: 'RPS PBD 2026', mod: 'resource', url: SCELE_URL, files: file('RPS-PBD.pdf') }] },
-    { num: week, name: `Week ${week}: React Hooks & State`, summary: 'useState, useEffect, custom hooks.', modules: [{ id: 2, name: `Slides Week ${week}`, mod: 'resource', url: SCELE_URL }, { id: 3, name: 'Lab 8: Todo app', mod: 'assign', url: SCELE_URL }] },
+    {
+      num: 0,
+      name: 'General',
+      summary: '',
+      modules: [mod(1, 'Course Overview (Term 1)'), mod(2, `Course Timeline (Term 1 - ${T.split(' ')[1]})`, { mod: 'url', links: [PBD_SHEET] })],
+    },
+    ...PBD_TOPICS.map((t, i) => ({
+      num: i + 1,
+      name: `Week ${i + 1}: ${t}`,
+      summary: '',
+      modules: [mod(100 + i, `Slides: ${t}`), mod(200 + i, `Lab ${i + 1}`, { mod: 'assign' })],
+    })),
   ],
-  102: [{ num: 0, name: 'General', summary: '', modules: [{ id: 4, name: 'Syllabus', mod: 'resource', url: SCELE_URL, files: file('Syllabus-OS.pdf') }] }],
-  103: [{ num: 0, name: 'General', summary: '', modules: [{ id: 5, name: 'Course Outline', mod: 'resource', url: SCELE_URL, files: file('Course-Outline-SP.pdf') }] }],
+  102: [
+    {
+      num: 0,
+      name: 'General',
+      summary: '',
+      modules: [mod(5, 'Tentative Timeline (pdf version)', { files: [{ name: 'Tentative-Timeline.pdf', url: OS_PDF, mime: 'application/pdf', modified: 0, size: 120_000 }] })],
+    },
+    { num: week, name: `Topic ${week}`, summary: '', modules: [mod(301, `Chapter ${week}: ${OS_TOPICS[week - 1] ?? 'Review'}`)] },
+  ],
+  103: [
+    {
+      num: 0,
+      name: 'Course Info',
+      summary: '',
+      modules: [
+        mod(6, 'Course Outline', { files: [{ name: 'Course-Outline-SP.docx', url: SP_DOC, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', modified: 0, size: 40_000 }] }),
+        mod(7, 'Jadwal & Timeline', { mod: 'url', links: [SP_SHEET] }),
+      ],
+    },
+  ],
 }
 function demoDeadlines(): Deadline[] {
   const n = Date.now()

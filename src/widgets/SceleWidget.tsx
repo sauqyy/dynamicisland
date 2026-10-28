@@ -1,17 +1,8 @@
 import { useMemo, useState } from 'react'
 import { play } from 'cuelume'
 import { BookOpen, CalendarCheck, Inbox, LogOut, RefreshCw } from 'lucide-react'
-import {
-  DAY_NAMES,
-  nextMeeting,
-  openScele,
-  relTime,
-  syllabusLinks,
-  topicFor,
-  type ClassSlot,
-  type Deadline,
-} from '../lib/scele'
-import type { SceleState } from '../lib/useScele'
+import { DAY_NAMES, openScele, relTime, slotTime, syllabusLinks, type ClassSlot, type Deadline } from '../lib/scele'
+import type { Meeting, SceleState } from '../lib/useScele'
 
 interface Props {
   page: 'deadlines' | 'classes' | 'inbox'
@@ -148,28 +139,47 @@ function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
   )
 }
 
-const SOURCE = {
-  dated: 'From SCELE: section dated this week',
-  week: 'Estimated: week number counted from the course start',
+/** Where a meeting's topic came from, shown so the user can judge it. */
+const FROM: Record<NonNullable<Meeting['from']>, string> = {
+  timeline: 'From the course timeline',
+  'timeline-week': "This week's entry in the course timeline",
+  'outline-dated': 'From SCELE: section dated this week',
+  'outline-week': 'Estimated: week number counted from the course start',
+}
+const fromClass = (m: Meeting) => (m.from === 'timeline' || m.from === 'outline-dated' ? 'dated' : m.from ? 'week' : 'none')
+const courseName = (m: Meeting) => (m.course?.full ?? '').replace(/^\s*\[[^\]]*\]\s*/, '').replace(/\s*(odd|even|gasal|genap|ganjil)\s+\d{4}\s*[/-]\s*\d{4}\s*$/i, '') || m.course?.short || 'Class'
+
+/** A meeting's topic line: an exam or a day off is said plainly, an unknown topic too. */
+function TopicLine({ m }: { m: Meeting }) {
+  if (m.kind === 'off') return <small className="sc-off">No class · {m.topic}</small>
+  if (!m.topic) return <small className="sc-src none">Topic not in the course's timeline or outline</small>
+  return (
+    <small className={`sc-topic-line ${m.kind}`} title={m.from ? FROM[m.from] : undefined}>
+      {m.kind === 'exam' && <b className="sc-exam">Exam</b>}
+      <span className={`sc-src ${fromClass(m)}`} />
+      {m.topic}
+    </small>
+  )
 }
 
 function Classes({ scele, now }: { scele: SceleState; now: number }) {
   const [adding, setAdding] = useState(false)
-  const upcoming = useMemo(
-    () => scele.slots.map((s) => ({ slot: s, ...nextMeeting(s, now) })).sort((a, b) => a.start - b.start),
-    [scele.slots, now],
-  )
-  const next = upcoming[0]
-  const course = next && scele.courses.find((c) => c.id === next.slot.courseId)
-  const sections = course ? scele.contents[course.id] ?? [] : []
-  const topic = course ? topicFor(course, sections, next.start) : null
+  // two weeks ahead is enough to get past a holiday or a break
+  const ahead = useMemo(() => scele.upcoming(now, 15), [scele, now])
+  const today = new Date(now).toDateString()
+  const tomorrow = new Date(now + 86_400_000).toDateString()
+  const todays = ahead.filter((m) => new Date(m.start).toDateString() === today)
+  const tomorrows = ahead.filter((m) => new Date(m.start).toDateString() === tomorrow)
+  const next = ahead.find((m) => m.end > now && m.kind !== 'off')
+  const sections = next?.course ? (scele.contents[next.course.id] ?? []) : []
   const syllabus = syllabusLinks(sections)
-  const dueSoon = course ? scele.deadlines.filter((d) => d.courseId === course.id && d.due > now).slice(0, 2) : []
+  const tl = next ? scele.timelines[next.slot.courseId] : undefined
+  const dueSoon = next?.course ? scele.deadlines.filter((d) => d.courseId === next.course!.id && d.due > now).slice(0, 2) : []
   const live = next && next.start <= now
 
   return (
     <div className="sc-list">
-      {next && course && (
+      {next && (
         <section className="sc-next">
           <div className="sc-next-head">
             <span>
@@ -177,39 +187,48 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
                 {live ? 'In class now' : 'Next class'}
                 {next.slot.teaching && ' · you TA this'}
               </small>
-              <b>{course.full}</b>
+              <b>{courseName(next)}</b>
             </span>
             <span className="sc-when">
-              <b>{live ? `until ${next.slot.end}` : relTime(next.start, now)}</b>
+              <b>{live ? `until ${next.slot.end}` : next.slot.start ? relTime(next.start, now) : dayLabel(next.start)}</b>
               <small>
-                {DAY_NAMES[next.slot.day]} {next.slot.start}–{next.slot.end}
+                {DAY_NAMES[next.slot.day]} {slotTime(next.slot)}
                 {next.slot.room && ` · ${next.slot.room}`}
               </small>
             </span>
           </div>
-          {topic ? (
-            <div className="sc-topic">
-              <b>{topic.section.name}</b>
-              {topic.section.summary && <p>{topic.section.summary}</p>}
-              <small className={`sc-src ${topic.source}`}>{SOURCE[topic.source]}</small>
-              {topic.section.modules.filter((m) => m.mod !== 'label').slice(0, 3).map((m) => (
-                <button key={m.id} className="sc-mat" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(m.url)}>
-                  <BookOpen size={12} aria-hidden /> {m.name}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="sc-topic">
-              <small className="sc-src none">This meeting's topic isn't on the SCELE course page. Check the syllabus to be sure.</small>
-            </div>
-          )}
-          {(syllabus.length > 0 || dueSoon.length > 0) && (
+          <div className="sc-topic">
+            {next.topic ? (
+              <>
+                <b>
+                  {next.kind === 'exam' && <span className="sc-exam">Exam</span>}
+                  {next.topic}
+                </b>
+                <small className={`sc-src ${fromClass(next)}`}>{next.from ? FROM[next.from] : ''}</small>
+              </>
+            ) : (
+              <small className="sc-src none">This meeting's topic isn't in the course's timeline or outline. Check the syllabus to be sure.</small>
+            )}
+            {next.materials.map((mat) => (
+              <button key={mat.id} className="sc-mat" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(mat.url)}>
+                <BookOpen size={12} aria-hidden /> {mat.name}
+              </button>
+            ))}
+          </div>
+          {(tl || syllabus.length > 0 || dueSoon.length > 0) && (
             <div className="sc-chips">
-              {syllabus.map((m) => (
-                <button key={m.id} className="chip" data-cuelume-open onClick={() => openScele(m.url)}>
-                  📄 {m.name}
+              {tl && (
+                <button className="chip" data-cuelume-open title="Open the course timeline" onClick={() => openScele(tl.url)}>
+                  🗓 {tl.name}
                 </button>
-              ))}
+              )}
+              {syllabus
+                .filter((m) => m.url !== tl?.url)
+                .map((m) => (
+                  <button key={m.id} className="chip" data-cuelume-open onClick={() => openScele(m.url)}>
+                    📄 {m.name}
+                  </button>
+                ))}
               {dueSoon.map((d) => (
                 <button key={d.id} className="chip" data-cuelume-open onClick={() => openScele(d.url)}>
                   ⏰ {d.name} · {relTime(d.due, now)}
@@ -218,6 +237,13 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
             </div>
           )}
         </section>
+      )}
+
+      {scele.slots.length > 0 && (
+        <>
+          <DayList title="Today" meetings={todays} now={now} empty="No classes today" />
+          <DayList title="Tomorrow" meetings={tomorrows} now={now} empty="No classes tomorrow" />
+        </>
       )}
 
       {scele.duplicates.map((q) => (
@@ -254,10 +280,10 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
         </h4>
         {adding && <AddSlot scele={scele} onAdded={() => setAdding(false)} />}
         {!scele.slots.length && !adding && !scele.duplicates.length && (
-          <div className="empty">No class times found on this term's course pages or syllabi yet. Add yours to get a heads-up and the day's topic before each class.</div>
+          <div className="empty">{scele.syncing ? 'Reading your courses’ timelines…' : 'No class days found in this term’s courses yet. Add yours to get a heads-up and the day’s topic before each class.'}</div>
         )}
         {[...scele.slots]
-          .sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || a.start.localeCompare(b.start))
+          .sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || (a.start || '99').localeCompare(b.start || '99'))
           .map((s) => (
             <SlotRow key={s.id} slot={s} name={scele.courses.find((c) => c.id === s.courseId)?.short ?? '?'} onRemove={() => scele.removeSlot(s)} />
           ))}
@@ -298,6 +324,43 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
   )
 }
 
+/** One day's classes in order, each with its time, room and what it covers. */
+function DayList({ title, meetings, now, empty }: { title: string; meetings: Meeting[]; now: number; empty: string }) {
+  return (
+    <section>
+      <h4>{title}</h4>
+      {!meetings.length && <small className="sc-none">{empty}</small>}
+      {meetings.map((m) => {
+        const live = m.slot.start && m.start <= now && m.end > now
+        const past = m.slot.start && m.end <= now
+        return (
+          <div key={`${m.slot.id}-${m.start}`} className={`sc-row static sc-day-row ${m.kind} ${past ? 'past' : ''} ${live ? 'live' : ''}`}>
+            <span className="sc-time">
+              <b>{m.slot.start || '—'}</b>
+              <small>{m.slot.end && m.slot.start ? m.slot.end : ''}</small>
+            </span>
+            <span className="sc-main">
+              <b>
+                {courseName(m)}
+                {m.slot.teaching && <span className="sc-ta">TA</span>}
+              </b>
+              <TopicLine m={m} />
+              {(m.slot.room || !m.slot.start || live) && (
+                <small className="sc-meta">{[live && 'Now', m.slot.room && `Room ${m.slot.room}`, !m.slot.start && 'time not listed'].filter(Boolean).join(' · ')}</small>
+              )}
+            </span>
+            {m.materials[0] && m.kind !== 'off' && (
+              <button className="chip" data-cuelume-open title={m.materials.map((x) => x.name).join('\n')} onClick={() => openScele(m.materials[0].url)}>
+                <BookOpen size={11} aria-hidden />
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
 /**
  * This term's courses and what the schedule found for each, so a missing one is visible, with the
  * user's say: TA (teaching it, not taking it) and Hide (leave it out). Earlier terms' courses that
@@ -318,7 +381,7 @@ function TermCourses({ scele }: { scele: SceleState }) {
           </button>
         )}
       </h4>
-      {rows.map(({ course: c, found, source, teaching, hidden: off }) => (
+      {rows.map(({ course: c, found, source, teaching, hidden: off, timeline, blocked }) => (
         <div key={c.id} className={`sc-row static sc-course ${off ? 'off' : ''}`}>
           <span className="sc-main">
             <b title={c.full}>{c.full.replace(/^\s*\[[^\]]*\]\s*/, '')}</b>
@@ -326,9 +389,21 @@ function TermCourses({ scele }: { scele: SceleState }) {
               {off
                 ? 'Hidden from the schedule'
                 : found
-                  ? `${found} class${found > 1 ? 'es' : ''} a week · from the ${source === 'syllabus' ? 'syllabus' : 'course page'}`
-                  : 'No class times found · add them with + Add'}
+                  ? `${found} class${found > 1 ? 'es' : ''} a week · from the ${SOURCE_NAME[source ?? 'page']}`
+                  : scele.syncing
+                    ? 'Reading its documents…'
+                    : 'No class days found · add them with + Add'}
             </small>
+            {timeline && !off && (
+              <small className="sc-tl" title={timeline.name}>
+                🗓 Topics from “{timeline.name}” · {timeline.sessions} entries
+              </small>
+            )}
+            {blocked.map((b) => (
+              <button key={b.url} className="sc-blocked" data-cuelume-open title="Shared only with signed-in accounts, so the island can't read it. Open it, or ask for a PDF version." onClick={() => openScele(b.url)}>
+                🔒 “{b.name}” needs a Google sign-in · open
+              </button>
+            ))}
           </span>
           <span className="sc-chips">
             <button
@@ -355,6 +430,9 @@ function TermCourses({ scele }: { scele: SceleState }) {
   )
 }
 
+/** Where a found class came from, as the rows say it. */
+const SOURCE_NAME: Record<NonNullable<ClassSlot['source']>, string> = { page: 'course page', syllabus: 'syllabus', timeline: 'timeline' }
+
 function SlotRow({ slot, name, onRemove }: { slot: ClassSlot; name: string; onRemove: () => void }) {
   return (
     <div className="sc-row static">
@@ -362,11 +440,11 @@ function SlotRow({ slot, name, onRemove }: { slot: ClassSlot; name: string; onRe
       <span className="sc-main">
         <b>{name}</b>
         <small>
-          {slot.start}–{slot.end}
+          {slotTime(slot)}
           {slot.room && ` · ${slot.room}`}
           {slot.auto && (
             <span className="sc-auto" title="Read from SCELE; it updates when the course does">
-              {slot.source === 'syllabus' ? ' · from the syllabus' : ' · from the course page'}
+              {` · from the ${SOURCE_NAME[slot.source ?? 'page']}`}
             </span>
           )}
         </small>
