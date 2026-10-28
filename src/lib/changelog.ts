@@ -11,6 +11,17 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.8',
+    title: 'Profiles and Apple Music lyrics',
+    items: [
+      "Click someone's picture in Friends, requests, chats and groups to open their profile, then click their photo to see it full size.",
+      'New profile photos are saved sharper, so they look good when opened full size.',
+      'Lyrics now show for songs playing in Apple Music on Windows.',
+      'New group and Join a group are now clear buttons at the top of Groups.',
+      'Settings shows which version you have installed, next to Version.',
+    ],
+  },
+  {
     version: '0.7.7',
     campus: true,
     title: 'Classes, rebuilt around your next class',
