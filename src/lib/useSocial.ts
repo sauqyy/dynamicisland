@@ -95,11 +95,13 @@ export function useSocial(me: string | null, onIncoming?: (m: Message, from: Fri
     setIncoming(inc)
     setOutgoing(sent)
 
-    // unread = messages from friends newer than the last time that chat was opened
+    // unread = messages the database has not marked read and that are newer than the last time this device
+    // opened the chat (read_at lives on the account, so signing out and in again does not bring them back)
     const { data: recent } = await supabase
       .from('messages')
       .select('sender, created_at')
       .eq('recipient', me)
+      .is('read_at', null)
       .order('created_at', { ascending: false })
       .limit(100)
     const counts: Record<string, number> = {}

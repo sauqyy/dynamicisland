@@ -273,6 +273,9 @@ function CityPicker({
   const [state, setState] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle')
   const [active, setActive] = useState(0)
   const touched = useRef(false)
+  const input = useRef<HTMLInputElement>(null)
+  // autoFocus would scroll the page's clip box to the still-sliding input and make the page jump
+  useEffect(() => input.current?.focus({ preventScroll: true }), [])
 
   useEffect(() => {
     const q = query.trim()
@@ -304,7 +307,7 @@ function CityPicker({
       <div className="city-box">
         <input
           className="todo-input"
-          autoFocus
+          ref={input}
           placeholder="Search a city, e.g. Jakarta"
           value={query}
           data-cuelume-type

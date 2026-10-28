@@ -5,7 +5,7 @@ import type { Auth } from './useAuth'
 import type { Friend, Request, Social } from './useSocial'
 import type { Call, CallState } from './useCall'
 import { MAX_VOICE, type GroupVoice, type VoiceState } from './useGroupVoice'
-import { joinCode, type Group, type GroupInvite, type GroupMessage, type Groups } from './useGroups'
+import { joinCode, type Group, type GroupInvite, type GroupMessage, type GroupReads, type Groups } from './useGroups'
 
 const params = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null
 const IN_TAURI = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
@@ -58,7 +58,7 @@ const seed = (): Record<string, Message[]> => ({
 })
 
 /** In-memory stand-ins for useAuth and useSocial. Messages get a canned reply after a moment. */
-export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: Call; voice: GroupVoice; ping: () => { friend: Friend; body: string }; ringCall: () => void } {
+export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: Call; voice: GroupVoice; ping: () => { friend: Friend; body: string }; ringCall: () => void; groupRing: string | null; ringGroupCall: () => void; answerGroupRing: () => void; declineGroupRing: () => void } {
   const [profile, setProfile] = useState<Profile>(ME)
   const [messages, setMessages] = useState<Record<string, Message[]>>(seed)
   const [unread, setUnread] = useState<Record<string, number>>({ a: 1, b: 1 })
@@ -79,6 +79,8 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
     ],
   })
   const [groupUnread, setGroupUnread] = useState<Record<string, number>>({ g1: 2 })
+  // who has read how far; people catch up a moment after you send
+  const [groupReads, setGroupReads] = useState<GroupReads>({ g1: { a: 2, b: 1 } })
 
   const friends: Friend[] = [
     ...people.map((p, i) => ({
@@ -180,6 +182,7 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
     invites: groupInvites,
     messages: groupMsgs,
     unread: groupUnread,
+    reads: groupReads,
     create: async (name, emoji, color) => {
       if (!name.trim()) return 'Give the group a name'
       const id = `g${nextId++}`
@@ -226,7 +229,11 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
     send: async (gid, kind, body) => {
       const text = body.trim()
       if (!text) return null
-      setGroupMsgs((c) => ({ ...c, [gid]: [...(c[gid] ?? []), { id: nextId++, group_id: gid, sender: 'me', kind, body: text, created_at: new Date().toISOString() }] }))
+      const id = nextId++
+      setGroupMsgs((c) => ({ ...c, [gid]: [...(c[gid] ?? []), { id, group_id: gid, sender: 'me', kind, body: text, created_at: new Date().toISOString() }] }))
+      const readBy = (who: string) => setGroupReads((r) => ({ ...r, [gid]: { ...r[gid], [who]: id } }))
+      setTimeout(() => readBy('a'), 900)
+      setTimeout(() => readBy('b'), 2600)
       setTimeout(() => {
         setGroupMsgs((c) => ({ ...c, [gid]: [...(c[gid] ?? []), { id: nextId++, group_id: gid, sender: 'a', kind: 'text', body: 'sounds good 👍', created_at: new Date().toISOString() }] }))
       }, 1400)
@@ -258,7 +265,8 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
     decline: endCall,
     hangUp: endCall,
     toggleMute: () => setCallState((c) => ({ ...c, muted: !c.muted, deafened: c.muted ? false : c.deafened })),
-    toggleDeafen: () => setCallState((c) => ({ ...c, deafened: !c.deafened })),
+    toggleDeafen: () => setCallState((c) => ({ ...c, deafened: !c.deafened, muted: !c.deafened })),
+    micStream: () => null,
   }
 
   /** Simulates a friend calling you right now. */
@@ -278,8 +286,22 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
     },
     leave: () => setVoiceState(noVoice),
     toggleMute: () => setVoiceState((v) => ({ ...v, muted: !v.muted, deafened: v.muted ? false : v.deafened })),
-    toggleDeafen: () => setVoiceState((v) => ({ ...v, deafened: !v.deafened })),
+    toggleDeafen: () => setVoiceState((v) => ({ ...v, deafened: !v.deafened, muted: !v.deafened })),
+    micStream: () => null,
   }
 
-  return { auth, social, groups, call, voice, ping, ringCall }
+  // a group's voice chat ringing: the group's id while it rings
+  const [groupRing, setGroupRing] = useState<string | null>(null)
+  const ringGroupCall = () => {
+    if (callState.phase !== 'idle' || voiceState.groupId) return
+    setGroupRing(groupList[0]?.id ?? null)
+  }
+  const answerGroupRing = () => {
+    const gid = groupRing
+    setGroupRing(null)
+    if (gid) void voice.join(gid)
+  }
+  const declineGroupRing = () => setGroupRing(null)
+
+  return { auth, social, groups, call, voice, ping, ringCall, groupRing, ringGroupCall, answerGroupRing, declineGroupRing }
 }

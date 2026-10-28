@@ -42,6 +42,9 @@ interface MemberRow {
   invited_by: string | null
 }
 
+/** per group: the id of the last message each member has read */
+export type GroupReads = Record<string, Record<string, number>>
+
 const SEEN_KEY = 'di.groups.seen'
 
 function loadSeen(): Record<string, string> {
@@ -67,6 +70,7 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
   const [invites, setInvites] = useState<GroupInvite[]>([])
   const [messages, setMessages] = useState<Record<string, GroupMessage[]>>({})
   const [unread, setUnread] = useState<Record<string, number>>({})
+  const [reads, setReads] = useState<GroupReads>({})
   const openGroup = useRef<string | null>(null)
   const seen = useRef(loadSeen())
   const incomingCb = useRef(onIncoming)
@@ -83,6 +87,24 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
     }
     setUnread((u) => (u[gid] ? { ...u, [gid]: 0 } : u))
   }, [])
+
+  /** Tell the group you have read up to this message. */
+  const markRead = useCallback(
+    (gid: string, id: number) => {
+      if (!me || !BACKEND_READY) return
+      let fresh = false
+      setReads((cur) => {
+        if ((cur[gid]?.[me] ?? 0) >= id) return cur
+        fresh = true
+        return { ...cur, [gid]: { ...cur[gid], [me]: id } }
+      })
+      // the table may not exist yet if groups.sql has not been run again; reading still works without it
+      queueMicrotask(() => {
+        if (fresh) void supabase.from('group_reads').upsert({ group_id: gid, user_id: me, last_read_id: id, updated_at: new Date().toISOString() }).then(() => {})
+      })
+    },
+    [me],
+  )
 
   const refresh = useCallback(async () => {
     if (!me || !BACKEND_READY) return
@@ -121,16 +143,28 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
     setInvites(pending)
 
     if (joined.length) {
-      const { data: recent } = await supabase
-        .from('group_messages')
-        .select('group_id, sender, created_at')
-        .in('group_id', joined.map((g) => g.id))
-        .neq('sender', me)
-        .order('created_at', { ascending: false })
-        .limit(200)
+      const [{ data: recent }, { data: mine }] = await Promise.all([
+        supabase
+          .from('group_messages')
+          .select('id, group_id, sender, created_at')
+          .in('group_id', joined.map((g) => g.id))
+          .neq('sender', me)
+          .order('created_at', { ascending: false })
+          .limit(200),
+        // how far you have read, kept on your account so it survives signing out and in
+        supabase.from('group_reads').select('group_id, last_read_id').eq('user_id', me),
+      ])
+      const readTo: Record<string, number> = {}
+      for (const r of (mine ?? []) as { group_id: string; last_read_id: number }[]) readTo[r.group_id] = r.last_read_id
+      setReads((cur) => {
+        const next = { ...cur }
+        for (const [gid, id] of Object.entries(readTo)) next[gid] = { ...next[gid], [me]: Math.max(next[gid]?.[me] ?? 0, id) }
+        return next
+      })
       const counts: Record<string, number> = {}
-      for (const m of (recent ?? []) as { group_id: string; created_at: string }[]) {
-        if (m.created_at > (seen.current[m.group_id] ?? '')) counts[m.group_id] = (counts[m.group_id] ?? 0) + 1
+      for (const m of (recent ?? []) as { id: number; group_id: string; created_at: string }[]) {
+        // unread only if neither your account nor this device has seen it
+        if (m.id > (readTo[m.group_id] ?? 0) && m.created_at > (seen.current[m.group_id] ?? '')) counts[m.group_id] = (counts[m.group_id] ?? 0) + 1
       }
       setUnread(counts)
     } else setUnread({})
@@ -155,15 +189,23 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
         )
         if (m.sender === me) return
         incomingCb.current?.(m, group, group.members.find((p) => p.id === m.sender))
-        if (openGroup.current === m.group_id) markSeen(m.group_id)
-        else setUnread((u) => ({ ...u, [m.group_id]: (u[m.group_id] ?? 0) + 1 }))
+        if (openGroup.current === m.group_id) {
+          markSeen(m.group_id)
+          markRead(m.group_id, m.id)
+        } else setUnread((u) => ({ ...u, [m.group_id]: (u[m.group_id] ?? 0) + 1 }))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_reads' }, (payload) => {
+        const r = payload.new as { group_id?: string; user_id?: string; last_read_id?: number }
+        if (!r.group_id || !r.user_id || typeof r.last_read_id !== 'number' || r.user_id === me) return
+        const { group_id, user_id, last_read_id } = r
+        setReads((cur) => ((cur[group_id]?.[user_id] ?? 0) >= last_read_id ? cur : { ...cur, [group_id]: { ...cur[group_id], [user_id]: last_read_id } }))
       })
       .subscribe()
     return () => {
       clearInterval(poll)
       supabase.removeChannel(channel)
     }
-  }, [me, refresh, markSeen])
+  }, [me, refresh, markSeen, markRead])
 
   const create = useCallback(
     async (name: string, emoji: string, color: string): Promise<string | null> => {
@@ -269,9 +311,13 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
         .eq('group_id', groupId)
         .order('created_at', { ascending: false })
         .limit(60)
-      setMessages((cur) => ({ ...cur, [groupId]: ((data ?? []) as GroupMessage[]).reverse() }))
+      const list = ((data ?? []) as GroupMessage[]).reverse()
+      setMessages((cur) => ({ ...cur, [groupId]: list }))
+      const { data: rs } = await supabase.from('group_reads').select('user_id, last_read_id').eq('group_id', groupId)
+      if (rs) setReads((cur) => ({ ...cur, [groupId]: { ...cur[groupId], ...Object.fromEntries((rs as { user_id: string; last_read_id: number }[]).map((r) => [r.user_id, r.last_read_id])) } }))
+      if (list.length) markRead(groupId, list[list.length - 1].id)
     },
-    [me, markSeen],
+    [me, markSeen, markRead],
   )
 
   const send = useCallback(
@@ -288,7 +334,7 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
     [me],
   )
 
-  return { groups, invites, messages, unread, create, join, invite, respond, removeMember, deleteGroup, rename, setIcon, resetCode, open, send }
+  return { groups, invites, messages, unread, reads, create, join, invite, respond, removeMember, deleteGroup, rename, setIcon, resetCode, open, send }
 }
 
 export type Groups = ReturnType<typeof useGroups>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { BACKEND_READY, supabase } from './supabase'
 import type { Friend } from './useSocial'
+import { openMic, trackOutput } from './audioDevices'
 
 export type CallPhase = 'idle' | 'calling' | 'incoming' | 'connecting' | 'active'
 
@@ -113,9 +114,7 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
 
   const getMic = useCallback(async () => {
     try {
-      mic.current = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      })
+      mic.current = await openMic()
       return true
     } catch {
       return false
@@ -130,7 +129,10 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
         if (e.candidate) send(peer, 'ice', { candidate: e.candidate.toJSON() }).catch(() => {})
       }
       conn.ontrack = (e) => {
-        audio.current ??= new Audio()
+        if (!audio.current) {
+          audio.current = new Audio()
+          trackOutput(audio.current)
+        }
         audio.current.srcObject = e.streams[0]
         audio.current.muted = stateRef.current.deafened
         audio.current.play().catch(() => {})
@@ -291,15 +293,19 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
     set({ ...stateRef.current, muted: next, deafened: next ? deafened : false })
   }, [set])
 
+  // deafening mutes you too, and undeafening unmutes you
   const toggleDeafen = useCallback(() => {
-    const { muted, deafened } = stateRef.current
-    applyAudio(muted, !deafened)
-    set({ ...stateRef.current, deafened: !deafened })
+    const next = !stateRef.current.deafened
+    applyAudio(next, next)
+    set({ ...stateRef.current, muted: next, deafened: next })
   }, [set])
 
   const hangUp = useCallback(() => end(), [end])
 
-  return { state, start, accept, decline, hangUp, toggleMute, toggleDeafen }
+  /** your live microphone, for the level meter */
+  const micStream = useCallback(() => mic.current, [])
+
+  return { state, start, accept, decline, hangUp, toggleMute, toggleDeafen, micStream }
 }
 
 export type Call = ReturnType<typeof useCall>

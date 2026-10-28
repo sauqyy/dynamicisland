@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { BACKEND_READY, supabase } from './supabase'
+import { openMic, trackOutput } from './audioDevices'
 import { ICE } from './useCall'
 import type { Group } from './useGroups'
 
@@ -101,9 +102,7 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
       set({ ...IDLE, groupId: gid, joining: true })
       let mic: MediaStream
       try {
-        mic = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        })
+        mic = await openMic()
       } catch {
         leave('Microphone unavailable')
         return
@@ -128,6 +127,7 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
         if (s.peers.size >= MAX_VOICE - 1) return null
         const pc = new RTCPeerConnection(ICE)
         const peer: Peer = { pc, audio: new Audio(), pending: [] }
+        trackOutput(peer.audio)
         s.peers.set(id, peer)
         pc.onicecandidate = (e) => {
           if (e.candidate) signal('ice', id, { candidate: e.candidate.toJSON() })
@@ -243,15 +243,19 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
     set({ ...stateRef.current, muted: next, deafened: next ? deafened : false })
   }, [set])
 
+  // deafening mutes you too, and undeafening unmutes you
   const toggleDeafen = useCallback(() => {
-    const { muted, deafened } = stateRef.current
-    applyAudio(muted, !deafened)
-    set({ ...stateRef.current, deafened: !deafened })
+    const next = !stateRef.current.deafened
+    applyAudio(next, next)
+    set({ ...stateRef.current, muted: next, deafened: next })
   }, [set])
 
   const hangUp = useCallback(() => leave(), [leave])
 
-  return { state, join, leave: hangUp, toggleMute, toggleDeafen }
+  /** your live microphone, for the level meter */
+  const micStream = useCallback(() => sess.current?.mic ?? null, [])
+
+  return { state, join, leave: hangUp, toggleMute, toggleDeafen, micStream }
 }
 
 export type GroupVoice = ReturnType<typeof useGroupVoice>

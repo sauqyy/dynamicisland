@@ -5,7 +5,7 @@ import { Avatar } from './Avatar'
 import { HangUpIcon, HeadphonesIcon, MicIcon } from './CallBar'
 
 /** Who is in this group's voice chat, with mute, deafen and leave. Shows why a join failed too. */
-export function VoiceBar({ voice, group }: { voice: GroupVoice; group: Group }) {
+export function VoiceBar({ voice, group, me }: { voice: GroupVoice; group: Group; me?: string }) {
   const { state } = voice
   if (state.groupId !== group.id) return null
   if (!state.joining && !state.members.length && !state.error) return null
@@ -20,7 +20,10 @@ export function VoiceBar({ voice, group }: { voice: GroupVoice; group: Group }) 
         {live && (
           <span className="voice-people">
             {inRoom.map((p) => (
-              <Avatar key={p.id} profile={p} size={20} />
+              <span key={p.id} className="voice-person">
+                <Avatar profile={p} size={20} />
+                <span>{p.id === me ? 'You' : p.display_name || `@${p.username}`}</span>
+              </span>
             ))}
           </span>
         )}

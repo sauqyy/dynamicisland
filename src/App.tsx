@@ -337,7 +337,9 @@ export default function App() {
   })
 
   const activeCall = DEMO_SOCIAL ? demo.call : call
-  const incomingCall = activeCall.state.phase === 'incoming'
+  // the demo can also ring a group's voice chat (the id of the group that is calling)
+  const groupRing = DEMO_SOCIAL ? demo.groupRing : null
+  const incomingCall = activeCall.state.phase === 'incoming' || Boolean(groupRing)
   const ringing = incomingCall && auth.profile?.presence !== 'dnd'
   // the ringtone follows the sound volume slider in Settings
   useEffect(() => {
@@ -651,7 +653,8 @@ export default function App() {
   const peekText = playing && track ? lyricText || `${track.title} · ${track.artist}` : ''
 
   // hovering the island while a call rings shows who is calling, with answer and decline
-  const caller = ringing ? social.friends.find((f) => f.profile.id === activeCall.state.peer) : undefined
+  const caller = ringing && !groupRing ? social.friends.find((f) => f.profile.id === activeCall.state.peer) : undefined
+  const groupCaller = ringing && groupRing ? demo.groups.groups.find((g) => g.id === groupRing) : undefined
   // while you are in a call the collapsed island becomes the call: a friend, or a group's voice chat
   const activeVoice = DEMO_SOCIAL ? demo.voice : voice
   const callPhase = activeCall.state.phase
@@ -665,7 +668,7 @@ export default function App() {
     ? 'alert'
     : expanded
       ? 'expanded'
-      : caller && hovered
+      : (caller || groupCaller) && hovered
         ? 'call'
         : alert
           ? 'alert'
@@ -687,6 +690,11 @@ export default function App() {
   const idleW = live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
   const peekW = peekText ? Math.max(340, liveWidth(peekText)) : 300
 
+  // hovering the pill during a group call drops down who is in the voice chat
+  const voicePeople = voiceGroup ? voiceGroup.members.filter((p) => activeVoice.state.members.includes(p.id)) : []
+  const showVoicePeople = mode === 'incall' && hovered && voicePeople.length > 0
+  const voiceRows = showVoicePeople ? Math.ceil(voicePeople.length / 2) : 0
+
   const shape: Shape = useMemo(() => {
     switch (mode) {
       case 'expanded':
@@ -701,13 +709,13 @@ export default function App() {
       case 'call':
         return { w: 340, h: 64, r: 28 }
       case 'incall':
-        return { w: 250, h: 42, r: 18 }
+        return voiceRows ? { w: 300, h: 42 + 14 + voiceRows * 30, r: 22 } : { w: 250, h: 42, r: 18 }
       case 'peek':
         return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -877,7 +885,7 @@ export default function App() {
           }
           const maxX = window.screen.width / 2 - 80
           const rawX = Math.max(-maxX, Math.min(maxX, g.ox + dx))
-          const rawY = Math.max(0, Math.min(window.screen.height - 120, g.oy + dy))
+          const rawY = Math.max(0, Math.min(window.screen.height - 56, g.oy + dy))
           const m = motionRef.current
           // magnets grab at 24px and let go at 44px, so they feel sticky
           m.magX = Math.abs(rawX) < (m.magX ? 44 : 24)
@@ -930,7 +938,7 @@ export default function App() {
         </>
       ) : null
     content = (
-      <div className={`expanded ${fs ? 'fs' : ''}`}>
+      <div className={`expanded ${fs ? 'fs' : ''} ${settings.cardFit ? '' : 'fixed'}`}>
         <div className="xtop">
           <span className="xtop-date">{d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           <span className="xtop-status">
@@ -1142,6 +1150,17 @@ export default function App() {
         onAnswer={activeCall.accept}
       />
     )
+  } else if (mode === 'call' && groupCaller) {
+    contentKey = 'incoming-call'
+    content = (
+      <IncomingCall
+        group={groupCaller}
+        name={groupCaller.name}
+        sub="Incoming group voice chat"
+        onDecline={demo.declineGroupRing}
+        onAnswer={demo.answerGroupRing}
+      />
+    )
   } else if (mode === 'incall' && (friendInCall || voiceGroup)) {
     contentKey = 'in-call'
     const live = friendInCall ? callPhase === 'active' : !activeVoice.state.joining
@@ -1155,9 +1174,12 @@ export default function App() {
         controls={live}
         muted={st.muted}
         deafened={st.deafened}
+        micStream={friendInCall ? activeCall.micStream : activeVoice.micStream}
         onMute={friendInCall ? activeCall.toggleMute : activeVoice.toggleMute}
         onDeafen={friendInCall ? activeCall.toggleDeafen : activeVoice.toggleDeafen}
         onEnd={friendInCall ? activeCall.hangUp : activeVoice.leave}
+        people={showVoicePeople ? voicePeople : undefined}
+        me={auth.profile?.id}
       />
     )
   } else if (mode === 'alert' && alert) {
@@ -1415,6 +1437,7 @@ export default function App() {
             </button>
             {/* rings like a real call: the island glows, and hovering it shows the caller with answer and decline */}
             {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
+            {DEMO_SOCIAL && <button onClick={demo.ringGroupCall}>Incoming group call</button>}
           </div>
           <div className="demo-row">
             <span>App</span>

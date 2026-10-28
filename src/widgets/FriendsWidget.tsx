@@ -10,6 +10,7 @@ import { GroupChat, GroupIcon, GroupsPanel } from './GroupsWidget'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { shownPresence } from '../lib/presence'
 import { Avatar } from './Avatar'
+import { ChatInput } from './ChatInput'
 import { play } from 'cuelume'
 import { disclosureCue } from '../lib/sound'
 
@@ -72,11 +73,12 @@ export function noteText() {
 }
 
 /** One tick when sent, two ticks once the friend has opened the chat. */
-function Ticks({ read }: { read: boolean }) {
+export function Ticks({ read, partial = false, label }: { read: boolean; partial?: boolean; label?: string }) {
+  const two = read || partial
   return (
-    <svg className={`ticks ${read ? 'read' : ''}`} width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={read ? 'Read' : 'Sent'}>
+    <svg className={`ticks ${read ? 'read' : ''}`} width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={label ?? (read ? 'Read' : 'Sent')}>
       <path d="m1 5.2 3 3L10 1.5" />
-      {read && <path d="m7 7.6.7.7L14 1.5" />}
+      {two && <path d="m7 7.6.7.7L14 1.5" />}
     </svg>
   )
 }
@@ -111,7 +113,9 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
   }, [friend.profile.id, open])
 
   useEffect(() => {
-    end.current?.scrollIntoView({ block: 'end' })
+    // scroll the list itself; scrollIntoView would also scroll the page and push the chat header under the date bar
+    const el = end.current?.parentElement
+    if (el) el.scrollTop = el.scrollHeight
   }, [list?.length])
 
   // a new message from them while the chat is open
@@ -199,14 +203,15 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
         <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" {...disclosureCue(sharing)} data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
           +
         </button>
-        <input
-          className="todo-input"
+        <ChatInput
           placeholder="Message…"
           value={draft}
-          data-cuelume-type
-          maxLength={2000}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.stopPropagation()}
+          onChange={setDraft}
+          onSend={() => {
+            if (!draft.trim()) return
+            send('text', draft)
+            setDraft('')
+          }}
         />
         {call && (
           <button

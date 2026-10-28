@@ -14,6 +14,8 @@ import { play } from 'cuelume'
 import { disclosureCue, previewPack } from '../lib/sound'
 import { Bars } from './Equalizer'
 
+import { setAudioPrefs, useAudioDevices, useAudioPrefs } from '../lib/audioDevices'
+
 interface Props {
   settings: Settings
   update: (patch: Partial<Settings>) => void
@@ -97,6 +99,52 @@ const capital = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 /** Album hue the equalizer previews use when their colour follows the music. */
 const PREVIEW_HUE = 265
+
+/** A short list of devices to pick from: the system default first, then each one that is plugged in. */
+function DevicePick({ label, devices, value, named, onPick }: { label: string; devices: MediaDeviceInfo[]; value: string; named: boolean; onPick: (id: string) => void }) {
+  const gone = value !== '' && !devices.some((d) => d.deviceId === value)
+  return (
+    <div className="device-pick">
+      <span>{label}</span>
+      <div className="device-list" role="radiogroup" aria-label={label}>
+        <button role="radio" aria-checked={value === ''} className={value === '' ? 'active' : ''} data-cuelume-select onClick={() => onPick('')}>
+          System default
+        </button>
+        {devices.map((d, i) => (
+          <button key={d.deviceId} role="radio" aria-checked={value === d.deviceId} className={value === d.deviceId ? 'active' : ''} data-cuelume-select onClick={() => onPick(d.deviceId)}>
+            {d.label || (named ? `Device ${i + 1}` : `${label} ${i + 1}`)}
+          </button>
+        ))}
+        {gone && (
+          <button role="radio" aria-checked className="active" disabled>
+            Chosen device not found
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CallAudio() {
+  const prefs = useAudioPrefs()
+  const { mics, speakers, named, allow } = useAudioDevices()
+  return (
+    <Group
+      title="Calls"
+      action={
+        !named && (
+          <button className="chip" onClick={allow} title="Allow microphone access so your devices show their names">
+            Show device names
+          </button>
+        )
+      }
+    >
+      <DevicePick label="Microphone" devices={mics} value={prefs.micId} named={named} onPick={(micId) => setAudioPrefs({ micId })} />
+      <DevicePick label="Speaker" devices={speakers} value={prefs.speakerId} named={named} onPick={(speakerId) => setAudioPrefs({ speakerId })} />
+      <small className="set-note">A new microphone applies from your next call.</small>
+    </Group>
+  )
+}
 
 export function SettingsWidget({ settings, update, updater }: Props) {
   const { state: update_, version, check: checkUpdate, install: downloadUpdate } = updater
@@ -406,6 +454,8 @@ export function SettingsWidget({ settings, update, updater }: Props) {
           <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />
         </div>
       </Group>
+
+      <CallAudio />
 
       <Group title="Pages">
         <div className="page-toggles">

@@ -35,6 +35,15 @@ create table if not exists public.group_messages (
 );
 create index if not exists group_messages_group_idx on public.group_messages (group_id, created_at);
 
+-- how far each member has read, so a message can show who has seen it
+create table if not exists public.group_reads (
+  group_id uuid not null references public.groups on delete cascade,
+  user_id uuid not null references public.profiles on delete cascade,
+  last_read_id bigint not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
 -- helpers are security definer so policies on one table can look at another without recursing
 create or replace function public.is_group_member(gid uuid, uid uuid) returns boolean
 language sql security definer set search_path = public stable as $$
@@ -52,6 +61,7 @@ $$;
 alter table public.groups enable row level security;
 alter table public.group_members enable row level security;
 alter table public.group_messages enable row level security;
+alter table public.group_reads enable row level security;
 
 drop policy if exists "see groups you are in or invited to" on public.groups;
 create policy "see groups you are in or invited to" on public.groups
@@ -80,6 +90,16 @@ create policy "write to your groups" on public.group_messages
 drop policy if exists "delete own group messages" on public.group_messages;
 create policy "delete own group messages" on public.group_messages
   for delete to authenticated using (sender = auth.uid());
+
+drop policy if exists "see who read" on public.group_reads;
+create policy "see who read" on public.group_reads
+  for select to authenticated using (public.is_group_member(group_id, auth.uid()));
+drop policy if exists "mark your own read" on public.group_reads;
+create policy "mark your own read" on public.group_reads
+  for insert to authenticated with check (user_id = auth.uid() and public.is_group_member(group_id, auth.uid()));
+drop policy if exists "move your own read" on public.group_reads;
+create policy "move your own read" on public.group_reads
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid() and public.is_group_member(group_id, auth.uid()));
 
 drop function if exists public.create_group(text, text);
 create or replace function public.create_group(group_name text, group_emoji text default '👥', group_color text default '#60a5fa') returns public.groups
@@ -152,7 +172,7 @@ grant execute on function public.reset_invite_code(uuid) to authenticated;
 do $$
 declare t text;
 begin
-  foreach t in array array['groups', 'group_members', 'group_messages'] loop
+  foreach t in array array['groups', 'group_members', 'group_messages', 'group_reads'] loop
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
       execute format('alter publication supabase_realtime add table public.%I', t);
     end if;

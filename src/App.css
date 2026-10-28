@@ -636,6 +636,9 @@
 .notes-input {
   width: 100%;
   height: 100%;
+  /* the card is as tall as its page, so a percentage height alone collapses to two rows */
+  min-height: 170px;
+  box-sizing: border-box;
   resize: none;
   border: 0;
   outline: 0;
@@ -677,6 +680,16 @@
 }
 .clip:hover {
   background: rgb(var(--fg-rgb) / 0.2);
+}
+/* a copied picture is a small thumbnail, not its full size */
+.clip-img {
+  display: block;
+  max-width: 100%;
+  max-height: 56px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
 }
 .clip:active {
   transform: scale(0.97);
@@ -740,7 +753,9 @@
 }
 
 .drop-overlay {
-  inset: 56px 18px 36px;
+  /* stop above the bottom tab rail instead of running under it */
+  inset: 56px 18px 72px;
+  background: color-mix(in srgb, var(--island-bg) 97%, transparent);
 }
 
 .media {
@@ -1242,6 +1257,17 @@
 .chat-compose .todo-input {
   flex: 1;
   min-width: 0;
+}
+/* the message box is a textarea that starts one line tall and grows to four */
+.chat-input {
+  resize: none;
+  align-self: flex-end;
+  min-height: 34px;
+  max-height: 90px;
+  line-height: 1.35;
+  overflow-y: auto;
+  scrollbar-width: none;
+  box-sizing: border-box;
 }
 
 /* ---------- roomier profile ---------- */
@@ -3444,6 +3470,30 @@ button.ao-text:hover {
   padding: 18px 16px 8px;
 }
 
+/* a fixed-height card has spare room under a short page: centre the empty state in all of it */
+.expanded.fixed .xbody > .page {
+  display: flex;
+  flex-direction: column;
+}
+.expanded.fixed .page-fit {
+  flex: 1 0 auto;
+}
+/* a chat fills the fixed card exactly (message list scrolls, the message box stays in view) */
+.expanded.fixed:not(.fs) .page-fit:has(.chat) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.expanded.fixed:not(.fs) .chat {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+.expanded.fixed .page-fit > .media.nothing,
+.expanded.fixed .page-fit > .empty-block,
+.expanded.fixed .page-fit > .empty {
+  flex: 1;
+}
+
 /* hourly strip: which day is showing, where now is, and a way back to it */
 .wx-hours {
   margin-top: 12px;
@@ -3525,8 +3575,16 @@ button.ao-text:hover {
 }
 .voice-people {
   display: flex;
-  gap: 3px;
-  margin-top: 2px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 3px;
+}
+.voice-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* ---------- incoming call on the island ---------- */
@@ -3587,6 +3645,26 @@ button.ao-text:hover {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.mic-wave {
+  flex: none;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 2px;
+}
+.mic-wave i {
+  --h: 0.12;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: #4ade80;
+  transform: scaleY(var(--h));
+  transition: transform 0.08s linear, background 0.2s;
+}
+.mic-wave.off i {
+  background: rgb(var(--fg-rgb) / 0.35);
 }
 .pill-ico {
   flex: none;
@@ -3986,4 +4064,118 @@ button.ao-text:hover {
 }
 .eq-pick.active small {
   color: var(--text-1);
+}
+
+/* ---------- microphone and speaker pickers ---------- */
+.device-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 0;
+}
+.device-pick > span {
+  font-size: var(--fs-body);
+}
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.device-list button {
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgb(var(--fg-rgb) / 0.08);
+}
+.device-list button:hover {
+  background: rgb(var(--fg-rgb) / 0.16);
+}
+.device-list button.active {
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+  font-weight: 600;
+}
+.set-note {
+  display: block;
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+/* ---------- group chat: who sent it, who has read it ---------- */
+.msg-row {
+  align-self: flex-start;
+  max-width: 88%;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.msg-row .msg {
+  max-width: none;
+  min-width: 0;
+}
+.msg-row .avatar {
+  flex: none;
+}
+.seen-by {
+  align-self: flex-start;
+  margin: -2px 0 2px 30px;
+  display: flex;
+  align-items: center;
+}
+.seen-by.mine {
+  align-self: flex-end;
+  margin: -2px 4px 2px 0;
+}
+.seen-by .avatar {
+  margin-left: -4px;
+  box-shadow: 0 0 0 1.5px var(--island-bg, #000);
+}
+.seen-by .avatar:first-child {
+  margin-left: 0;
+}
+.seen-by small {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* ---------- who is in the group voice chat (hover the pill) ---------- */
+.incall-col {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.incall-col > .incall {
+  flex: none;
+  height: 42px;
+}
+.incall-people {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 14px 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  align-content: start;
+}
+.incall-person {
+  min-width: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.incall-person > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -1,15 +1,16 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { play } from 'cuelume'
-import type { Message } from '../lib/supabase'
+import type { Message, Profile } from '../lib/supabase'
 import { inviteLink, type Group, type GroupMessage, type Groups } from '../lib/useGroups'
 import { disclosureCue } from '../lib/sound'
 import { ACCENTS } from '../lib/settings'
 import type { GroupVoice } from '../lib/useGroupVoice'
 import { MAX_VOICE } from '../lib/useGroupVoice'
 import { Avatar } from './Avatar'
+import { ChatInput } from './ChatInput'
 import { HeadphonesIcon } from './CallBar'
 import { VoiceBar } from './VoiceBar'
-import { dayLabel, dayStart, noteText, timeLabel } from './FriendsWidget'
+import { dayLabel, dayStart, noteText, Ticks, timeLabel } from './FriendsWidget'
 
 const ICONS = ['👥', '📚', '🎮', '🎧', '🎨', '💻', '⚽', '🍕', '🎬', '✈️', '🏠', '💼', '🔥', '🌙', '🚀', '🐱']
 
@@ -45,18 +46,42 @@ function copy(text: string) {
   navigator.clipboard?.writeText(text).catch(() => {})
 }
 
-function GroupBubble({ m, mine, group }: { m: GroupMessage; mine: boolean; group: Group }) {
+const nameOf = (p: Profile) => p.display_name || `@${p.username}`
+
+/** One message: who sent it (their picture beside it), when, and for your own whether the others have read it. */
+function GroupBubble({ m, mine, group, readers, seenHere, everyoneRead }: { m: GroupMessage; mine: boolean; group: Group; readers: Profile[]; seenHere: Profile[]; everyoneRead: boolean }) {
   const from = group.members.find((p) => p.id === m.sender)
-  return (
+  const bubble = (
     <div className={`msg ${mine ? 'mine' : ''} ${m.kind}`}>
-      {!mine && <small>{from ? from.display_name || `@${from.username}` : 'Former member'}</small>}
+      {!mine && <small>{from ? nameOf(from) : 'Former member'}</small>}
       {m.kind === 'activity' && <small>Activity</small>}
       {m.kind === 'note' && <small>Note</small>}
       <span>{m.body}</span>
       <time>
         <span className="t">{timeLabel(m.created_at)}</span>
+        {mine && <Ticks read={everyoneRead} partial={readers.length > 0} label={readers.length ? `Read by ${readers.map(nameOf).join(', ')}` : 'Sent'} />}
       </time>
     </div>
+  )
+  return (
+    <>
+      {mine ? (
+        bubble
+      ) : (
+        <div className="msg-row">
+          {from ? <Avatar profile={from} size={24} /> : <span className="avatar ghost" style={{ width: 24, height: 24 }} />}
+          {bubble}
+        </div>
+      )}
+      {seenHere.length > 0 && (
+        <div className={`seen-by ${mine ? 'mine' : ''}`} title={`Read by ${seenHere.map(nameOf).join(', ')}`}>
+          {seenHere.slice(0, 5).map((p) => (
+            <Avatar key={p.id} profile={p} size={14} />
+          ))}
+          {seenHere.length > 5 && <small>+{seenHere.length - 5}</small>}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -217,7 +242,9 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
   }, [group.id, open])
 
   useEffect(() => {
-    end.current?.scrollIntoView({ block: 'end' })
+    // scroll the list itself; scrollIntoView would also scroll the page and push the chat header under the date bar
+    const el = end.current?.parentElement
+    if (el) el.scrollTop = el.scrollHeight
   }, [list?.length, info])
 
   const send = async (kind: Message['kind'], body: string) => {
@@ -227,6 +254,16 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
     setSharing(false)
   }
   const note = noteText()
+
+  // everyone else's read position, and the message each of them has read up to (their picture sits there)
+  const readMap = groups.reads[group.id] ?? {}
+  const others = group.members.filter((p) => p.id !== me)
+  const lastReadMsg = new Map<number, Profile[]>()
+  for (const p of others) {
+    const upTo = readMap[p.id] ?? 0
+    const hit = list ? [...list].reverse().find((x) => x.id <= upTo) : undefined
+    if (hit) lastReadMsg.set(hit.id, [...(lastReadMsg.get(hit.id) ?? []), p])
+  }
 
   return (
     <div className="chat">
@@ -259,7 +296,7 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
         <GroupInfo group={group} me={me} groups={groups} onLeft={onBack} />
       ) : (
         <>
-          {voice && <VoiceBar voice={voice} group={group} />}
+          {voice && <VoiceBar voice={voice} group={group} me={me} />}
           <div className="chat-list">
             {!list ? (
               <div className="empty">Loading…</div>
@@ -271,7 +308,14 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
                       <span>{dayLabel(m.created_at)}</span>
                     </div>
                   )}
-                  <GroupBubble m={m} mine={m.sender === me} group={group} />
+                  <GroupBubble
+                    m={m}
+                    mine={m.sender === me}
+                    group={group}
+                    readers={others.filter((p) => p.id !== m.sender && (readMap[p.id] ?? 0) >= m.id)}
+                    seenHere={lastReadMsg.get(m.id) ?? []}
+                    everyoneRead={others.length > 0 && others.every((p) => (readMap[p.id] ?? 0) >= m.id)}
+                  />
                 </Fragment>
               ))
             ) : (
@@ -302,14 +346,15 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
             <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" {...disclosureCue(sharing)} data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
               +
             </button>
-            <input
-              className="todo-input"
+            <ChatInput
               placeholder="Message the group…"
               value={draft}
-              data-cuelume-type
-              maxLength={2000}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.stopPropagation()}
+              onChange={setDraft}
+              onSend={() => {
+                if (!draft.trim()) return
+                send('text', draft)
+                setDraft('')
+              }}
             />
             {voice && (
               <button
