@@ -371,6 +371,7 @@ pub fn run() {
             scele::scele_account,
             scele::scele_logout,
             scele::scele_call,
+            scele::scele_file,
             sso::sso_verify,
             sso::sso_student,
             sso::sso_forget,

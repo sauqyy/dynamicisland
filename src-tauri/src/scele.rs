@@ -23,7 +23,45 @@ const ALLOWED: &[&str] = &[
     "mod_assign_get_assignments",
     "gradereport_user_get_grade_items",
     "core_group_get_course_user_groups",
+    "core_user_get_course_user_profiles",
 ];
+
+/// Largest course file read for the class schedule (a syllabus is far smaller).
+const FILE_LIMIT: u64 = 20 * 1024 * 1024;
+
+/// Downloads a file from a SCELE course page (e.g. its syllabus) with the saved token, as base64.
+/// Only SCELE's own file URLs are fetched.
+#[tauri::command]
+pub async fn scele_file(app: AppHandle, url: String) -> Result<String, String> {
+    use base64::Engine;
+    use std::io::Read;
+    let path = url
+        .strip_prefix(&format!("{BASE}/webservice/pluginfile.php/"))
+        .or_else(|| url.strip_prefix(&format!("{BASE}/pluginfile.php/")))
+        .ok_or_else(|| "not a SCELE file".to_string())?
+        .to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        if !crate::sso::saved(&app).is_some_and(|s| s.fasilkom) {
+            return Err("signed-out".to_string());
+        }
+        let saved = load(&app).ok_or_else(|| "signed-out".to_string())?;
+        let token = saved.get("token").and_then(Value::as_str).ok_or_else(|| "signed-out".to_string())?;
+        // the web-service file endpoint takes the token instead of a browser session
+        let (path, query) = path.split_once('?').unwrap_or((path.as_str(), ""));
+        let mut req = ureq::get(&format!("{BASE}/webservice/pluginfile.php/{path}")).timeout(std::time::Duration::from_secs(30));
+        for (k, v) in query.split('&').filter_map(|kv| kv.split_once('=')) {
+            if k != "token" {
+                req = req.query(k, v);
+            }
+        }
+        let resp = req.query("token", token).call().map_err(|_| "SCELE file unavailable".to_string())?;
+        let mut bytes = Vec::new();
+        resp.into_reader().take(FILE_LIMIT).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[derive(Clone, Serialize)]
 pub struct SceleAccount {

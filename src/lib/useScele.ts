@@ -4,8 +4,15 @@ import type { IslandAlert } from '../types'
 import {
   DAY_NAMES,
   classFromGroups,
+  classInName,
+  currentTerm,
   detectSlots,
   fetchContents,
+  fetchMyRoles,
+  fileText,
+  isTeachingRole,
+  materials,
+  syllabusFiles,
   fetchCourses,
   fetchDeadlines,
   fetchMyGroups,
@@ -56,6 +63,10 @@ interface Cache {
   contents: Record<number, Section[]>
   /** the user's SCELE groups per course, for telling which parallel class is theirs */
   groups: Record<number, string[]>
+  /** the user's roles per course ('student', 'teacher', …) */
+  roles: Record<number, string[]>
+  /** text read from syllabus files, by url@modified, so each file is downloaded once */
+  docs: Record<string, string>
   fresh: Fresh[]
   syncedAt: number
 }
@@ -68,10 +79,25 @@ interface Prefs {
   primary: Record<string, number>
   /** found meetings the user removed (slotKey), so they are not brought back */
   dismissed: string[]
+  /** the user's own say on teaching a course (a TA), over what SCELE's roles suggest */
+  teaching: Record<number, boolean>
+  /** courses left out of the schedule altogether */
+  hidden: number[]
 }
 
-const EMPTY: Cache = { courses: [], deadlines: [], notices: [], contents: {}, groups: {}, fresh: [], syncedAt: 0 }
-const NO_PREFS: Prefs = { choice: {}, primary: {}, dismissed: [] }
+/** How the schedule sees one of this term's courses, for the list on the Classes page. */
+export interface CourseStatus {
+  course: Course
+  /** meetings found for it */
+  found: number
+  source: 'page' | 'syllabus' | null
+  teaching: boolean
+  hidden: boolean
+}
+
+const EMPTY: Cache = { courses: [], deadlines: [], notices: [], contents: {}, groups: {}, roles: {}, docs: {}, fresh: [], syncedAt: 0 }
+const NO_PREFS: Prefs = { choice: {}, primary: {}, dismissed: [], teaching: {}, hidden: [] }
+const docKey = (f: { url: string; modified: number }) => `${f.url}@${f.modified}`
 const CACHE_KEY = 'di.scele'
 /** classes the user added by hand */
 const SLOTS_KEY = 'di.scele.slots'
@@ -124,18 +150,24 @@ function write(key: string, v: unknown) {
 const times = (slots: ClassSlot[]) => slots.map((s) => `${DAY_NAMES[s.day]} ${s.start}`).join(', ')
 
 /**
- * The class times read from the pages of the courses the user is enrolled in, with no setup:
- * a page with one schedule gives it; a combined course (SCELE's "(A,B,C)") gives the class the
- * user's SCELE group names. The only question asked is when one subject is enrolled twice, since
- * that is usually a mistake; until it is answered neither course adds classes. A combined course
- * whose groups don't say is listed as unsure, without reminders.
+ * The class times of this term's courses, with no setup. They are read from the course page (its
+ * summary, first section and schedule labels) or else from its syllabus files. A course that lists
+ * several parallel classes gives the user's: the one its name is for ("(A)"), or the one their
+ * SCELE group names. The only question asked is when one subject is enrolled twice, since that is
+ * usually a mistake; until it is answered neither course adds classes. Courses of earlier terms
+ * (SCELE keeps some "in progress") and hidden ones are left out; ones the user teaches are marked.
  */
 function detect(data: Cache, prefs: Prefs) {
   const auto: ClassSlot[] = []
   const duplicates: DuplicateQuestion[] = []
   const unsure: ClassQuestion[] = []
+  const status: CourseStatus[] = []
+  const { current, earlier } = currentTerm(data.courses)
+  const teaching = (c: Course) => prefs.teaching[c.id] ?? isTeachingRole(data.roles[c.id] ?? [])
+  const taking = current.filter((c) => !prefs.hidden.includes(c.id) && !teaching(c))
+
   const bySubject = new Map<string, Course[]>()
-  for (const c of data.courses) {
+  for (const c of taking) {
     const k = subjectOf(c)
     if (k) bySubject.set(k, [...(bySubject.get(k) ?? []), c])
   }
@@ -146,14 +178,27 @@ function detect(data: Cache, prefs: Prefs) {
     if (!list.some((c) => c.id === keep)) duplicates.push({ subject, courses: list.map((c) => ({ id: c.id, name: c.full })) })
     for (const c of list) if (c.id !== keep) skip.add(c.id)
   }
-  for (const c of data.courses) {
-    if (skip.has(c.id)) continue
-    const found = detectSlots(c, data.contents[c.id] ?? [])
+
+  for (const c of current) {
+    const hidden = prefs.hidden.includes(c.id)
+    const teach = teaching(c)
+    const row: CourseStatus = { course: c, found: 0, source: null, teaching: teach, hidden }
+    status.push(row)
+    if (hidden || skip.has(c.id)) continue
+    const sections = data.contents[c.id] ?? []
+    let found = detectSlots(c, sections)
+    row.source = found.length ? 'page' : null
+    if (!found.length) {
+      const docs = syllabusFiles(sections).map((f) => data.docs[docKey(f)]).filter(Boolean)
+      found = detectSlots(c, [], docs)
+      if (found.length) row.source = 'syllabus'
+    }
     if (!found.length) continue
     const labels = found.map((f) => f.label).filter(Boolean)
     let pick = found.length === 1 ? found[0] : null
     if (!pick) {
-      const label = prefs.choice[c.id] ?? classFromGroups(labels, data.groups[c.id] ?? [])
+      const own = classInName(c)
+      const label = prefs.choice[c.id] ?? (own && labels.includes(own) ? own : classFromGroups(labels, data.groups[c.id] ?? []))
       if (label === '-') continue
       pick = found.find((f) => f.label === label) ?? null
       if (!pick) {
@@ -161,12 +206,14 @@ function detect(data: Cache, prefs: Prefs) {
         continue
       }
     }
-    for (const s of pick.slots) {
-      const key = slotKey(s)
-      if (!prefs.dismissed.includes(key)) auto.push({ ...s, id: `auto-${key}`, auto: true })
+    for (const sl of pick.slots) {
+      const key = slotKey(sl)
+      if (prefs.dismissed.includes(key)) continue
+      auto.push({ ...sl, id: `auto-${key}`, auto: true, teaching: teach, source: row.source ?? 'page' })
+      row.found++
     }
   }
-  return { auto, duplicates, unsure }
+  return { auto, duplicates, unsure, status, earlier }
 }
 
 type Alert = (a: Omit<IslandAlert, 'id'>, cue?: SoundName) => void
@@ -189,6 +236,8 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   alertRef.current = onAlert
   const prefsRef = useRef(prefs)
   prefsRef.current = prefs
+  const dataRef = useRef(data)
+  dataRef.current = data
   const round = useRef(0)
 
   useEffect(() => write(CACHE_KEY, data), [data])
@@ -234,9 +283,12 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
 
         let contents: Record<number, Section[]> | null = null
         const groups: Record<number, string[]> = {}
+        const roles: Record<number, string[]> = {}
+        const docs: Record<string, string> = {}
         const added: Fresh[] = []
         if (withContents) {
           contents = {}
+          const thisTerm = new Set(currentTerm(courses).current.map((c) => c.id))
           for (const c of courses) {
             const secs = await fetchContents(c.id).catch((e) => {
               if (e === 'signed-out') throw e
@@ -244,17 +296,33 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
             })
             if (!secs) continue
             contents[c.id] = secs
-            const ids = secs.flatMap((x) => x.modules.map((m) => m.id))
+            // labels are page text, not materials: they are neither counted nor announced
+            const ids = materials(secs).map((m) => m.id)
             const known = s.modules[c.id]
             if (known) {
               const had = new Set(known)
-              for (const m of secs.flatMap((x) => x.modules)) {
+              for (const m of materials(secs)) {
                 if (!had.has(m.id)) added.push({ key: `${c.id}:${m.id}`, courseId: c.id, course: c.short, name: m.name, url: m.url, at: Date.now() })
               }
             }
             s.modules[c.id] = ids
+            if (!thisTerm.has(c.id)) continue
+            // teaching or taking it: SCELE's role in the course, looked up once
+            if (dataRef.current.roles[c.id] === undefined) roles[c.id] = await fetchMyRoles(c.id, acc.userid).catch(() => [])
+            // no class times on the page: read them from the syllabus files, each file once
+            let found = detectSlots(c, secs)
+            if (!found.length) {
+              const texts: string[] = []
+              for (const f of syllabusFiles(secs)) {
+                const key = docKey(f)
+                const text = dataRef.current.docs[key] ?? (await fileText(f.url, f.name).catch(() => ''))
+                docs[key] = text
+                texts.push(text)
+              }
+              found = detectSlots(c, [], texts)
+            }
             // several parallel classes listed and none chosen: the user's SCELE group may say which
-            if (detectSlots(c, secs).length > 1 && prefsRef.current.choice[c.id] === undefined) {
+            if (found.length > 1 && prefsRef.current.choice[c.id] === undefined) {
               groups[c.id] = await fetchMyGroups(c.id, acc.userid).catch(() => [])
             }
           }
@@ -268,6 +336,9 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
           notices,
           contents: contents ? { ...d.contents, ...contents } : d.contents,
           groups: { ...d.groups, ...groups },
+          roles: { ...d.roles, ...roles },
+          // only the files still on the course pages are kept
+          docs: contents ? docs : d.docs,
           fresh: [...added, ...d.fresh].slice(0, 20),
           syncedAt: Date.now(),
         }))
@@ -291,7 +362,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     return () => clearInterval(id)
   }, [account, sync])
 
-  const { auto, duplicates, unsure } = useMemo(() => detect(data, prefs), [data, prefs])
+  const { auto, duplicates, unsure, status, earlier } = useMemo(() => detect(data, prefs), [data, prefs])
   // the period's classes only: hand-added slots of a course that has ended drop out
   const slots = useMemo(() => {
     const own = data.courses.length ? manual.filter((s) => data.courses.some((c) => c.id === s.courseId)) : manual
@@ -355,7 +426,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
         alertRef.current(
           {
             icon: '🎓',
-            text: `${course?.short ?? 'Class'} ${relTime(start, now)}${slot.room ? ` · ${slot.room}` : ''}`,
+            text: `${slot.teaching ? 'TA · ' : ''}${course?.short ?? 'Class'} ${relTime(start, now)}${slot.room ? ` · ${slot.room}` : ''}`,
             sub: topic ? topic.section.name.slice(0, 48) : 'Topic not listed on SCELE',
             openTab: 'classes',
           },
@@ -411,13 +482,21 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   }, [])
   /** Forget class choices and hidden meetings, and read the course pages afresh. */
   const redetect = useCallback(() => setPrefs(NO_PREFS), [])
+  /** Mark a course as one the user teaches (a TA) or takes, over what SCELE's roles suggest. */
+  const setTeaching = useCallback((courseId: number, on: boolean) => {
+    setPrefs((p) => ({ ...p, teaching: { ...p.teaching, [courseId]: on } }))
+  }, [])
+  /** Leave a course out of the schedule, or bring it back. */
+  const setHidden = useCallback((courseId: number, on: boolean) => {
+    setPrefs((p) => ({ ...p, hidden: on ? [...new Set([...p.hidden, courseId])] : p.hidden.filter((x) => x !== courseId) }))
+  }, [])
   const setLead = useCallback((m: number) => {
     setLeadState(m)
     write(LEAD_KEY, m)
   }, [])
 
-  const tuned = prefs.dismissed.length > 0 || Object.keys(prefs.choice).length > 0 || Object.keys(prefs.primary).length > 0
-  return { account, ...data, slots, duplicates, unsure, tuned, lead, syncing, error, login, logout, refresh, addSlot, removeSlot, chooseClass, choosePrimary, redetect, setLead }
+  const tuned = prefs.dismissed.length > 0 || Object.keys(prefs.choice).length > 0 || Object.keys(prefs.primary).length > 0 || Object.keys(prefs.teaching).length > 0 || prefs.hidden.length > 0
+  return { account, ...data, slots, duplicates, unsure, status, earlier, tuned, lead, syncing, error, login, logout, refresh, addSlot, removeSlot, chooseClass, choosePrimary, redetect, setTeaching, setHidden, setLead }
 }
 
 export type SceleState = ReturnType<typeof useScele>
