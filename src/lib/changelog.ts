@@ -11,6 +11,13 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.5',
+    title: 'Campus has its own build',
+    items: [
+      'The Campus tools for Fasilkom UI students (Verify Student, Due, Classes and Inbox) now come in their own build, Dynamic Island UI, so this version is the same for everyone.',
+    ],
+  },
+  {
     version: '0.7.4',
     campus: true,
     title: 'Classes from your course timelines',
