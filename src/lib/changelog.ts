@@ -11,6 +11,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.6',
+    title: 'Prompter, deadlines and your week',
+    items: [
+      'Prompter (Tools): paste a script and read it as it scrolls at your pace, with speed, text size, mirror and fullscreen.',
+      'Deadlines (Plan): add things with a date and time. In Settings, choose Deadline for what the pill shows, then hover the pill to see them all.',
+      'Schedule (Plan): plan Monday to Sunday, and open fullscreen to see the whole week at once.',
+    ],
+  },
+  {
     version: '0.7.5',
     title: 'Campus has its own build',
     items: [
