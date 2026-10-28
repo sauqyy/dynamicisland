@@ -431,27 +431,82 @@ function sectionRange(name: string, year: number): [number, number] | null {
 
 export interface Topic {
   section: Section
+  /** what the section is about (see sectionTopic) */
+  topic: string
   /** how the section was matched, shown so the user can judge it */
   source: 'dated' | 'week'
 }
 
+/** The name Moodle gives a section nobody named, or one only numbered: "Topic 15", "Minggu 3", "Pertemuan 5". Not a topic. */
+const PLACEHOLDER = /^(?:topic|topik|section|bagian|week|minggu|pekan|pertemuan|sesi|session|meeting|unit|modul|module|chapter|bab|lecture|kuliah|part)\s*(?:ke)?\s*-?\s*\d{1,2}\s*$/i
+/** A section numbered for one of the term's weeks: "Week 3", "Minggu ke-3", "Pekan 3: Graphs". Moodle numbers "Topic N" itself, so those don't count. */
+export const WEEK_SECTION = /\b(?:week|minggu|pekan)\s*(?:ke\s*-?\s*)?(\d{1,2})\b/i
+
+/**
+ * What a section is about: its name, unless that is only a number ("Topic 15"); then the first
+ * line of its summary, or else its study materials' names without their "Slides:" or file endings.
+ */
+export function sectionTopic(s: Section): string {
+  const name = s.name.trim()
+  const numbered = name.match(/^(?:week|minggu|pekan|pertemuan|topic|topik)\s*(?:ke)?\s*-?\s*\d{1,2}\s*[:.\-–]\s*(.+)$/i)
+  if (numbered) return numbered[1].trim()
+  if (name && !PLACEHOLDER.test(name)) return name
+  const line = s.summary
+    .split('\n')
+    .map((l) => l.trim())
+    .find((l) => /\p{L}{3,}/u.test(l) && l.length <= 140 && !PLACEHOLDER.test(l))
+  if (line) return line
+  return s.modules
+    .filter((m) => m.mod !== 'label' && m.mod !== 'forum' && m.mod !== 'assign' && m.mod !== 'quiz')
+    .map((m) =>
+      m.name
+        .replace(/\.(?:pdf|pptx?|docx?|xlsx?|zip)$/i, '')
+        .replace(/^(?:slides?|ppt|materi|material|lecture notes?|handout|(?:chapter|bab|week|minggu|topic|topik)\s*\d+)\s*[:\-–.]\s*/i, '')
+        .trim(),
+    )
+    .filter((n) => /\p{L}{3,}/u.test(n) && !PLACEHOLDER.test(n))
+    .slice(0, 2)
+    .join(' · ')
+}
+
+/**
+ * The Monday a term's first week starts, as UI's calendar sets it when nothing better is known:
+ * odd terms in the week of 20 August, even terms in the week of 1 February, short terms in mid June.
+ */
+export function termStartEstimate(win: Window): number {
+  const year = new Date(win[0]).getFullYear()
+  const month = new Date(win[0]).getMonth()
+  // the window opens a month before the term (see termWindow)
+  const from = month === 6 ? new Date(year, 7, 20) : month === 0 ? new Date(year, 1, 1) : new Date(year, 5, 15)
+  return new Date(from.getFullYear(), from.getMonth(), from.getDate() + ((8 - from.getDay()) % 7)).getTime()
+}
+
 /**
  * The section of the course outline that a meeting on `date` belongs to. Only what SCELE itself says
- * is used: a section whose name carries that date, or else the "Week N" section counted from the
- * course's start date. Returns null rather than guessing further.
+ * is used: a section whose name carries that date, or else the "Week N" section, with weeks counted
+ * from `termStart` (the Monday the term's first week starts; a page may count from Week 0). Returns
+ * null rather than guessing further, and never a section that says nothing about its topic.
  */
-export function topicFor(course: Course, sections: Section[], date: number): Topic | null {
+export function topicFor(course: Course, sections: Section[], date: number, termStart: number): Topic | null {
+  const found = (section: Section, source: Topic['source']) => {
+    const topic = sectionTopic(section)
+    return topic ? { section, topic, source } : null
+  }
   const year = new Date(course.start || date).getFullYear()
   for (const s of sections) {
     for (const y of [year, year + 1]) {
       const r = sectionRange(s.name, y)
-      if (r && date >= r[0] && date < r[1]) return { section: s, source: 'dated' }
+      if (r && date >= r[0] && date < r[1]) return found(s, 'dated')
     }
   }
-  if (!course.start || date < course.start) return null
-  const week = Math.floor((date - course.start) / (7 * DAY)) + 1
-  const s = sections.find((x) => Number(x.name.match(/\b(?:week|minggu|pekan|pertemuan|sesi|session|topic|topik)\s*(?:ke-?\s*)?(\d{1,2})\b/i)?.[1]) === week)
-  return s ? { section: s, source: 'week' } : null
+  if (!termStart || date < termStart) return null
+  // "Week N" sections; or Moodle's own "Topic N" ones, on a page with one per week of the term
+  const topics = sections.filter((x) => /^(?:topic|topik)\s*\d{1,2}\b/i.test(x.name.trim()))
+  const byTopic = topics.length >= 12 && topics.length <= 18
+  const numberOf = (x: Section) => Number(x.name.match(WEEK_SECTION)?.[1] ?? (byTopic ? x.name.match(/^(?:topic|topik)\s*(\d{1,2})\b/i)?.[1] : undefined) ?? NaN)
+  const week = Math.floor((date - termStart) / (7 * DAY)) + 1 - (sections.some((x) => numberOf(x) === 0) ? 1 : 0)
+  const s = sections.find((x) => numberOf(x) === week)
+  return s ? found(s, 'week') : null
 }
 
 const DAYS: Record<string, number> = {
@@ -482,7 +537,7 @@ export interface Detected {
 const DAY_WORD = "senin|selasa|rabu|kamis|jum'?at|sabtu|minggu|ahad|monday|tuesday|wednesday|thursday|friday|saturday|sunday"
 const SPAN = String.raw`(\d{1,2})[.:](\d{2})\s*(?:-|–|s\.?d\.?|sampai|to)\s*(\d{1,2})[.:](\d{2})`
 /** a room after the time: ", Ruang 2.2304", " (Room 2.2303)", " R. 2.2301" */
-const ROOM = String.raw`(?:\s*(?:WIB)?[,\s(]*(?:(?:ruang|room|di|r\.)\s*)?([A-Z]?\d\.\d{3,4}|[A-Z]\d{3,4}))?`
+const ROOM = String.raw`(?:\s*(?:WIB)?[,\s(@]*(?:(?:ruang|room|di|r\.)\s*)?([A-Z]?\d\.\d{3,4}|[A-Z]\d{1,2}\.\d{2,4}|[A-Z]\d{3,4}))?`
 /** an exam or deadline line, whose times are not classes */
 const NOT_CLASS = /\b(uts|uas|ujian|exam|kuis|quiz|deadline|tenggat|pengumpulan|asistensi|responsi|konsultasi|office hours?)\b/i
 
@@ -511,9 +566,9 @@ export function classInName(c: Course): string | null {
 export function detectSlots(course: Course, sections: Section[], extra: string[] = []): Detected[] {
   let text = [scheduleText(course, sections), ...extra].join(' \n ')
   // "Selasa & Kamis, 10.00 - 11.40" is two meetings at the same time
-  const list = new RegExp(String.raw`\b(${DAY_WORD})((?:\s*(?:,|&|dan|and|/)\s*(?:${DAY_WORD}))+)\b[,:\s]*(?:pukul|jam|at)?\s*(${SPAN}${ROOM})`, 'gi')
+  const list = new RegExp(String.raw`\b(${DAY_WORD})((?:\s*(?:,|&|dan|and|/|-|–)\s*(?:${DAY_WORD}))+)\b[,:\s]*(?:pukul|jam|at)?\s*(${SPAN}${ROOM})`, 'gi')
   text = text.replace(list, (_all, d1: string, rest: string, span: string) =>
-    [d1, ...rest.split(/\s*(?:,|&|dan|and|\/)\s*/).filter(Boolean)].map((d) => `${d} ${span}`).join(' ; '),
+    [d1, ...rest.split(/\s*(?:,|&|dan|and|\/|-|–)\s*/).filter(Boolean)].map((d) => `${d} ${span}`).join(' ; '),
   )
   const re = new RegExp(String.raw`\b(${DAY_WORD})\b[,:\s]*(?:pukul\s*|jam\s*|at\s*)?${SPAN}${ROOM}`, 'gi')
   // "Kelas A", "Class B", "KELAS 2": case-sensitive so "kelas di …" is not a class named "di"
