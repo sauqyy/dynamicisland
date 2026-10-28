@@ -186,7 +186,7 @@ export function SettingsWidget({ settings, update, updater, unavailable }: Props
             ? 'Updating…'
             : update_.s === 'error'
               ? update_.msg
-              : version && `v${version}`
+              : ''
 
   return (
     <div className="settings settings2" onClick={(e) => e.stopPropagation()}>
@@ -528,7 +528,9 @@ export function SettingsWidget({ settings, update, updater, unavailable }: Props
 
       <Group title="Updates">
         <div className="row">
-          <span>Version</span>
+          <span>
+            Version {version && <span className="version-now">v{version}</span>}
+          </span>
           <span className="update-status">{status}</span>
           {update_.s === 'available' ? (
             <button className="chip" data-cuelume-tap onClick={() => downloadUpdate(update_.url)}>

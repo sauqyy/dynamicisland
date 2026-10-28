@@ -29,9 +29,14 @@ const ME: Profile = {
   presence: 'online',
 }
 
+/** A drawn stand-in for a profile photo, so the demo can show opening a picture full size. */
+const DEMO_PHOTO = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbcfe8"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/><circle cx="196" cy="60" r="26" fill="#fff7ed"/><path d="M0 200 70 130l50 46 46-60 90 84v56H0z" fill="#be185d" opacity=".75"/><path d="M0 230 90 170l60 40 40-24 66 44v26H0z" fill="#831843"/></svg>',
+)}`
+
 const people: Profile[] = [
   { id: 'a', username: 'zhillan', display_name: 'Zhillan', avatar_emoji: '🦊', avatar_color: '#fb923c', avatar_url: null, status: '💻 Working', presence: 'online' },
-  { id: 'b', username: 'mira_k', display_name: 'Mira', avatar_emoji: '🐼', avatar_color: '#f472b6', avatar_url: null, status: '', presence: 'idle' },
+  { id: 'b', username: 'mira_k', display_name: 'Mira', avatar_emoji: '🐼', avatar_color: '#f472b6', avatar_url: DEMO_PHOTO, status: '', presence: 'idle' },
   { id: 'c', username: 'dev_ardi', display_name: 'Ardi', avatar_emoji: '🎧', avatar_color: '#c084fc', avatar_url: null, status: '🎮 Gaming', presence: 'dnd' },
   { id: 'e', username: 'kaito', display_name: 'Kaito', avatar_emoji: '🐙', avatar_color: '#60a5fa', avatar_url: null, status: '', presence: 'invisible' },
 ]
