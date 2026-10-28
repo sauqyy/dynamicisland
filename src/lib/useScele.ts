@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SoundName } from 'cuelume'
 import type { IslandAlert } from '../types'
 import {
-  DAY_NAMES,
+  browserUrl,
   classFromGroups,
   classInName,
+  courseTitle,
   currentTerm,
+  dayName,
   detectSlots,
   docCandidates,
   fetchContents,
@@ -36,7 +38,9 @@ import {
   type SceleModule,
   type Section,
 } from './scele'
-import { agendaOn, classDays, overlap, parseTimeline, timelineOver, timelineScore, type Timeline } from './timeline'
+import { coverage } from './coverage'
+import { matchCourses, slcmConnect, slcmForget, slcmSaved, type SlcmSchedule } from './slcm'
+import { agendaOn, classDays, parseTimeline, timelineOver, timelineScore, type Timeline } from './timeline'
 
 /** Something added to a course page since the last look. */
 export interface Fresh {
@@ -115,20 +119,31 @@ export interface CourseStatus {
   timeline?: { sessions: number; name: string; url: string }
   /** documents it links to that need a sign-in to read */
   blocked: { name: string; url: string }[]
+  /** its subject is enrolled twice and the user hasn't said which is theirs yet */
+  waiting: boolean
 }
 
 /** One meeting of a class, with what it covers. */
 export interface Meeting {
   slot: ClassSlot
   course?: Course
+  /** the course's name as the user knows it: "Statistics & Probability (A)" */
+  title: string
   start: number
   end: number
+  /** what it covers, as its timeline row or outline section says it */
   topic: string
+  /** the row's other topic cells (sub-topics, a lab), shown under the topic */
+  detail: string[]
   /** where the topic came from: the timeline row for that day, the timeline's week, or the course outline */
   from: 'timeline' | 'timeline-week' | 'outline-dated' | 'outline-week' | null
+  /** the document the topic was read from, opened at its page */
+  source?: { name: string; url: string; page?: number }
   /** a class, an exam, or a day without class (holiday) */
   kind: 'class' | 'exam' | 'off'
-  /** course materials that go with it */
+  /** the course page's section about the topic */
+  section: { name: string; url: string } | null
+  /** the study materials that go with it: the section's, and any other named for the topic */
   materials: SceleModule[]
 }
 
@@ -201,7 +216,9 @@ function loadCache(): Cache {
   return read(CACHE_KEY, EMPTY)
 }
 
-const times = (slots: ClassSlot[]) => slots.map((s) => `${DAY_NAMES[s.day]} ${s.start || '(time not listed)'}`).join(', ')
+const times = (slots: ClassSlot[]) => slots.map((s) => `${dayName(s.day)} ${s.start || '(time not listed)'}`).join(', ')
+/** A study plan read this long ago is a past term's. */
+const SLCM_MAX_AGE = 160 * 86_400_000
 const startOfDay = (t: number) => {
   const d = new Date(t)
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
@@ -220,6 +237,7 @@ async function readOne(ref: DocRef, course: Course): Promise<DocResult> {
 
 /**
  * The class times of this term's courses, with no setup:
+ * - the study plan in SLCM, when the user has connected it: the official day, time and room;
  * - times written out ("Selasa 10.00 - 11.40") on the course page or in its documents;
  * - else the weekdays the course timeline's dated sessions fall on, with the time its rows give,
  *   or marked as not listed.
@@ -229,7 +247,7 @@ async function readOne(ref: DocRef, course: Course): Promise<DocResult> {
  * Courses of earlier terms (SCELE keeps some "in progress") and hidden ones are left out; ones
  * the user teaches are marked.
  */
-function detect(data: Cache, prefs: Prefs) {
+function detect(data: Cache, prefs: Prefs, slcm: SlcmSchedule | null) {
   const auto: ClassSlot[] = []
   const duplicates: DuplicateQuestion[] = []
   const unsure: ClassQuestion[] = []
@@ -239,6 +257,19 @@ function detect(data: Cache, prefs: Prefs) {
   const teaching = (c: Course) => prefs.teaching[c.id] ?? isTeachingRole(data.roles[c.id] ?? [])
   const taking = current.filter((c) => !prefs.hidden.includes(c.id) && !teaching(c))
 
+  // the study plan: each of its classes goes to the course it names (every one of equally good
+  // matches, so the one kept of a subject enrolled twice gets it), or stays a class of its own
+  const planned = new Map<number, Omit<ClassSlot, 'id'>[]>()
+  const unmatched: Omit<ClassSlot, 'id'>[] = []
+  if (slcm && Date.now() - slcm.at < SLCM_MAX_AGE) {
+    for (const k of slcm.classes) {
+      const slot = { courseId: 0, day: k.day, start: k.start, end: k.end, room: k.room }
+      const to = matchCourses(k, taking)
+      if (!to.length) unmatched.push({ ...slot, name: k.course })
+      for (const c of to) planned.set(c.id, [...(planned.get(c.id) ?? []), { ...slot, courseId: c.id }])
+    }
+  }
+
   const bySubject = new Map<string, Course[]>()
   for (const c of taking) {
     const k = subjectOf(c)
@@ -247,7 +278,9 @@ function detect(data: Cache, prefs: Prefs) {
   const skip = new Set<number>()
   for (const [subject, list] of bySubject) {
     if (list.length < 2) continue
-    const keep = prefs.primary[subject]
+    // the study plan settles it when it has exactly one of them
+    const inPlan = list.filter((c) => planned.has(c.id))
+    const keep = prefs.primary[subject] ?? (inPlan.length === 1 ? inPlan[0].id : undefined)
     if (!list.some((c) => c.id === keep)) duplicates.push({ subject, courses: list.map((c) => ({ id: c.id, name: c.full })) })
     for (const c of list) if (c.id !== keep) skip.add(c.id)
   }
@@ -269,13 +302,14 @@ function detect(data: Cache, prefs: Prefs) {
       hidden,
       timeline: best ? { sessions: best.timeline!.sessions.length, name: best.name, url: best.url } : undefined,
       blocked: results.filter((r) => r.blocked === 'signin').map((r) => ({ name: r.name, url: r.url })),
+      waiting: duplicates.some((q) => q.courses.some((x) => x.id === c.id)),
     }
     status.push(row)
     if (hidden || skip.has(c.id)) continue
 
-    // times written out: the course page first, then its documents
-    let found = detectSlots(c, sections)
-    let source: ClassSlot['source'] = 'page'
+    // the study plan's times, else times written out: the course page first, then its documents
+    let found = planned.has(c.id) ? [{ label: '', slots: planned.get(c.id)! }] : detectSlots(c, sections)
+    let source: ClassSlot['source'] = planned.has(c.id) ? 'slcm' : 'page'
     if (!found.length) {
       found = results.find((r) => r.slots.length)?.slots ?? []
       source = 'syllabus'
@@ -295,7 +329,8 @@ function detect(data: Cache, prefs: Prefs) {
       picked = pick?.slots ?? []
     }
     // the timeline's class days, for a course with no written times or days it leaves out
-    const days = best ? classDays(best.timeline!) : []
+    // (the study plan is complete as it is)
+    const days = best && source !== 'slcm' ? classDays(best.timeline!) : []
     if (!picked.length && days.length) source = 'timeline'
     for (const d of days) {
       if (picked.some((p) => p.day === d.day)) continue
@@ -311,22 +346,19 @@ function detect(data: Cache, prefs: Prefs) {
     }
     row.source = row.found ? source : null
   }
+
+  // a study-plan class no SCELE course was matched to: one already found at that day and time is
+  // the same class under another name (it gets the room); any other is listed under SLCM's name
+  for (const u of unmatched) {
+    const same = auto.find((a) => a.day === u.day && a.start === u.start)
+    if (same) same.room ||= u.room
+    else if (!prefs.dismissed.includes(slotKey(u))) auto.push({ ...u, id: `auto-${slotKey(u)}`, auto: true, source: 'slcm' })
+  }
   return { auto, duplicates, unsure, status, earlier, timelines }
 }
 
-/** The SCELE materials that go with a meeting: from its week's section, and named like its topic. */
-function materialsFor(sections: Section[], topic: string, week: number | undefined, outline: Section | null): SceleModule[] {
-  const weekOf = (s: Section) => Number(s.name.match(/\b(?:week|minggu|pekan|pertemuan|sesi|session|topic|topik)\s*(?:ke-?\s*)?(\d{1,2})\b/i)?.[1] ?? NaN)
-  return sections
-    .flatMap((s) => {
-      const sameWeek = (week !== undefined && weekOf(s) === week) || s === outline
-      return materials([s]).map((m) => ({ m, score: (sameWeek ? 2 : 0) + (topic ? overlap(topic, m.name) : 0) }))
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((x) => x.m)
-}
+/** A section numbered for a week: "Week 3", "Minggu ke-3", "Pertemuan 3". */
+const weekOf = (s: Section) => Number(s.name.match(/\b(?:week|minggu|pekan|pertemuan|sesi|session)\s*(?:ke-?\s*)?(\d{1,2})\b/i)?.[1] ?? NaN)
 
 type Alert = (a: Omit<IslandAlert, 'id'>, cue?: SoundName) => void
 
@@ -343,6 +375,9 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   const [lead, setLeadState] = useState<number>(() => Number(localStorage.getItem(LEAD_KEY)) || 30)
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** the study plan read from SLCM; undefined while it is looked up */
+  const [slcm, setSlcm] = useState<SlcmSchedule | null | undefined>(undefined)
+  const [slcmBusy, setSlcmBusy] = useState(false)
   const seen = useRef<Seen>(read(SEEN_KEY, noSeen()))
   const alertRef = useRef(onAlert)
   alertRef.current = onAlert
@@ -370,8 +405,12 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
       setPrefs(NO_PREFS)
       seen.current = noSeen()
       write(SEEN_KEY, seen.current)
+      setSlcm(null)
       return
     }
+    slcmSaved()
+      .then(setSlcm)
+      .catch(() => setSlcm(null))
     sceleAccount()
       .then((a) => setAccount(a ?? null))
       .catch(() => setAccount(null))
@@ -489,7 +528,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     return () => clearInterval(id)
   }, [account, sync])
 
-  const { auto, duplicates, unsure, status, earlier, timelines } = useMemo(() => detect(data, prefs), [data, prefs])
+  const { auto, duplicates, unsure, status, earlier, timelines } = useMemo(() => detect(data, prefs, slcm ?? null), [data, prefs, slcm])
   // the period's classes only: hand-added slots of a course that has ended drop out, and a class
   // added by hand stands in for a found one on the same day whose time wasn't listed
   const slots = useMemo(() => {
@@ -498,35 +537,41 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     return [...own, ...found]
   }, [manual, auto, data.courses])
 
-  /** One meeting of a slot, with what the timeline (or else the course outline) says it covers. */
+  /**
+   * One meeting of a slot: what the timeline (or else the course outline) says it covers, where
+   * that is written, and the course page's section and materials for that topic.
+   */
   const meeting = useCallback(
     (slot: ClassSlot, start: number, end: number): Meeting => {
       const course = data.courses.find((c) => c.id === slot.courseId)
       const sections = course ? (data.contents[course.id] ?? []) : []
-      const tl = timelines[slot.courseId]?.timeline
-      const ag = tl && course ? agendaOn(tl, start, course.start) : null
-      if (ag) {
+      const base = { slot, course, title: course ? courseTitle(course) : (slot.name ?? 'Class'), start, end }
+      const none = { section: null, materials: [] as SceleModule[] }
+      const tl = timelines[slot.courseId]
+      const ag = tl && course ? agendaOn(tl.timeline, start, course.start) : null
+      if (ag && course) {
+        const [topic = '', ...detail] = ag.topic.split(' · ')
+        // the words decide; a section dated or numbered for this week is the fallback
+        const dated = topicFor(course, sections, start)
+        const fallback = (ag.week !== undefined ? sections.find((s) => weekOf(s) === ag.week) : undefined) ?? (dated?.source === 'dated' ? dated.section : null)
         return {
-          slot,
-          course,
-          start,
-          end,
-          topic: ag.topic || (ag.kind === 'off' ? 'No class' : ''),
+          ...base,
+          topic: topic || (ag.kind === 'off' ? 'No class' : ''),
+          detail,
           from: ag.exact ? 'timeline' : 'timeline-week',
+          source: { name: tl.name, url: browserUrl(tl.url, ag.page), page: ag.page },
           kind: ag.kind,
-          materials: ag.kind === 'off' ? [] : materialsFor(sections, ag.topic, ag.week, null),
+          ...(ag.kind === 'off' ? none : coverage(course, sections, ag.topic, start, fallback ?? null)),
         }
       }
       const outline = course ? topicFor(course, sections, start) : null
       return {
-        slot,
-        course,
-        start,
-        end,
+        ...base,
         topic: outline?.section.name ?? '',
+        detail: [],
         from: outline ? (outline.source === 'dated' ? 'outline-dated' : 'outline-week') : null,
         kind: 'class',
-        materials: outline ? materialsFor(sections, outline.section.name, undefined, outline.section) : [],
+        ...(outline && course ? coverage(course, sections, outline.section.name, start, outline.section) : none),
       }
     },
     [data.courses, data.contents, timelines],
@@ -602,7 +647,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
       const hour = new Date(now).getHours()
       const morning = hour >= MORNING[0] && hour < MORNING[1]
       for (const m of upcoming(now, 2)) {
-        const name = `${m.slot.teaching ? 'TA · ' : ''}${m.course?.short ?? 'Class'}`
+        const name = `${m.slot.teaching ? 'TA · ' : ''}${m.course?.short ?? m.title}`
         const key = `class:${slotKey(m.slot)}:${new Date(m.start).toDateString()}`
         const today = startOfDay(m.start) === startOfDay(now)
         if (m.kind === 'off') {
@@ -680,6 +725,21 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     setLeadState(m)
     write(LEAD_KEY, m)
   }, [])
+  /** Opens SLCM to read the study plan's class times; resolves false if the window was closed first. */
+  const connectSlcm = useCallback(async () => {
+    setSlcmBusy(true)
+    try {
+      const got = await slcmConnect()
+      if (got) setSlcm(got)
+      return Boolean(got)
+    } finally {
+      setSlcmBusy(false)
+    }
+  }, [])
+  const forgetSlcm = useCallback(() => {
+    slcmForget().catch(() => {})
+    setSlcm(null)
+  }, [])
 
   const tuned = prefs.dismissed.length > 0 || Object.keys(prefs.choice).length > 0 || Object.keys(prefs.primary).length > 0 || Object.keys(prefs.teaching).length > 0 || prefs.hidden.length > 0
   return {
@@ -692,6 +752,10 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     earlier,
     timelines,
     upcoming,
+    slcm: slcm ?? null,
+    slcmBusy,
+    connectSlcm,
+    forgetSlcm,
     tuned,
     lead,
     syncing,

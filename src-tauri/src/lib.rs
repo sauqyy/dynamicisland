@@ -2,6 +2,8 @@ mod auth;
 #[cfg(feature = "campus")]
 mod scele;
 #[cfg(feature = "campus")]
+mod slcm;
+#[cfg(feature = "campus")]
 mod sso;
 #[cfg(windows)]
 mod files;
@@ -381,6 +383,12 @@ pub fn run() {
             scele::scele_file,
             #[cfg(feature = "campus")]
             scele::web_doc,
+            #[cfg(feature = "campus")]
+            slcm::slcm_open,
+            #[cfg(feature = "campus")]
+            slcm::slcm_saved,
+            #[cfg(feature = "campus")]
+            slcm::slcm_forget,
             #[cfg(feature = "campus")]
             sso::sso_verify,
             #[cfg(feature = "campus")]

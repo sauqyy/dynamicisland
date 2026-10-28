@@ -169,9 +169,127 @@ async function docxLines(bytes: Uint8Array): Promise<string> {
 /** pdf.js's worker, started on the first PDF and kept for the rest. */
 let pdfWorker: Worker | null = null
 
+/** Marks where a PDF page starts in the text, so a session can say which page it is on. */
+const PAGE_MARK = /^⟦p(\d+)⟧$/
+/** Something that looks like a date, for telling table rows apart before the term is known. */
+const DATE_HINT = new RegExp(
+  String.raw`\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|mei|may|jun|jul|agu|agt|aug|sep|okt|oct|nov|des|dec)|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b`,
+  'i',
+)
+
+interface PdfCell {
+  text: string
+  x0: number
+  x1: number
+}
+interface PdfLine {
+  y: number
+  h: number
+  cells: PdfCell[]
+}
+
+/**
+ * One table row from the lines it wraps over: each cell's text joined top to bottom with the cells
+ * above and below it in the same column, so "Measurement scales: nominal," on one line and
+ * "ordinal, interval, ratio" on the next stay one topic instead of joining the neighbouring column.
+ */
+function mergeColumns(lines: PdfLine[]): string {
+  const cols: PdfCell[] = []
+  for (const line of lines) {
+    for (const c of line.cells) {
+      const slack = line.h * 1.5
+      const col = cols.find((k) => c.x0 < k.x1 && c.x1 > k.x0) ?? cols.find((k) => Math.abs(c.x0 - k.x0) < slack)
+      if (col) {
+        col.text += ' ' + c.text
+        col.x0 = Math.min(col.x0, c.x0)
+        col.x1 = Math.max(col.x1, c.x1)
+      } else cols.push({ ...c })
+    }
+  }
+  return cols
+    .sort((a, b) => a.x0 - b.x0)
+    .map((c) => c.text)
+    .join(' | ')
+}
+
+/**
+ * A page's lines as table rows. Lines closer together than the page's usual line spacing are one
+ * row whose cells wrap; a wider gap starts the next row. A group holding more than one date is
+ * several rows set without padding, and is kept line by line.
+ */
+function pageRows(lines: PdfLine[]): string[] {
+  // the spacing of wrapped lines: a low percentile of the gaps a line high or more, so padded rows
+  // don't set it, nor the half-line gaps a cell centred in its row (often the date) leaves
+  const gaps = lines
+    .slice(1)
+    .map((l, i) => ({ gap: lines[i].y - l.y, h: l.h }))
+    .filter(({ gap, h }) => gap >= h * 0.8 && gap < h * 3)
+    .map(({ gap }) => gap)
+    .sort((a, b) => a - b)
+  const unit = gaps.length >= 4 ? gaps[Math.floor(gaps.length * 0.25)] : 0
+  const out: string[] = []
+  let group: PdfLine[] = []
+  const flush = () => {
+    if (!group.length) return
+    const text = (l: PdfLine) => l.cells.map((c) => c.text).join(' | ')
+    const dated = group.filter((l) => DATE_HINT.test(text(l))).length
+    if (group.length > 1 && dated <= 1) out.push(mergeColumns(group))
+    else out.push(...group.map(text))
+    group = []
+  }
+  for (const [i, line] of lines.entries()) {
+    const gap = i ? lines[i - 1].y - line.y : 0
+    if (i && (!unit || gap > Math.max(unit * 1.35 + 0.5, line.h * 1.45) || gap > line.h * 2.5)) flush()
+    group.push(line)
+  }
+  flush()
+  return out
+}
+
+/** A run of text as pdf.js gives it: the string, its transform (x and y at 4 and 5) and its width. */
+interface PdfItem {
+  str: string
+  transform: number[]
+  width: number
+  height: number
+}
+
+/** One PDF page's text items as table rows (see pageRows). */
+export function pdfPageRows(items: readonly object[]): string[] {
+  const runs = items
+    .filter((it): it is PdfItem => 'str' in it && typeof it.str === 'string' && it.str.trim() !== '')
+    .map((it) => ({ s: it.str, x: it.transform[4], y: it.transform[5], w: it.width, h: Math.abs(it.transform[3]) || it.height || 10 }))
+    .sort((a, b) => b.y - a.y || a.x - b.x)
+  const grouped: (typeof runs)[] = []
+  for (const r of runs) {
+    const line = grouped.at(-1)
+    if (line && Math.abs(line[0].y - r.y) <= Math.max(2, r.h * 0.45)) line.push(r)
+    else grouped.push([r])
+  }
+  const lines: PdfLine[] = grouped.map((line) => {
+    line.sort((a, b) => a.x - b.x)
+    const cells: PdfCell[] = []
+    let end = -Infinity
+    for (const r of line) {
+      const gap = r.x - end
+      const cell = cells.at(-1)
+      if (!cell || gap > r.h * 1.2) cells.push({ text: r.s, x0: r.x, x1: r.x + r.w })
+      else {
+        cell.text += (gap > r.h * 0.15 ? ' ' : '') + r.s
+        cell.x1 = r.x + r.w
+      }
+      end = r.x + r.w
+    }
+    const hs = line.map((r) => r.h).sort((a, b) => a - b)
+    return { y: line[0].y, h: hs[Math.floor(hs.length / 2)], cells }
+  })
+  return pageRows(lines)
+}
+
 /**
  * PDF text rebuilt into rows: pdf.js gives each run of text with its position, so runs on the same
- * line are put together in reading order, with " | " where a wide gap separates table columns.
+ * line are put together in reading order, with " | " where a wide gap separates table columns, and
+ * a row's wrapped lines are put back together (pageRows). Each page starts with a page mark.
  */
 async function pdfLines(bytes: Uint8Array): Promise<string> {
   // loaded only when a PDF is read, so the island itself stays light
@@ -185,28 +303,7 @@ async function pdfLines(bytes: Uint8Array): Promise<string> {
   try {
     for (let n = 1; n <= Math.min(doc.numPages, 40); n++) {
       const content = await (await doc.getPage(n)).getTextContent()
-      const runs = content.items
-        .filter((it): it is Extract<typeof it, { str: string }> => 'str' in it && it.str.trim() !== '')
-        .map((it) => ({ s: it.str, x: it.transform[4], y: it.transform[5], w: it.width, h: Math.abs(it.transform[3]) || it.height || 10 }))
-        .sort((a, b) => b.y - a.y || a.x - b.x)
-      const lines: (typeof runs)[] = []
-      for (const r of runs) {
-        const line = lines.at(-1)
-        if (line && Math.abs(line[0].y - r.y) <= Math.max(2, r.h * 0.45)) line.push(r)
-        else lines.push([r])
-      }
-      for (const line of lines) {
-        line.sort((a, b) => a.x - b.x)
-        let text = ''
-        let end = -Infinity
-        for (const r of line) {
-          const gap = r.x - end
-          text += end === -Infinity ? '' : gap > r.h * 1.2 ? ' | ' : gap > r.h * 0.15 ? ' ' : ''
-          text += r.s
-          end = r.x + r.w
-        }
-        out.push(text)
-      }
+      out.push(`⟦p${n}⟧`, ...pdfPageRows(content.items))
     }
   } finally {
     await doc.destroy()
@@ -245,6 +342,8 @@ export interface Session {
   /** "10:00", when the row gives a time */
   start?: string
   end?: string
+  /** the PDF page the row is on */
+  page?: number
 }
 
 /** What a timeline document says: its dated sessions, and topics by week number when it has no dates. */
@@ -267,7 +366,11 @@ const WEEK = /\b(?:week|minggu|pekan|pertemuan|sesi|session|meeting|wk|w)\s*(?:k
 const DAY_ABBR = /\b(senin|selasa|rabu|kamis|jum'?at|sabtu|minggu(?=\s*,|\s+\d)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|sen|sel|rab|kam|jum|sab)\b\.?,?/gi
 const EXAM = /\b(uts|uas|ujian|midterm|mid-term|mid term|final exam|final test|final examination|exam|ujian akhir|ujian tengah)\b/i
 const OFF = /\b(libur|holiday|no class|no classes|no lecture|tidak ada kuliah|tidak ada kelas|cuti bersama|break|reading week|minggu tenang|dies natalis|day off)\b/i
-const HEADER = /^(no\.?|#|topic|topics|topik|materi|material|materials|subject|date|dates|tanggal|week|weeks|minggu|minggu ke|pekan|pertemuan|pertemuan ke|day|hari|notes?|keterangan|catatan|lecturer|dosen|pengajar|activity|activities|kegiatan|session|sesi|time|waktu|jam|room|ruang|description|deskripsi|agenda|content|bahasan|pokok bahasan|sub topic|reading|readings|reference|referensi|assignment|assignments|tugas)$/i
+/** Words of a table's column headings: a cell made only of them is a heading, not a topic. */
+const HEADER_WORDS = new Set(
+  'no # topic topics topik materi material materials subject subjects sub date dates tanggal week weeks minggu ke pekan pertemuan day hari notes note keterangan catatan lecturer lecturers dosen pengajar activity activities kegiatan session sessions sesi time waktu jam room ruang description deskripsi agenda content contents bahasan pokok reading readings reference references referensi pustaka assignment assignments tugas learning outcome outcomes expected kemampuan akhir yang diharapkan capaian method methods metode schedule jadwal assessment assessments penilaian criteria kriteria indikator indicator indicators weight weights bobot form bentuk mode moda delivery media and dan of / & - (%)'.split(' '),
+)
+const isHeader = (cell: string) => cell.toLowerCase().split(/[\s/&()-]+/).filter(Boolean).every((w) => HEADER_WORDS.has(w))
 
 /** The days a timeline can be about: the course's term, so revision dates and references are left out. */
 export type Window = [from: number, to: number]
@@ -326,19 +429,54 @@ function datesIn(line: string, win: Window) {
   return { singles: singles.filter((t) => !Number.isNaN(t)), spans: spans.filter(([a, b]) => !Number.isNaN(a) && !Number.isNaN(b)), rest, any }
 }
 
-/** What a row is about: its text without dates, times, days, week numbers and column headings. */
+/** How a class is held, as lesson plans list it in a column of its own. */
+const METHOD = new Set(
+  'lecture lectures lecturing discussion discussions ceramah diskusi tanya jawab q&a qa presentation presentasi self study self-study belajar mandiri tatap muka face to face face-to-face online offline hybrid daring luring onsite on-site synchronous asynchronous sinkron asinkron zoom teams ms gmeet google meet video conference interactive interaktif problem based learning pbl case study studi kasus demo demonstration demonstrasi exercise exercises latihan practice praktik group work kerja kelompok flipped classroom blended scele elearning e-learning lms tm bt bm pt ps'.split(' '),
+)
+/** Cells that hold no topic: scheduling notes, references, weights, durations, lecturers' initials. */
+const NOT_TOPIC = [
+  /^(?:planned to be scheduled|to be (?:announced|scheduled|confirmed|determined)|tba|tbd|tbc|n\/a|none|-+|menyesuaikan|sesuai jadwal|akan diumumkan)$/i,
+  /^\[?\d+\]?(?:\s*[,;&]\s*\[?\d+\]?)*$/, // [1], [2, 3]
+  /^(?:ref(?:erence|erensi)?s?|pustaka|bacaan|readings?)\b/i,
+  /^(?:\[?\d+\]?\s*)?(?:ch(?:apter|\.)?|bab|hal(?:aman)?\.?|pp?\.|pages?)\s*\d[\d\s,.\-–]*$/i,
+  /^\d+(?:[.,]\d+)?\s*%$/,
+  /^\d+\s*[x×]\s*\d+\s*(?:'|menit|min(?:utes?)?)?\.?$/i, // 2 x 50'
+  /^\d+\s*(?:menit|minutes?|mins?|jam|hours?|sks|credits?)$/i,
+  /^[A-Z]{2,4}(?:\s*[/,&]\s*[A-Z]{2,4})+$/, // "ABC/DEF": the lecturers teaching it (a lone "SQL" may be the topic)
+]
+/** A learning outcome ("Students are able to …"): kept only when a row has nothing else. */
+const OUTCOME = /^(?:students?|mahasiswa|peserta|able to|mampu|dapat|can|understand|memahami|(?:sub-?\s*)?cpmk|clo|lo)\b/i
+
+const isMethod = (cell: string) => {
+  const parts = cell
+    .toLowerCase()
+    .split(/\s*(?:[,/&+;]|\band\b|\bdan\b)\s*/)
+    .filter(Boolean)
+  return parts.length > 0 && parts.every((p) => p.split(/\s+/).every((w) => METHOD.has(w)))
+}
+
+/**
+ * What a row is about: its cells without dates, times, days, week numbers and column headings,
+ * and without the columns a lesson plan keeps beside the topic (how it's taught, references,
+ * weights, a "planned to be scheduled" note). A learning outcome stands in when nothing else is left.
+ */
 function topicOf(rest: string): string {
-  return rest
+  const cells = rest
     .replace(new RegExp(TIME.source, 'gi'), ' ')
     .replace(DAY_ABBR, ' ')
     .replace(new RegExp(WEEK.source, 'gi'), ' ')
     .replace(/⟦⟧/g, ' ')
     .replace(/\bWIB\b/gi, ' ')
     .split('|')
-    .map((c) => c.replace(/^[\s\d.,:;()\-–—#]+|[\s,:;(\-–—]+$/g, '').trim())
-    .filter((c) => /\p{L}{3,}/u.test(c) && !HEADER.test(c))
-    .join(' · ')
-    .slice(0, 160)
+    .map((c) =>
+      c
+        .replace(/^[\s\d.,:;()\-–—#]+|[\s,:;(\-–—]+$/g, '')
+        .replace(/^(?:topics?|topik|materi|materials?|pokok bahasan|bahasan|sub[- ]?topics?|subject)\s*[:\-–]\s*/i, '')
+        .trim(),
+    )
+    .filter((c) => /\p{L}{3,}/u.test(c) && !isHeader(c) && !NOT_TOPIC.some((re) => re.test(c)) && !isMethod(c))
+  const topics = cells.filter((c) => !OUTCOME.test(c))
+  return (topics.length ? topics : cells).join(' · ').slice(0, 200)
 }
 
 const kindOf = (text: string): Session['kind'] => (OFF.test(text) ? 'off' : EXAM.test(text) ? 'exam' : 'class')
@@ -354,7 +492,15 @@ export function parseTimeline(text: string, win: Window): Timeline | null {
   const weeks: Record<number, string> = {}
   let last: Session | null = null
   let carried = 0
+  let page: number | undefined
   for (const line of text.split('\n')) {
+    const mark = line.match(PAGE_MARK)
+    if (mark) {
+      page = Number(mark[1])
+      // a row doesn't run on over a page break: the next page starts with its own rows or headings
+      last = null
+      continue
+    }
     const time = line.match(TIME)
     const week = line.match(WEEK)
     const { singles, spans, rest, any } = datesIn(line.replace(new RegExp(TIME.source, 'g'), ' '), win)
@@ -365,6 +511,7 @@ export function parseTimeline(text: string, win: Window): Timeline | null {
       kind,
       week: week ? Number(week[1]) : undefined,
       ...(time ? { start: `${time[1].padStart(2, '0')}:${time[2]}`, end: `${time[3].padStart(2, '0')}:${time[4]}` } : {}),
+      ...(page ? { page } : {}),
     }
     const found: Session[] = singles.length ? singles.map((date) => ({ date, ...base })) : spans.map(([a, b]) => ({ date: a, until: b + 86_400_000, ...base }))
     if (found.length) {
@@ -429,6 +576,8 @@ export interface Agenda {
   /** exactly that day, or only the week (a span or a week number) */
   exact: boolean
   week?: number
+  /** the PDF page it is written on */
+  page?: number
 }
 
 const WEEK_MS = 7 * 86_400_000
@@ -442,10 +591,10 @@ export function agendaOn(t: Timeline, date: number, courseStart: number): Agenda
   const exact = t.sessions.filter((s) => !s.until && s.date === day)
   if (exact.length) {
     const kind = exact.some((s) => s.kind === 'off') ? 'off' : exact.some((s) => s.kind === 'exam') ? 'exam' : 'class'
-    return { topic: exact.map((s) => s.topic).filter(Boolean).join(' · '), kind, exact: true, week: exact[0].week }
+    return { topic: exact.map((s) => s.topic).filter(Boolean).join(' · '), kind, exact: true, week: exact[0].week, page: exact[0].page }
   }
   const span = t.sessions.find((s) => s.until && day >= s.date && day < s.until)
-  if (span) return { topic: span.topic, kind: span.kind, exact: false, week: span.week }
+  if (span) return { topic: span.topic, kind: span.kind, exact: false, week: span.week, page: span.page }
   // a timeline by week number only: count weeks from the first session, or the course start
   const first = t.sessions[0]?.date ?? courseStart
   if (first && Object.keys(t.weeks).length) {

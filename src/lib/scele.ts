@@ -79,14 +79,16 @@ export interface ClassSlot {
   room: string
   /** read from the course page rather than added by hand */
   auto?: boolean
-  /** where a found meeting was read: the course page, a syllabus, or the course timeline's dates */
-  source?: 'page' | 'syllabus' | 'timeline'
+  /** where a found meeting was read: the study plan in SLCM, the course page, a syllabus, or the course timeline's dates */
+  source?: 'slcm' | 'page' | 'syllabus' | 'timeline'
+  /** the course's name in SLCM, for a class there that no SCELE course matches (courseId 0) */
+  name?: string
   /** a course the user teaches (a TA) rather than takes */
   teaching?: boolean
 }
 
 /** Same course, day and start time: the same meeting. */
-export const slotKey = (s: Pick<ClassSlot, 'courseId' | 'day' | 'start'>) => `${s.courseId}-${s.day}-${s.start}`
+export const slotKey = (s: Pick<ClassSlot, 'courseId' | 'day' | 'start' | 'name'>) => `${s.courseId || s.name}-${s.day}-${s.start}`
 
 const DAY = 86_400_000
 
@@ -219,6 +221,17 @@ export async function fetchContents(courseId: number): Promise<Section[]> {
         links: (m.contents ?? []).filter((f) => f.type === 'url' && f.fileurl).map((f) => f.fileurl!),
       })),
   }))
+}
+
+/** A course's name as its students say it: "[KI] Statistics & Probability (A) Odd 2026/2027" → "Statistics & Probability (A)". */
+export function courseTitle(c: Course): string {
+  return (
+    c.full
+      .replace(/^\s*\[[^\]]*\]\s*/, '')
+      .replace(/\s*[-–]?\s*\b(?:odd|even|gasal|genap|ganjil|short|pendek)\b\s*[-–]?\s*\d{4}\s*[/-]\s*\d{4}\s*$/i, '')
+      .replace(/\s*\d{4}\s*[/-]\s*\d{4}\s*[-–]?\s*\b(?:odd|even|gasal|genap|ganjil|short|pendek)\b\s*$/i, '')
+      .trim() || c.short
+  )
 }
 
 /** Activities and files a student would open: everything but labels. */
@@ -368,6 +381,18 @@ export function termWindow(c: Course): Window {
   return [base - 30 * DAY, base + 220 * DAY]
 }
 
+/**
+ * A SCELE file's address for the browser, which is signed in to SCELE rather than holding the
+ * app's token: the web service path becomes the ordinary one. `page` opens a PDF at that page.
+ */
+export function browserUrl(url: string, page?: number): string {
+  const plain = url
+    .replace('/webservice/pluginfile.php/', '/pluginfile.php/')
+    .replace(/([?&])(?:token|forcedownload)=[^&#]*&?/g, '$1')
+    .replace(/[?&]$/, '')
+  return page ? `${plain.split('#')[0]}#page=${page}` : plain
+}
+
 export function openScele(url: string) {
   if (IS_TAURI) invoke('open_url', { url }).catch(() => {})
   else window.open(url, '_blank')
@@ -439,6 +464,12 @@ const DAYS: Record<string, number> = {
   sabtu: 6, saturday: 6,
 }
 export const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+
+/** A weekday (0 = Sunday) in the language the rest of the island's dates use: "Thu", "Thursday". */
+export function dayName(day: number, width: 'short' | 'long' = 'short'): string {
+  // 4 Jan 2026 was a Sunday
+  return new Date(2026, 0, 4 + day).toLocaleDateString([], { weekday: width })
+}
 
 const pad = (h: string, m: string) => `${h.padStart(2, '0')}:${m}`
 
@@ -586,8 +617,9 @@ const DEMO_ACCOUNT: SceleAccount = { userid: 1, fullname: 'Demo Mahasiswa', user
 const now0 = Date.now()
 // Shaped like a real term, named the way SCELE names them, with dates around today: Platform-Based
 // Development keeps its timeline in a linked Google Sheet, Operating Systems in a PDF "Tentative
-// Timeline", Statistics writes its class times in an outline (its sheet needs a Google sign-in),
-// the user TAs Calculus 1, Databases is enrolled twice, and last term's Calculus 2 is still listed.
+// Timeline", Statistics in a lesson plan PDF with no class times (its sheet needs a Google
+// sign-in; SLCM has the times), the user TAs Calculus 1, Databases is enrolled twice, and last
+// term's Calculus 2 is still listed.
 const termNow = termAt(now0)
 const T = `${['Odd', 'Even', 'Short'][termNow % 3]} ${Math.floor(termNow / 3)}/${Math.floor(termNow / 3) + 1}`
 const monday0 = new Date(new Date(now0).getFullYear(), new Date(now0).getMonth(), new Date(now0).getDate() - ((new Date(now0).getDay() + 6) % 7) - 8 * 7).getTime()
@@ -599,13 +631,19 @@ const on = (w: number, day: number) => {
   return `${WD[d.getDay()]}, ${d.getDate()} ${MON_EN[d.getMonth()]} ${d.getFullYear()}`
 }
 const PBD_TOPICS = ['Course intro & web basics', 'HTML & CSS layout', 'JavaScript fundamentals', 'DOM & events', 'Django models', 'Django views & templates', 'Forms & validation', 'Midterm', 'React components', 'React Hooks & State', 'Fetching data & REST APIs', 'Authentication', 'Deployment & CI', 'Final project presentations']
+const SP_TOPICS = [
+  'Introduction to probability', 'Counting and sample spaces', 'Conditional probability and Bayes theorem', 'Random variables',
+  'Multiple random variables', 'Expectation and variance', 'Common distributions', 'Midterm exam',
+  'Measurement scales: nominal, ordinal, interval, ratio; Sampling technique: simple, systematic, stratified, random',
+  'Descriptive statistics', 'Sampling distributions', 'Estimation and confidence intervals', 'Hypothesis testing', 'Correlation and regression',
+]
 const OS_TOPICS = ['Introduction to operating systems', 'Processes', 'Threads & concurrency', 'CPU scheduling', 'Synchronization', 'Deadlocks', 'Main memory', 'Midterm exam', 'Virtual memory', 'File systems', 'Mass storage', 'I/O systems', 'Protection & security', 'Review']
 
 const PBD_SHEET = 'https://docs.google.com/spreadsheets/d/1uT6b3YYEd5AqSNn2lvbAJjgK4tdIN5lF6KUx7Y38M40/edit?gid=982244062#gid=982244062'
 const SP_SHEET = 'https://docs.google.com/spreadsheets/d/1demoSignInOnlySheetXXXXXXXXXXXXXXX/edit'
 const fileUrl = (name: string) => `${SCELE_URL}/webservice/pluginfile.php/demo/${name}`
 const OS_PDF = fileUrl('Tentative-Timeline.pdf')
-const SP_DOC = fileUrl('Course-Outline-SP.docx')
+const SP_DOC = fileUrl('Lesson%20Plan%20StatProb-1-2627%20International%20Class.pdf')
 
 /** What each document says, as its rows come out of the readers. */
 const DEMO_DOCS: Record<string, string> = {
@@ -625,7 +663,16 @@ const DEMO_DOCS: Record<string, string> = {
     ...OS_TOPICS.flatMap((t, i) => [`${i * 2 + 1} | ${on(i + 1, 1)} | 13.00 - 14.40 | ${t}`, `${i * 2 + 2} | ${on(i + 1, 3)} | 13.00 - 14.40 | ${t} (continued)`]),
   ].join('\n'),
   [SP_SHEET]: 'signin',
-  [SP_DOC]: 'Statistics & Probability — Course Outline\nKelas A: Jumat 08.00 - 10.30 R. 2.2301\nKelas B: Jumat 13.00 - 15.30',
+  // a lesson plan's columns: the topic sits between the outcome, the method, a scheduling note and the references
+  [SP_DOC]: [
+    '⟦p1⟧',
+    'Lesson Plan - Statistics and Probability',
+    'Week | Date | Learning outcomes | Topics | Method | Schedule | References',
+    ...SP_TOPICS.flatMap((t, i) => [
+      ...(i === 7 ? ['⟦p2⟧'] : []),
+      `${i + 1} | ${on(i + 1, 4)} | Students are able to apply ${t.split(':')[0].toLowerCase()} | ${t} | Lecture, discussion | planned to be scheduled | [1] Ch. ${i + 1}`,
+    ]),
+  ].join('\n'),
 }
 
 const DEMO_COURSES: Course[] = [
@@ -671,9 +718,21 @@ const DEMO_CONTENTS: Record<number, Section[]> = {
       name: 'Course Info',
       summary: '',
       modules: [
-        mod(6, 'Course Outline', { files: [{ name: 'Course-Outline-SP.docx', url: SP_DOC, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', modified: 0, size: 40_000 }] }),
+        mod(6, 'Lesson Plan - Statistics and Probability 1-2627', {
+          files: [{ name: 'Lesson Plan StatProb-1-2627 International Class.pdf', url: SP_DOC, mime: 'application/pdf', modified: 0, size: 240_000 }],
+        }),
         mod(7, 'Jadwal & Timeline', { mod: 'url', links: [SP_SHEET] }),
       ],
+    },
+    // named like a real course page: the random-variable sections share the word "random" with this week's sampling topic
+    { num: 1, name: '01. Probability', summary: '', modules: [mod(401, '01 - Introduction to Probability'), mod(402, '02 - Conditional Probability')] },
+    { num: 2, name: '03. Random Variables', summary: '', modules: [mod(403, '03a - Random Variables'), mod(404, 'Forum Random Variables', { mod: 'forum' })] },
+    { num: 3, name: '04. Multiple Random Variables', summary: '', modules: [mod(405, '04. Multiple Random Variables')] },
+    {
+      num: 4,
+      name: '05. Data and Sampling',
+      summary: '',
+      modules: [mod(406, '05 - Measurement Scales and Sampling Techniques'), mod(407, 'Sampling Worksheet', { mod: 'assign' })],
     },
   ],
 }

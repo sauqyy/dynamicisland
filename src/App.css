@@ -4336,34 +4336,6 @@ button.sc-row:hover {
   font-weight: 700;
   color: var(--accent);
 }
-.sc-next {
-  padding: 12px;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: inset 0 0 0 1px var(--rim);
-  gap: 8px !important;
-}
-.sc-next-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-.sc-next-head > span:first-child {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.sc-next-head small {
-  font-size: var(--fs-label);
-  color: var(--accent);
-  font-weight: 600;
-}
-.sc-next-head b {
-  font-size: var(--fs-title);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .sc-topic {
   display: flex;
   flex-direction: column;
@@ -4392,17 +4364,6 @@ button.sc-row:hover {
 .sc-src.week::before {
   content: '≈ ';
   color: var(--warn);
-}
-.sc-mat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-meta);
-  color: var(--text-2);
-  text-align: left;
-}
-.sc-mat:hover {
-  color: var(--text-1);
 }
 .sc-chips {
   display: flex;
@@ -4546,9 +4507,6 @@ button.sc-row:hover {
   background: transparent;
   color: var(--text-2);
 }
-.sc-auto {
-  color: var(--text-3);
-}
 .sc-pick {
   display: flex;
   flex-direction: column;
@@ -4560,9 +4518,6 @@ button.sc-row:hover {
 .sc-pick .sc-main b {
   white-space: normal;
   font-weight: 500;
-}
-.sc-unsure .sc-main b {
-  color: var(--text-2);
 }
 /* SSO UI verified the account but not the faculty: confirm it with SCELE */
 .student-confirm {
@@ -4603,21 +4558,6 @@ button.sc-row:hover {
   font-size: var(--fs-label);
   color: var(--text-3);
 }
-/* Classes: today and tomorrow, with each meeting's topic */
-.sc-day-row {
-  align-items: flex-start;
-}
-.sc-day-row.past {
-  opacity: 0.45;
-}
-.sc-day-row.live {
-  background: rgb(var(--fg-rgb) / 0.06);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-.sc-day-row.off .sc-main b {
-  text-decoration: line-through;
-  color: var(--text-2);
-}
 .sc-time {
   flex: none;
   width: 42px;
@@ -4633,16 +4573,6 @@ button.sc-row:hover {
 .sc-time small {
   font-size: var(--fs-label);
   color: var(--text-3);
-}
-.sc-day-row .sc-main b,
-.sc-topic-line,
-.sc-day-row .sc-main small {
-  white-space: normal;
-}
-.sc-day-row .sc-main b {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 .sc-topic-line {
   display: block;
@@ -4672,18 +4602,226 @@ button.sc-row:hover {
   font-size: var(--fs-label);
   color: var(--text-3);
 }
-.sc-tl {
-  color: var(--text-3) !important;
+/* Classes: the agenda. Every meeting is one row that opens to what it covers; the next class
+   starts open and is set apart as a card. */
+.sc-meeting {
+  border-radius: var(--r-tile);
+  transition: background 0.15s;
 }
-.sc-blocked {
-  align-self: flex-start;
-  margin-top: 2px;
-  font-size: var(--fs-label);
-  color: var(--warn);
+.sc-meeting.next {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+.sc-meeting.past .sc-meeting-head {
+  opacity: 0.45;
+}
+.sc-meeting-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-tile);
   text-align: left;
 }
-.sc-blocked:hover {
+.sc-meeting-head:hover {
+  background: rgb(var(--fg-rgb) / 0.05);
+}
+.sc-meeting-head:focus-visible,
+.sc-link:focus-visible,
+.sc-sources summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.sc-meeting .sc-main b,
+.sc-topic-line,
+.sc-meeting .sc-main small {
+  white-space: normal;
+}
+.sc-meeting .sc-main b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sc-meeting.off .sc-main b {
+  text-decoration: line-through;
+  color: var(--text-2);
+}
+.sc-meeting.next .sc-main > b {
+  font-size: var(--fs-title);
+}
+.sc-badge-line {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+.sc-chev {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-3);
+  transition: transform 0.2s;
+}
+.sc-meeting.open > .sc-meeting-head .sc-chev,
+.sc-sources[open] > summary .sc-chev {
+  transform: rotate(180deg);
+}
+.sc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 10px 62px;
+}
+.sc-fix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sc-fix > small {
+  font-size: var(--fs-label);
+  color: var(--warn);
+}
+.sc-topic p {
+  -webkit-line-clamp: 3;
+}
+.sc-detail .sc-meta {
+  font-size: var(--fs-label);
+}
+.sc-meeting:not(.open) .sc-topic-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sc-prov {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.sc-link {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  text-align: left;
+}
+.sc-link > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.sc-link:hover {
+  color: var(--text-1);
+}
+.sc-link:hover > span {
   text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sc-link.sub {
+  padding-left: 14px;
+}
+.sc-link.small {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-link.warn {
+  color: var(--warn);
+}
+.sc-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sc-cover-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.sc-none-inline {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+/* the weekly schedule, by weekday */
+.sc-weekday {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.sc-weekday > .sc-day {
+  padding-top: 9px;
+}
+.sc-weekday > div {
+  flex: 1;
+  min-width: 0;
+}
+.sc-slot {
+  padding: 6px 8px;
+}
+.sc-slot-time {
+  flex: none;
+  width: 74px;
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.sc-slot .sc-main b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+/* where the schedule comes from: folded away under the agenda */
+.sc-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.sc-sources > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.sc-sources > summary::-webkit-details-marker {
+  display: none;
+}
+.sc-sources > summary > span {
+  flex: 1;
+}
+.sc-sources > h4 {
+  margin-top: 8px;
+}
+.sc-warn-count {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--warn);
+}
+.sc-src-icon {
+  flex: none;
+  color: var(--text-2);
+}
+.sc-main small.sc-missing {
+  color: var(--warn);
+}
+.sc-course .sc-main b,
+.sc-course .sc-main small {
+  white-space: normal;
+}
+.sc-reset {
+  margin: 6px 2px 0;
 }
 
 /* ---------- deadlines ---------- */
