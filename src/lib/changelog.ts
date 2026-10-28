@@ -7,6 +7,16 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.0',
+    title: 'Campus for Fasilkom UI',
+    items: [
+      'Fasilkom UI students: tap Verify Student on the Profile page and sign in with SSO UI to unlock Campus.',
+      'Due lists your SCELE deadlines, and the island warns you 24 hours, 3 hours and 1 hour before each one.',
+      'Classes builds your weekly schedule from your SCELE courses and reminds you before class, with that week\'s topic.',
+      'Inbox collects SCELE announcements and new course materials, and the pill shows how much is due today.',
+    ],
+  },
+  {
     version: '0.6.3',
     title: 'Better group chats',
     items: [
