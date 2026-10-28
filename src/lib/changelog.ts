@@ -7,6 +7,11 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.2',
+    title: 'Verify Student for assistants',
+    items: ['Fasilkom UI students whom SSO UI also lists as staff, such as teaching assistants, can now verify and use Campus.'],
+  },
+  {
     version: '0.7.1',
     title: 'Verify Student fixed',
     items: [
