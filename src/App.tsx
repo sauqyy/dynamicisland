@@ -17,6 +17,9 @@ import { SettingsWidget } from './widgets/SettingsWidget'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
+import { SceleWidget } from './widgets/SceleWidget'
+import { useScele } from './lib/useScele'
+import { useStudent } from './lib/sso'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
@@ -83,6 +86,7 @@ function loadTodos(): Todo[] {
 }
 
 const TAB_KEY = 'di.tab'
+const CAMPUS_PAGES: Tab[] = ['deadlines', 'classes', 'inbox']
 
 /** The page that was open last time, so the card comes back where it was left. */
 function loadTab(): Tab {
@@ -214,9 +218,12 @@ export default function App() {
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
+  // the Campus pages only exist for a Fasilkom student verified with SSO UI on the Profile page
+  const student = useStudent()
+  const campus = Boolean(student.student?.fasilkom)
   const pages = useMemo(
-    () => PAGES.filter((p) => p.id === 'settings' || !settings.hiddenPages.includes(p.id)),
-    [settings.hiddenPages],
+    () => PAGES.filter((p) => (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) && (campus || !CAMPUS_PAGES.includes(p.id))),
+    [settings.hiddenPages, campus],
   )
   // the groups that still have a visible page, and which one the current page is in
   const groups = useMemo(
@@ -289,6 +296,18 @@ export default function App() {
     setAlert({ ...a, id: ++alertId.current })
     if (cue) play(cue, opts)
   }, [])
+
+  const scele = useScele(pushAlert, student.student === undefined ? undefined : campus)
+  // a Campus page left open from before is not there once the verification is removed
+  useEffect(() => {
+    if (student.student === null && CAMPUS_PAGES.includes(tab)) setTab('profile')
+  }, [student.student, tab])
+  // what is still due before midnight, for the badge on the pill
+  const dueToday = useMemo(() => {
+    const midnight = new Date(now).setHours(24, 0, 0, 0)
+    return scele.deadlines.filter((d) => d.due > now && d.due < midnight).length
+  }, [scele.deadlines, now])
+  const sceleUnread = scele.notices.some((n) => !n.read)
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
@@ -918,6 +937,7 @@ export default function App() {
 
   let content: React.ReactNode
   let contentKey: string
+  const dueBadge = dueToday > 0 ? <span className="sc-badge" title={`${dueToday} due today on SCELE`}>{dueToday}</span> : null
 
   if (mode === 'expanded') {
     contentKey = 'expanded'
@@ -1009,6 +1029,9 @@ export default function App() {
             {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
             {tab === 'notes' && <NotesWidget />}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
+            {(tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
+              <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} />
+            )}
             {tab === 'clipboard' && (
               <ClipboardWidget
                 items={clipboard.items}
@@ -1053,8 +1076,8 @@ export default function App() {
                 onFullscreen={toggleFullscreen}
               />
             )}
-            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
-            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
+            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} student={student} />}
+            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} unavailable={campus ? [] : CAMPUS_PAGES} />}
             </div>
             </motion.div>
           </AnimatePresence>
@@ -1068,7 +1091,7 @@ export default function App() {
                 const g = groups.find((x) => x.id === id)!
                 setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
               }}
-              dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+              dots={[...(unreadCount > 0 ? ['social'] : []), ...(sceleUnread ? ['campus'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
             />
         </div>
         {notes && (
@@ -1220,7 +1243,7 @@ export default function App() {
       content = (
         <div className="peek center">
           <span className="peek-text">
-            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null]
+            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null, dueToday ? `${dueToday} due today` : null]
               .filter(Boolean)
               .join(' · ')}
           </span>
@@ -1234,8 +1257,9 @@ export default function App() {
         <Art track={track} size={22} />
         {weatherGlyph}
         <LiveText text={live} k={idleLyric ? lyricIdx : live} />
-        {(unreadCount > 0 || privacy.camera || privacy.mic) && (
+        {(unreadCount > 0 || privacy.camera || privacy.mic || dueToday > 0) && (
           <span className="live-dots">
+            {dueBadge}
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1253,6 +1277,7 @@ export default function App() {
             {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
             {weatherGlyph}
             <span className="idle-lyric">{idleText}</span>
+            {dueBadge}
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1263,6 +1288,7 @@ export default function App() {
             <span className="idle-side left">{playing && track && settings.idleBars && <Bars active hue={track.hue} />}</span>
             <span>{clock}</span>
             <span className="idle-side right">
+              {dueBadge}
               {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
               {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
               {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1312,6 +1338,10 @@ export default function App() {
           if (justDragged.current) return
           if (mode === 'alert' && alert?.nowPlaying) {
             setTab('media')
+            setAlert(null)
+          }
+          if (mode === 'alert' && alert?.openTab) {
+            setTab(alert.openTab)
             setAlert(null)
           }
           if (mode === 'alert' && alert?.chatWith) {
@@ -1439,6 +1469,13 @@ export default function App() {
             {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
             {DEMO_SOCIAL && <button onClick={demo.ringGroupCall}>Incoming group call</button>}
           </div>
+          {campus && <div className="demo-row">
+            <span>SCELE</span>
+            <button onClick={() => pushAlert({ icon: '📅', text: 'PPW: Lab 8: Todo app', sub: 'Due in 2h 30m', openTab: 'deadlines' }, 'attention')}>Deadline</button>
+            <button onClick={() => pushAlert({ icon: '🎓', text: 'PPW in 30m · 2.2304', sub: 'Week 9: React Hooks & State', openTab: 'classes' }, 'attention')}>Class soon</button>
+            <button onClick={() => pushAlert({ icon: '📣', text: 'PPW: Perubahan deadline Lab 8', sub: 'Deadline Lab 8 diundur ke Jumat 23.55.', openTab: 'inbox' }, 'ready')}>Announcement</button>
+            <button onClick={() => pushAlert({ icon: '📄', text: 'New in SDA', sub: 'Slide AVL Tree', openTab: 'inbox' }, 'ready')}>New material</button>
+          </div>}
           <div className="demo-row">
             <span>App</span>
             <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>Update alert</button>
