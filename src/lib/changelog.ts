@@ -7,6 +7,14 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.1',
+    title: 'Verify Student fixed',
+    items: [
+      'Verify Student now works for Fasilkom UI students even when SSO UI leaves out which faculty you are in.',
+      'If it does, the Profile card asks you to confirm with your SCELE sign-in, which also connects SCELE.',
+    ],
+  },
+  {
     version: '0.7.0',
     title: 'Campus for Fasilkom UI',
     items: [
