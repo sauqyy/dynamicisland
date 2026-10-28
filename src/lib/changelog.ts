@@ -7,6 +7,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.6.2',
+    title: 'Easier to read lyrics',
+    items: [
+      'Lyrics in Playing are bigger, wrap instead of cutting off, and fade with distance from the current line. Click a line to jump to it.',
+      'Previous, play and next now sit on one row with the timeline and both times.',
+      'Pick how the equalizer looks (Bars, Wave or Pulse) and its colour (Album, Accent or your own) in Settings, under Pill.',
+    ],
+  },
+  {
     version: '0.6.1',
     title: 'A new look',
     items: [
