@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 340" width="800" height="340" font-family="'Segoe UI', -apple-system, Inter, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e2a6b" />
+      <stop offset="0.55" stop-color="#4b2a7a" />
+      <stop offset="1" stop-color="#a0457e" />
+    </linearGradient>
+    <radialGradient id="blob" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff9ad5" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#ff9ad5" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff7ac6" />
+      <stop offset="0.5" stop-color="#a45bff" />
+      <stop offset="1" stop-color="#5b6cff" />
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.15" />
+      <stop offset="0.5" stop-color="#fff" stop-opacity="1" />
+      <stop offset="1" stop-color="#fff" stop-opacity="0.15" />
+    </linearGradient>
+    <mask id="lyricMask">
+      <rect x="160" y="146" width="480" height="66" fill="url(#fade)" />
+    </mask>
+    <clipPath id="frame"><rect width="800" height="340" rx="20" /></clipPath>
+    <g id="eq">
+      <rect x="0" y="-14" width="3" height="14" rx="1.5" fill="#ff9ad5">
+        <animateTransform attributeName="transform" type="scale" values="1 .3;1 1;1 .5;1 .8;1 .3" dur="0.9s" repeatCount="indefinite" />
+      </rect>
+      <rect x="5" y="-14" width="3" height="14" rx="1.5" fill="#d58bff">
+        <animateTransform attributeName="transform" type="scale" values="1 .9;1 .4;1 1;1 .3;1 .9" dur="0.7s" repeatCount="indefinite" />
+      </rect>
+      <rect x="10" y="-14" width="3" height="14" rx="1.5" fill="#a99bff">
+        <animateTransform attributeName="transform" type="scale" values="1 .5;1 .8;1 .3;1 1;1 .5" dur="1.1s" repeatCount="indefinite" />
+      </rect>
+      <rect x="15" y="-14" width="3" height="14" rx="1.5" fill="#8fb0ff">
+        <animateTransform attributeName="transform" type="scale" values="1 .7;1 .3;1 .9;1 .5;1 .7" dur="0.8s" repeatCount="indefinite" />
+      </rect>
+    </g>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="800" height="340" fill="url(#wall)" />
+    <circle cx="640" cy="260" r="220" fill="url(#blob)" />
+    <circle cx="120" cy="40" r="160" fill="url(#blob)" opacity="0.6" />
+
+    <!-- the island: compact music pill -> Now Playing card -> back -->
+    <rect y="20" fill="#050509" stroke="#ffffff" stroke-opacity="0.08">
+      <animate attributeName="x" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.18;.24;.27;.8;.86;.89;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="250;250;152;160;160;254;250;250" />
+      <animate attributeName="width" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.18;.24;.27;.8;.86;.89;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="300;300;496;480;480;292;300;300" />
+      <animate attributeName="height" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.18;.24;.27;.8;.86;.89;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="36;36;258;250;250;34;36;36" />
+      <animate attributeName="rx" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.18;.24;.27;.8;.86;.89;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="18;18;34;34;34;17;18;18" />
+    </rect>
+
+    <!-- compact content -->
+    <g>
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" keyTimes="0;.17;.19;.87;.9;1" values="1;1;0;0;1;1" />
+      <rect x="258" y="26" width="24" height="24" rx="7" fill="url(#cover)" />
+      <text x="292" y="43" font-size="12.5" fill="#ffffff" fill-opacity="0.9">city lights are fading slow</text>
+      <use href="#eq" transform="translate(518 45)" />
+    </g>
+
+    <!-- expanded content -->
+    <g>
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" keyTimes="0;.26;.3;.78;.8;1" values="0;0;1;1;0;0" />
+      <rect x="188" y="46" width="84" height="84" rx="16" fill="url(#cover)" />
+      <circle cx="230" cy="88" r="20" fill="#fff" fill-opacity="0.18" />
+      <circle cx="230" cy="88" r="6" fill="#fff" fill-opacity="0.5" />
+      <text x="290" y="80" font-size="19" font-weight="600" fill="#ffffff">Midnight Drive</text>
+      <text x="290" y="102" font-size="13.5" fill="#ffffff" fill-opacity="0.55">Neon Avenue</text>
+      <use href="#eq" transform="translate(590 84) scale(1.3)" />
+
+      <!-- synced lyrics: lines scroll up, the centre line is bright -->
+      <g mask="url(#lyricMask)">
+        <g font-size="17" font-weight="600" fill="#ffffff">
+          <animateTransform attributeName="transform" type="translate" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.36;.4;.52;.56;.68;.72;1" keySplines=".4 0 .2 1;.4 0 .2 1;.4 0 .2 1;.4 0 .2 1;.4 0 .2 1;.4 0 .2 1;.4 0 .2 1" values="0 0;0 0;0 -24;0 -24;0 -48;0 -48;0 -72;0 -72" />
+          <text x="188" y="160">city lights are fading slow</text>
+          <text x="188" y="184">we keep driving, radio low</text>
+          <text x="188" y="208">every mile a little glow</text>
+          <text x="188" y="232">out where the night winds go</text>
+          <text x="188" y="256">hold the wheel and let it show</text>
+        </g>
+      </g>
+
+      <!-- controls and timeline on one row -->
+      <g fill="#ffffff" transform="translate(0 12)">
+        <path d="M192 226 l9 -6 v12 z M190 220 h2 v12 h-2 z" fill-opacity="0.8" />
+        <circle cx="222" cy="226" r="12" fill-opacity="1" />
+        <rect x="217.5" y="220" width="3" height="12" rx="1" fill="#050509" />
+        <rect x="223.5" y="220" width="3" height="12" rx="1" fill="#050509" />
+        <path d="M252 226 l-9 -6 v12 z M252 220 h2 v12 h-2 z" fill-opacity="0.8" />
+        <text x="270" y="230.5" font-size="11.5" fill-opacity="0.55" font-family="Consolas, 'Cascadia Mono', ui-monospace, monospace">1:12</text>
+        <rect x="306" y="224" width="250" height="4" rx="2" fill-opacity="0.15" />
+        <rect x="306" y="224" height="4" rx="2">
+          <animate attributeName="width" dur="8s" repeatCount="indefinite" values="80;125" />
+        </rect>
+        <text x="566" y="230.5" font-size="11.5" fill-opacity="0.55" font-family="Consolas, 'Cascadia Mono', ui-monospace, monospace">3:41</text>
+      </g>
+    </g>
+  </g>
+</svg>
