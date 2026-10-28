@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { play } from 'cuelume'
-import { BookOpen, CalendarCheck, Inbox, LogOut, RefreshCw } from 'lucide-react'
-import { DAY_NAMES, openScele, relTime, slotTime, syllabusLinks, type ClassSlot, type Deadline } from '../lib/scele'
+import { BookOpen, CalendarCheck, CalendarClock, ChevronDown, Clock, FileText, FolderOpen, Inbox, Lock, LogOut, Plus, RefreshCw, RotateCcw } from 'lucide-react'
+import { browserUrl, courseTitle, dayName, openScele, relTime, syllabusLinks, type ClassSlot, type Deadline } from '../lib/scele'
 import type { Meeting, SceleState } from '../lib/useScele'
 
 interface Props {
@@ -73,7 +73,16 @@ function SceleLogin({ scele, username }: { scele: SceleState; username: string }
 function SyncRow({ scele, now }: { scele: SceleState; now: number }) {
   return (
     <div className="sc-sync">
-      <span>{scele.error ? <span className="sc-error">{scele.error}</span> : scele.syncedAt ? `Synced ${relTime(scele.syncedAt, now)}` : 'Not synced yet'}</span>
+      <span>
+        {scele.error ? (
+          <span className="sc-error">{scele.error}</span>
+        ) : scele.syncedAt ? (
+          // the clock ticks every 15 s, so a sync can be a moment "ahead" of it
+          `Synced ${now - scele.syncedAt < 60_000 ? 'just now' : relTime(scele.syncedAt, now)}`
+        ) : (
+          'Not synced yet'
+        )}
+      </span>
       <button className={`chip ${scele.syncing ? 'sc-spin' : ''}`} aria-label="Sync now" data-cuelume-tap data-cuelume-emphasis="subtle" disabled={scele.syncing} onClick={scele.refresh}>
         <RefreshCw size={11} aria-hidden /> Sync
       </button>
@@ -139,173 +148,114 @@ function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
   )
 }
 
-/** Where a meeting's topic came from, shown so the user can judge it. */
-const FROM: Record<NonNullable<Meeting['from']>, string> = {
-  timeline: 'From the course timeline',
-  'timeline-week': "This week's entry in the course timeline",
-  'outline-dated': 'From SCELE: section dated this week',
-  'outline-week': 'Estimated: week number counted from the course start',
+/** How sure a topic is: said next to the document it came from. */
+const CERTAINTY: Record<NonNullable<Meeting['from']>, { word: string; cls: 'dated' | 'week' }> = {
+  timeline: { word: 'dated for this day', cls: 'dated' },
+  'timeline-week': { word: "this week's entry", cls: 'week' },
+  'outline-dated': { word: 'section dated this week', cls: 'dated' },
+  'outline-week': { word: 'estimated from the week number', cls: 'week' },
 }
-const fromClass = (m: Meeting) => (m.from === 'timeline' || m.from === 'outline-dated' ? 'dated' : m.from ? 'week' : 'none')
-const courseName = (m: Meeting) => (m.course?.full ?? '').replace(/^\s*\[[^\]]*\]\s*/, '').replace(/\s*(odd|even|gasal|genap|ganjil)\s+\d{4}\s*[/-]\s*\d{4}\s*$/i, '') || m.course?.short || 'Class'
+/** Where a found class came from, as the rows say it. */
+const SOURCE_NAME: Record<NonNullable<ClassSlot['source']>, string> = { slcm: 'SLCM study plan', page: 'course page', syllabus: 'syllabus', timeline: 'timeline' }
 
-/** A meeting's topic line: an exam or a day off is said plainly, an unknown topic too. */
+const DAY = 86_400_000
+const dayStart = (t: number) => new Date(new Date(t).setHours(0, 0, 0, 0)).getTime()
+const meetingKey = (m: Meeting) => `${m.slot.id}@${m.start}`
+const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString()
+/** A document's own name: "Lesson Plan - Statistics" of "Lesson Plan - Statistics · LessonPlan-SP.pdf". */
+const docName = (name: string) => name.split(' · ')[0]
+
+/** The collapsed row's topic: an exam or a day off said plainly, an unknown topic too. */
 function TopicLine({ m }: { m: Meeting }) {
   if (m.kind === 'off') return <small className="sc-off">No class · {m.topic}</small>
   if (!m.topic) return <small className="sc-src none">Topic not in the course's timeline or outline</small>
   return (
-    <small className={`sc-topic-line ${m.kind}`} title={m.from ? FROM[m.from] : undefined}>
+    <small className={`sc-topic-line ${m.kind}`}>
       {m.kind === 'exam' && <b className="sc-exam">Exam</b>}
-      <span className={`sc-src ${fromClass(m)}`} />
       {m.topic}
     </small>
   )
 }
 
+/**
+ * Classes: one agenda (today, tomorrow, and the next class if it is later), where every meeting is
+ * the same row and the next one starts open; then the weekly schedule; then, folded away, where
+ * the schedule comes from and the user's say over it. Questions that need the user come first.
+ */
 function Classes({ scele, now }: { scele: SceleState; now: number }) {
-  const [adding, setAdding] = useState(false)
-  // two weeks ahead is enough to get past a holiday or a break
-  const ahead = useMemo(() => scele.upcoming(now, 15), [scele, now])
-  const today = new Date(now).toDateString()
-  const tomorrow = new Date(now + 86_400_000).toDateString()
-  const todays = ahead.filter((m) => new Date(m.start).toDateString() === today)
-  const tomorrows = ahead.filter((m) => new Date(m.start).toDateString() === tomorrow)
+  const today = dayStart(now)
+  // the agenda changes with the day and with what SCELE says, not with every tick of the clock
+  const { upcoming } = scele
+  const ahead = useMemo(() => upcoming(today, 15), [upcoming, today])
   const next = ahead.find((m) => m.end > now && m.kind !== 'off')
-  const sections = next?.course ? (scele.contents[next.course.id] ?? []) : []
-  const syllabus = syllabusLinks(sections)
-  const tl = next ? scele.timelines[next.slot.courseId] : undefined
-  const dueSoon = next?.course ? scele.deadlines.filter((d) => d.courseId === next.course!.id && d.due > now).slice(0, 2) : []
-  const live = next && next.start <= now
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [adding, setAdding] = useState<Partial<Omit<ClassSlot, 'id'>> | null>(null)
+  const isOpen = (m: Meeting) => open[meetingKey(m)] ?? (next !== undefined && meetingKey(m) === meetingKey(next))
+  const toggle = (m: Meeting) => setOpen((o) => ({ ...o, [meetingKey(m)]: !isOpen(m) }))
+  const setTime = (slot: ClassSlot) => setAdding({ courseId: slot.courseId, day: slot.day })
+  const later = next && dayStart(next.start) >= today + 2 * DAY ? next : null
+  const row = (m: Meeting) => (
+    <MeetingRow key={meetingKey(m)} m={m} now={now} isNext={m === next} open={isOpen(m)} onToggle={() => toggle(m)} scele={scele} onSetTime={setTime} />
+  )
 
   return (
     <div className="sc-list">
-      {next && (
-        <section className="sc-next">
-          <div className="sc-next-head">
-            <span>
-              <small>
-                {live ? 'In class now' : 'Next class'}
-                {next.slot.teaching && ' · you TA this'}
-              </small>
-              <b>{courseName(next)}</b>
-            </span>
-            <span className="sc-when">
-              <b>{live ? `until ${next.slot.end}` : next.slot.start ? relTime(next.start, now) : dayLabel(next.start)}</b>
-              <small>
-                {DAY_NAMES[next.slot.day]} {slotTime(next.slot)}
-                {next.slot.room && ` · ${next.slot.room}`}
-              </small>
-            </span>
-          </div>
-          <div className="sc-topic">
-            {next.topic ? (
-              <>
-                <b>
-                  {next.kind === 'exam' && <span className="sc-exam">Exam</span>}
-                  {next.topic}
-                </b>
-                <small className={`sc-src ${fromClass(next)}`}>{next.from ? FROM[next.from] : ''}</small>
-              </>
-            ) : (
-              <small className="sc-src none">This meeting's topic isn't in the course's timeline or outline. Check the syllabus to be sure.</small>
-            )}
-            {next.materials.map((mat) => (
-              <button key={mat.id} className="sc-mat" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(mat.url)}>
-                <BookOpen size={12} aria-hidden /> {mat.name}
-              </button>
-            ))}
-          </div>
-          {(tl || syllabus.length > 0 || dueSoon.length > 0) && (
-            <div className="sc-chips">
-              {tl && (
-                <button className="chip" data-cuelume-open title="Open the course timeline" onClick={() => openScele(tl.url)}>
-                  🗓 {tl.name}
-                </button>
-              )}
-              {syllabus
-                .filter((m) => m.url !== tl?.url)
-                .map((m) => (
-                  <button key={m.id} className="chip" data-cuelume-open onClick={() => openScele(m.url)}>
-                    📄 {m.name}
-                  </button>
-                ))}
-              {dueSoon.map((d) => (
-                <button key={d.id} className="chip" data-cuelume-open onClick={() => openScele(d.url)}>
-                  ⏰ {d.name} · {relTime(d.due, now)}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
+      <NeedsYou scele={scele} />
       {scele.slots.length > 0 && (
         <>
-          <DayList title="Today" meetings={todays} now={now} empty="No classes today" />
-          <DayList title="Tomorrow" meetings={tomorrows} now={now} empty="No classes tomorrow" />
+          {[
+            { title: 'Today', day: today, empty: 'No classes today' },
+            { title: 'Tomorrow', day: today + DAY, empty: 'No classes tomorrow' },
+          ].map(({ title, day, empty }) => {
+            const list = ahead.filter((m) => sameDay(m.start, day + 12 * 3600_000))
+            return (
+              <section key={title}>
+                <h4>{title}</h4>
+                {list.length ? list.map(row) : <small className="sc-none">{empty}</small>}
+              </section>
+            )
+          })}
+          {later && (
+            <section>
+              <h4>{new Date(later.start).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })}</h4>
+              {row(later)}
+            </section>
+          )}
         </>
       )}
 
-      {scele.duplicates.map((q) => (
-        <section key={q.subject} className="sc-ask">
-          <span>
-            <b>You're enrolled in {q.courses.length} courses for the same subject</b>
-            <small>That's often an enrolment mistake. Which one is your actual class?</small>
-          </span>
-          <div className="sc-pick">
-            {q.courses.map((c) => (
-              <button key={c.id} className="sc-row" data-cuelume-select onClick={() => scele.choosePrimary(q.subject, c.id)}>
-                <span className="sc-main">
-                  <b>{c.name}</b>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
-
       <section>
         <h4>
-          Weekly schedule
-          <span className="sc-chips">
-            {scele.tuned && (
-              <button className="chip" data-cuelume-navigate data-cuelume-emphasis="subtle" title="Forget your class picks and removed classes, and read the course pages again" onClick={scele.redetect}>
-                Re-detect
-              </button>
+          Every week
+          <button className="chip" data-cuelume-open data-cuelume-emphasis="subtle" aria-expanded={adding !== null} onClick={() => setAdding((a) => (a ? null : {}))}>
+            {adding ? 'Done' : (
+              <>
+                <Plus size={10} aria-hidden /> Add
+              </>
             )}
-            <button className="chip" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => setAdding((a) => !a)}>
-              {adding ? 'Done' : '+ Add'}
-            </button>
-          </span>
+          </button>
         </h4>
-        {adding && <AddSlot scele={scele} onAdded={() => setAdding(false)} />}
-        {!scele.slots.length && !adding && !scele.duplicates.length && (
-          <div className="empty">{scele.syncing ? 'Reading your courses’ timelines…' : 'No class days found in this term’s courses yet. Add yours to get a heads-up and the day’s topic before each class.'}</div>
+        {adding && <AddSlot scele={scele} initial={adding} onAdded={() => setAdding(null)} />}
+        {!scele.slots.length && !adding && (
+          <div className="empty">{scele.syncing ? 'Reading your courses’ timelines…' : 'No class days found in this term’s courses yet. Connect SLCM below, or add yours, to get a heads-up and the day’s topic before each class.'}</div>
         )}
-        {[...scele.slots]
-          .sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || (a.start || '99').localeCompare(b.start || '99'))
-          .map((s) => (
-            <SlotRow key={s.id} slot={s} name={scele.courses.find((c) => c.id === s.courseId)?.short ?? '?'} onRemove={() => scele.removeSlot(s)} />
-          ))}
-        {/* a combined course whose groups don't say which class is the user's: listed, not asked */}
-        {scele.unsure.map((u) => (
-          <div key={u.courseId} className="sc-row static sc-unsure">
-            <span className="sc-main">
-              <b>{u.course}</b>
-              <small>Lists classes {u.labels.join(', ')}; SCELE doesn't say which is yours</small>
-            </span>
-            <span className="sc-chips">
-              {u.labels.map((l) => (
-                <button key={l} className="chip" data-cuelume-select onClick={() => scele.chooseClass(u.courseId, l)}>
-                  {l}
-                </button>
-              ))}
-            </span>
-          </div>
-        ))}
+        {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+          const slots = scele.slots.filter((s) => s.day === d).sort((a, b) => (a.start || '99').localeCompare(b.start || '99'))
+          if (!slots.length) return null
+          return (
+            <div key={d} className="sc-weekday">
+              <span className="sc-day">{dayName(d)}</span>
+              <div>
+                {slots.map((s) => (
+                  <SlotRow key={s.id} slot={s} name={titleOf(scele, s)} onRemove={() => scele.removeSlot(s)} onSetTime={() => setTime(s)} />
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </section>
 
-      <TermCourses scele={scele} />
+      <Sources scele={scele} />
 
       {scele.slots.length > 0 && (
         <div className="sc-lead">
@@ -324,55 +274,244 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
   )
 }
 
-/** One day's classes in order, each with its time, room and what it covers. */
-function DayList({ title, meetings, now, empty }: { title: string; meetings: Meeting[]; now: number; empty: string }) {
+const titleOf = (scele: SceleState, s: ClassSlot) => {
+  const c = scele.courses.find((x) => x.id === s.courseId)
+  return c ? courseTitle(c) : (s.name ?? '?')
+}
+
+/** What the schedule can't settle alone, asked once, at the top. */
+function NeedsYou({ scele }: { scele: SceleState }) {
+  const [error, setError] = useState<string | null>(null)
+  const untimed = new Set(scele.slots.filter((s) => !s.start).map((s) => s.courseId)).size
+  const connect = () => {
+    setError(null)
+    scele.connectSlcm().catch((e) => setError(typeof e === 'string' ? e : 'Could not open SLCM'))
+  }
   return (
-    <section>
-      <h4>{title}</h4>
-      {!meetings.length && <small className="sc-none">{empty}</small>}
-      {meetings.map((m) => {
-        const live = m.slot.start && m.start <= now && m.end > now
-        const past = m.slot.start && m.end <= now
-        return (
-          <div key={`${m.slot.id}-${m.start}`} className={`sc-row static sc-day-row ${m.kind} ${past ? 'past' : ''} ${live ? 'live' : ''}`}>
-            <span className="sc-time">
-              <b>{m.slot.start || '—'}</b>
-              <small>{m.slot.end && m.slot.start ? m.slot.end : ''}</small>
-            </span>
-            <span className="sc-main">
-              <b>
-                {courseName(m)}
-                {m.slot.teaching && <span className="sc-ta">TA</span>}
-              </b>
-              <TopicLine m={m} />
-              {(m.slot.room || !m.slot.start || live) && (
-                <small className="sc-meta">{[live && 'Now', m.slot.room && `Room ${m.slot.room}`, !m.slot.start && 'time not listed'].filter(Boolean).join(' · ')}</small>
-              )}
-            </span>
-            {m.materials[0] && m.kind !== 'off' && (
-              <button className="chip" data-cuelume-open title={m.materials.map((x) => x.name).join('\n')} onClick={() => openScele(m.materials[0].url)}>
-                <BookOpen size={11} aria-hidden />
-              </button>
-            )}
+    <>
+      {untimed > 0 && !scele.slcm && (
+        <section className="sc-ask">
+          <span>
+            <b>
+              {untimed} course{untimed > 1 ? 's don’t' : ' doesn’t'} list a class time
+            </b>
+            <small>Your study plan in SLCM has the times and rooms. Sign in there once and the island reads them.</small>
+            {error && <small className="sc-error">{error}</small>}
+          </span>
+          <div className="sc-chips">
+            <button className="chip on" data-cuelume-open disabled={scele.slcmBusy} onClick={connect}>
+              {scele.slcmBusy ? 'Waiting for SLCM…' : 'Get times from SLCM'}
+            </button>
           </div>
-        )
-      })}
-    </section>
+        </section>
+      )}
+      {scele.duplicates.map((q) => (
+        <section key={q.subject} className="sc-ask">
+          <span>
+            <b>You're enrolled in {q.courses.length} courses for the same subject</b>
+            <small>That's often an enrolment mistake. Which one is your actual class?</small>
+          </span>
+          <div className="sc-pick">
+            {q.courses.map((c) => (
+              <button key={c.id} className="sc-row" data-cuelume-select onClick={() => scele.choosePrimary(q.subject, c.id)}>
+                <span className="sc-main">
+                  <b>{c.name}</b>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+      {/* a combined course whose groups don't say which class is the user's */}
+      {scele.unsure.map((u) => (
+        <section key={u.courseId} className="sc-ask">
+          <span>
+            <b>Which class of {u.course} are you in?</b>
+            <small>Its page lists classes {u.labels.join(', ')}, and SCELE doesn't say which is yours.</small>
+          </span>
+          <div className="sc-chips">
+            {u.labels.map((l) => (
+              <button key={l} className="chip" data-cuelume-select onClick={() => scele.chooseClass(u.courseId, l)}>
+                Class {l}
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  )
+}
+
+/** One meeting: a row that opens to what it covers. The next class starts open. */
+function MeetingRow(props: { m: Meeting; now: number; isNext: boolean; open: boolean; onToggle: () => void; scele: SceleState; onSetTime: (s: ClassSlot) => void }) {
+  const { m, now, isNext, open, onToggle } = props
+  const live = Boolean(m.slot.start) && m.start <= now && m.end > now
+  const past = Boolean(m.slot.start) && m.end <= now
+  const badge = live ? `In class now · until ${m.slot.end}` : isNext ? `Next class${m.slot.start ? ` · ${relTime(m.start, now)}` : ''}` : null
+  return (
+    <div className={`sc-meeting ${m.kind} ${open ? 'open' : ''} ${isNext || live ? 'next' : ''} ${past ? 'past' : ''}`}>
+      <button className="sc-meeting-head" aria-expanded={open} data-cuelume-tap data-cuelume-emphasis="subtle" onClick={onToggle}>
+        <span className="sc-time">
+          <b>{m.slot.start || '—'}</b>
+          <small>{m.slot.start ? m.slot.end : 'no time'}</small>
+        </span>
+        <span className="sc-main">
+          {badge && <small className="sc-badge-line">{badge}</small>}
+          <b>
+            {m.title}
+            {m.slot.teaching && <span className="sc-ta">TA</span>}
+          </b>
+          {!open && <TopicLine m={m} />}
+        </span>
+        <ChevronDown size={14} className="sc-chev" aria-hidden />
+      </button>
+      {open && <MeetingDetail {...props} />}
+    </div>
   )
 }
 
 /**
- * This term's courses and what the schedule found for each, so a missing one is visible, with the
- * user's say: TA (teaching it, not taking it) and Hide (leave it out). Earlier terms' courses that
- * SCELE still lists as in progress are named but left out.
+ * What a meeting covers, in the order a student asks: where and when, what it's about (and where
+ * that is written, at its page, with how sure it is), then the course page's section and materials
+ * for it. Nothing is listed rather than something unrelated.
  */
-function TermCourses({ scele }: { scele: SceleState }) {
+function MeetingDetail({ m, now, scele, onSetTime }: { m: Meeting; now: number; scele: SceleState; onSetTime: (s: ClassSlot) => void }) {
+  const due = m.course ? scele.deadlines.filter((d) => d.courseId === m.course!.id && d.due > now).slice(0, 2) : []
+  const syllabus = !m.topic && m.course ? syllabusLinks(scele.contents[m.course.id] ?? []) : []
+  const where = [m.slot.room && `Room ${m.slot.room}`, m.slot.source && `times from the ${SOURCE_NAME[m.slot.source]}`].filter(Boolean).join(' · ')
+  return (
+    <div className="sc-detail">
+      {m.slot.start ? (
+        where && <small className="sc-meta">{where}</small>
+      ) : (
+        <div className="sc-fix">
+          <small>Time not listed on SCELE</small>
+          {!scele.slcm && (
+            <button className="chip" data-cuelume-open disabled={scele.slcmBusy} onClick={() => scele.connectSlcm().catch(() => {})}>
+              Get times from SLCM
+            </button>
+          )}
+          <button className="chip ghost" data-cuelume-open onClick={() => onSetTime(m.slot)}>
+            Set time
+          </button>
+        </div>
+      )}
+
+      {m.kind === 'off' ? (
+        <p className="sc-off">No class · {m.topic}</p>
+      ) : m.topic ? (
+        <div className="sc-topic">
+          <b>
+            {m.kind === 'exam' && <span className="sc-exam">Exam</span>}
+            {m.topic}
+          </b>
+          {m.detail.map((d) => (
+            <p key={d}>{d}</p>
+          ))}
+          <span className="sc-prov">
+            {m.source && (
+              <button className="sc-link" data-cuelume-open title={`Open ${m.source.name}`} onClick={() => openScele(m.source!.url)}>
+                <FileText size={12} aria-hidden />
+                <span>
+                  {docName(m.source.name)}
+                  {m.source.page && ` · page ${m.source.page}`}
+                </span>
+              </button>
+            )}
+            {m.from && <small className={`sc-src ${CERTAINTY[m.from].cls}`}>{CERTAINTY[m.from].word}</small>}
+          </span>
+        </div>
+      ) : (
+        <p className="sc-src none">This class's topic isn't in the course's timeline or outline.</p>
+      )}
+
+      {m.kind !== 'off' && m.course && (
+        <div className="sc-cover">
+          <small className="sc-cover-label">On SCELE</small>
+          {m.section && (
+            <button className="sc-link" data-cuelume-open onClick={() => openScele(m.section!.url)}>
+              <FolderOpen size={12} aria-hidden />
+              <span>{m.section.name}</span>
+            </button>
+          )}
+          {m.materials.map((mat) => (
+            <button key={mat.id} className={`sc-link ${m.section ? 'sub' : ''}`} data-cuelume-open onClick={() => openScele(mat.url)}>
+              <BookOpen size={12} aria-hidden />
+              <span>{mat.name}</span>
+            </button>
+          ))}
+          {syllabus.map((s) => (
+            <button key={s.id} className="sc-link" data-cuelume-open onClick={() => openScele(s.url)}>
+              <FileText size={12} aria-hidden />
+              <span>{s.name}</span>
+            </button>
+          ))}
+          {!m.section && !m.materials.length && !syllabus.length && (
+            <small className="sc-none-inline">{m.topic ? 'Nothing posted for this topic yet' : 'Nothing found for this class'}</small>
+          )}
+        </div>
+      )}
+
+      {due.length > 0 && (
+        <div className="sc-chips">
+          {due.map((d) => (
+            <button key={d.id} className="chip" data-cuelume-open onClick={() => openScele(d.url)}>
+              <Clock size={10} aria-hidden /> {d.name} · due {relTime(d.due, now)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Where the schedule comes from, folded away: SLCM, then this term's courses and what was found
+ * for each, with the user's say (TA, Hide). Earlier terms' courses SCELE still lists are named.
+ */
+function Sources({ scele }: { scele: SceleState }) {
   const [showHidden, setShowHidden] = useState(false)
-  if (!scele.status.length) return null
+  const [error, setError] = useState<string | null>(null)
+  const missing = scele.status.filter((s) => !s.hidden && !s.found && !s.teaching && !s.waiting).length
   const hidden = scele.status.filter((s) => s.hidden)
   const rows = scele.status.filter((s) => !s.hidden || showHidden)
+  const connect = () => {
+    setError(null)
+    scele.connectSlcm().catch((e) => setError(typeof e === 'string' ? e : 'Could not open SLCM'))
+  }
   return (
-    <section>
+    <details className="sc-sources">
+      <summary>
+        <span>Where your schedule comes from</span>
+        {missing > 0 && <small className="sc-warn-count">{missing} without class days</small>}
+        <ChevronDown size={14} className="sc-chev" aria-hidden />
+      </summary>
+
+      <div className="sc-row static">
+        <CalendarClock size={16} className="sc-src-icon" aria-hidden />
+        <span className="sc-main">
+          <b>SLCM study plan</b>
+          <small>
+            {scele.slcmBusy
+              ? 'Waiting for you to sign in to SLCM…'
+              : scele.slcm
+                ? `${scele.slcm.classes.length} weekly classes · read ${relTime(scele.slcm.at, Date.now())}`
+                : 'Official class times and rooms. Sign in once in the window it opens.'}
+          </small>
+          {error && <small className="sc-error">{error}</small>}
+        </span>
+        <span className="sc-chips">
+          <button className={`chip ${scele.slcm ? '' : 'on'}`} data-cuelume-open disabled={scele.slcmBusy} onClick={connect}>
+            {scele.slcm ? 'Read again' : 'Connect'}
+          </button>
+          {scele.slcm && (
+            <button className="chip ghost" data-cuelume-close data-cuelume-emphasis="subtle" onClick={scele.forgetSlcm}>
+              Forget
+            </button>
+          )}
+        </span>
+      </div>
+
       <h4>
         This term's courses
         {hidden.length > 0 && (
@@ -381,38 +520,38 @@ function TermCourses({ scele }: { scele: SceleState }) {
           </button>
         )}
       </h4>
-      {rows.map(({ course: c, found, source, teaching, hidden: off, timeline, blocked }) => (
+      {rows.map(({ course: c, found, source, teaching, hidden: off, timeline, blocked, waiting }) => (
         <div key={c.id} className={`sc-row static sc-course ${off ? 'off' : ''}`}>
           <span className="sc-main">
-            <b title={c.full}>{c.full.replace(/^\s*\[[^\]]*\]\s*/, '')}</b>
-            <small>
+            <b title={c.full}>{courseTitle(c)}</b>
+            <small className={!off && !found && !scele.syncing && !teaching && !waiting ? 'sc-missing' : ''}>
               {off
                 ? 'Hidden from the schedule'
-                : found
+                : waiting
+                  ? 'Waiting for you to pick your class above'
+                  : found
                   ? `${found} class${found > 1 ? 'es' : ''} a week · from the ${SOURCE_NAME[source ?? 'page']}`
                   : scele.syncing
                     ? 'Reading its documents…'
-                    : 'No class days found · add them with + Add'}
+                    : 'No class days found · add them under Every week'}
             </small>
             {timeline && !off && (
-              <small className="sc-tl" title={timeline.name}>
-                🗓 Topics from “{timeline.name}” · {timeline.sessions} entries
-              </small>
+              <button className="sc-link small" data-cuelume-open title="Open the document the topics come from" onClick={() => openScele(browserUrl(timeline.url))}>
+                <FileText size={11} aria-hidden />
+                <span>
+                  Topics from “{docName(timeline.name)}” · {timeline.sessions} entries
+                </span>
+              </button>
             )}
             {blocked.map((b) => (
-              <button key={b.url} className="sc-blocked" data-cuelume-open title="Shared only with signed-in accounts, so the island can't read it. Open it, or ask for a PDF version." onClick={() => openScele(b.url)}>
-                🔒 “{b.name}” needs a Google sign-in · open
+              <button key={b.url} className="sc-link small warn" data-cuelume-open title="Shared only with signed-in accounts, so the island can't read it. Open it, or ask for a PDF version." onClick={() => openScele(b.url)}>
+                <Lock size={11} aria-hidden />
+                <span>“{b.name}” needs a Google sign-in</span>
               </button>
             ))}
           </span>
           <span className="sc-chips">
-            <button
-              className={`chip ${teaching ? 'on' : ''}`}
-              aria-pressed={teaching}
-              title="You're a teaching assistant for this course"
-              data-cuelume-toggle
-              onClick={() => scele.setTeaching(c.id, !teaching)}
-            >
+            <button className={`chip ${teaching ? 'on' : ''}`} aria-pressed={teaching} title="You're a teaching assistant for this course" data-cuelume-toggle onClick={() => scele.setTeaching(c.id, !teaching)}>
               TA
             </button>
             <button className="chip ghost" data-cuelume-toggle data-cuelume-emphasis="subtle" onClick={() => scele.setHidden(c.id, !off)}>
@@ -426,40 +565,48 @@ function TermCourses({ scele }: { scele: SceleState }) {
           Left out, from an earlier term: {scele.earlier.map((c) => c.short).join(', ')}
         </small>
       )}
-    </section>
+      {scele.tuned && (
+        <button className="sc-link small sc-reset" data-cuelume-navigate title="Forget your class picks, removed classes, TA marks and hidden courses" onClick={scele.redetect}>
+          <RotateCcw size={11} aria-hidden />
+          <span>Start over: forget my picks and read the courses again</span>
+        </button>
+      )}
+    </details>
   )
 }
 
-/** Where a found class came from, as the rows say it. */
-const SOURCE_NAME: Record<NonNullable<ClassSlot['source']>, string> = { page: 'course page', syllabus: 'syllabus', timeline: 'timeline' }
-
-function SlotRow({ slot, name, onRemove }: { slot: ClassSlot; name: string; onRemove: () => void }) {
+function SlotRow({ slot, name, onRemove, onSetTime }: { slot: ClassSlot; name: string; onRemove: () => void; onSetTime: () => void }) {
   return (
-    <div className="sc-row static">
-      <span className="sc-day">{DAY_NAMES[slot.day].slice(0, 3)}</span>
+    <div className="sc-row static sc-slot">
+      <span className="sc-slot-time">{slot.start ? `${slot.start}–${slot.end}` : 'no time'}</span>
       <span className="sc-main">
-        <b>{name}</b>
-        <small>
-          {slotTime(slot)}
-          {slot.room && ` · ${slot.room}`}
-          {slot.auto && (
-            <span className="sc-auto" title="Read from SCELE; it updates when the course does">
-              {` · from the ${SOURCE_NAME[slot.source ?? 'page']}`}
+        <b>
+          {name}
+          {slot.teaching && (
+            <span className="sc-ta" title="You teach this course (TA)">
+              TA
             </span>
           )}
+        </b>
+        <small>
+          {[slot.room, slot.auto ? `from the ${SOURCE_NAME[slot.source ?? 'page']}` : 'added by you'].filter(Boolean).join(' · ')}
         </small>
       </span>
-      {slot.teaching && <span className="sc-ta" title="You teach this course (TA)">TA</span>}
-      <button className="x" aria-label={slot.auto ? 'Hide this class' : 'Remove class'} title={slot.auto ? 'Not my class' : 'Remove'} data-cuelume-close data-cuelume-emphasis="subtle" onClick={onRemove}>
+      {!slot.start && (
+        <button className="chip" data-cuelume-open onClick={onSetTime}>
+          Set time
+        </button>
+      )}
+      <button className="x" aria-label={slot.auto ? `Not my class: hide ${name} on this day` : `Remove ${name}`} title={slot.auto ? 'Not my class' : 'Remove'} data-cuelume-close data-cuelume-emphasis="subtle" onClick={onRemove}>
         ×
       </button>
     </div>
   )
 }
 
-function AddSlot({ scele, onAdded }: { scele: SceleState; onAdded: () => void }) {
-  const [courseId, setCourseId] = useState(scele.courses[0]?.id ?? 0)
-  const [day, setDay] = useState(1)
+function AddSlot({ scele, initial, onAdded }: { scele: SceleState; initial: Partial<Omit<ClassSlot, 'id'>>; onAdded: () => void }) {
+  const [courseId, setCourseId] = useState(initial.courseId || scele.courses[0]?.id || 0)
+  const [day, setDay] = useState(initial.day ?? 1)
   const [start, setStart] = useState('08:00')
   const [end, setEnd] = useState('09:40')
   const [room, setRoom] = useState('')
@@ -467,23 +614,23 @@ function AddSlot({ scele, onAdded }: { scele: SceleState; onAdded: () => void })
   if (!scele.courses.length) return <div className="empty">No courses this period yet. Sync first.</div>
   return (
     <div className="sc-add" onKeyDown={stop}>
-      <select className="todo-input" value={courseId} onChange={(e) => setCourseId(Number(e.target.value))}>
+      <select className="todo-input" aria-label="Course" value={courseId} onChange={(e) => setCourseId(Number(e.target.value))}>
         {scele.courses.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.short} · {c.full}
+            {courseTitle(c)}
           </option>
         ))}
       </select>
       <div className="sc-add-row">
-        <select className="todo-input" value={day} onChange={(e) => setDay(Number(e.target.value))}>
+        <select className="todo-input" aria-label="Day" value={day} onChange={(e) => setDay(Number(e.target.value))}>
           {[1, 2, 3, 4, 5, 6, 0].map((d) => (
             <option key={d} value={d}>
-              {DAY_NAMES[d]}
+              {dayName(d, 'long')}
             </option>
           ))}
         </select>
-        <input className="todo-input" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
-        <input className="todo-input" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+        <input className="todo-input" type="time" aria-label="Starts" value={start} onChange={(e) => setStart(e.target.value)} />
+        <input className="todo-input" type="time" aria-label="Ends" value={end} onChange={(e) => setEnd(e.target.value)} />
       </div>
       <div className="sc-add-row">
         <input className="todo-input" placeholder="Room (optional)" value={room} data-cuelume-type onChange={(e) => setRoom(e.target.value)} />

@@ -243,11 +243,12 @@ pub fn sso_student(app: AppHandle) -> Option<Student> {
     saved(&app)
 }
 
-/// Forgets the verification, and with it the SCELE connection that depends on it.
+/// Forgets the verification, and with it the SCELE connection and SLCM schedule that depend on it.
 #[tauri::command]
 pub fn sso_forget(app: AppHandle) {
     if let Ok(p) = path(&app) {
         let _ = std::fs::remove_file(p);
     }
     crate::scele::forget_token(&app);
+    crate::slcm::forget(&app);
 }
