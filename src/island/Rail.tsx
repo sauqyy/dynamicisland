@@ -57,7 +57,7 @@ export function Rail({ groups, tab, onPage, onGroup, dots }: Props) {
   }, [tab, active, groups])
 
   return (
-    <nav className="rail" ref={rail} aria-label="Pages" onClick={(e) => e.stopPropagation()}>
+    <nav className={`rail ${groups.length > 6 ? 'tight' : ''}`} ref={rail} aria-label="Pages" onClick={(e) => e.stopPropagation()}>
       <span className="rail-lit" ref={lit} />
       {groups.map((g) => (
         <div key={g.id} className={`rail-g ${g.id === active ? 'on' : ''}`}>

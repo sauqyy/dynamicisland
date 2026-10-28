@@ -9,7 +9,7 @@ export type TabAnim = 'fade' | 'slide' | 'liquid' | 'zoom' | 'stack' | 'flip' | 
 
 export const TAB_ANIMS: TabAnim[] = ['fade', 'slide', 'liquid', 'zoom', 'stack', 'flip', 'blur', 'rise', 'morph', 'elastic']
 export type Theme = 'dark' | 'light' | 'glass' | 'auto'
-export type IdleDisplay = 'clock' | 'lyrics' | 'weather'
+export type IdleDisplay = 'clock' | 'lyrics' | 'weather' | 'deadline'
 /** cuelume's themes; 'basic' is the one cuelume calls 'default' */
 /** how the music-is-playing mark moves */
 export type EqStyle = 'bars' | 'wave' | 'pulse'

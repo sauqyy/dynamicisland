@@ -4685,3 +4685,447 @@ button.sc-row:hover {
 .sc-blocked:hover {
   text-decoration: underline;
 }
+
+/* ---------- deadlines ---------- */
+.dl {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dl-add,
+.wk-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.dl-add .todo-input,
+.wk-add .todo-input {
+  min-width: 0;
+}
+.dl-when {
+  flex: none;
+  width: auto;
+  color-scheme: dark;
+}
+.wk-clock {
+  flex: none;
+  width: auto;
+  padding: 9px 8px;
+  color-scheme: dark;
+}
+.light .dl-when,
+.light .wk-clock {
+  color-scheme: light;
+}
+.dl-go {
+  flex: none;
+}
+.dl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: none;
+}
+.dl-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+}
+.dl-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+.dl-text b,
+.dl-text small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dl-text b {
+  font-weight: 600;
+}
+.dl-text small {
+  font-size: 11px;
+  opacity: 0.5;
+}
+.dl-left {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.dl-item.u-soon .dl-left,
+.dl-peek li.u-soon small {
+  color: #fb923c;
+}
+.dl-item.u-late .dl-left,
+.dl-peek li.u-late small {
+  color: #f87171;
+}
+.dl-item.done .dl-left {
+  color: inherit;
+  opacity: 0.45;
+}
+.dl-item.done .dl-text b {
+  text-decoration: line-through;
+  opacity: 0.45;
+}
+/* the list that drops out of the pill on hover */
+.dl-peek {
+  list-style: none;
+  margin: 0;
+  padding: 7px 16px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.dl-peek li {
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.dl-peek li i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.dl-peek li.u-soon i {
+  background: #fb923c;
+}
+.dl-peek li.u-late i {
+  background: #f87171;
+}
+.dl-peek li span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dl-peek li small {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+.dl-peek li.more {
+  justify-content: center;
+  opacity: 0.5;
+  font-size: 12px;
+}
+
+/* ---------- schedule ---------- */
+.wk {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wk-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wk-days {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+}
+.wk-day {
+  position: relative;
+  flex: 1;
+  height: 28px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgb(var(--fg-rgb) / 0.08);
+  opacity: 0.7;
+  transition: background 0.15s, opacity 0.15s;
+}
+.wk-day:hover {
+  opacity: 1;
+}
+.wk-day.on {
+  opacity: 1;
+  background: var(--accent);
+  color: var(--on-accent, #000);
+}
+.wk-day.today:not(.on) {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.wk-day i {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+.wk-full {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+.wk-list,
+.wk-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wk-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.wk-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: rgb(var(--fg-rgb) / 0.07);
+  font-size: 13px;
+}
+.wk-slot.now {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.wk-time {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.wk-time small {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.5;
+}
+.wk-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+/* fullscreen: the whole week at once */
+.wk-fs {
+  gap: 14px;
+}
+.wk-fs .wk-days {
+  display: none;
+}
+.wk-fs .wk-top {
+  justify-content: flex-end;
+}
+.wk-fs .wk-add {
+  max-width: 640px;
+}
+.wk-week {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+.wk-col {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 16px;
+  background: rgb(var(--fg-rgb) / 0.05);
+  overflow-y: auto;
+  scrollbar-width: none;
+  cursor: pointer;
+}
+.wk-col.sel {
+  box-shadow: inset 0 0 0 1.5px rgb(var(--fg-rgb) / 0.3);
+}
+.wk-col h4 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0.6;
+}
+.wk-col.today h4 {
+  color: var(--accent);
+  opacity: 1;
+}
+.wk-col .wk-slot {
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-bottom: 0;
+}
+.wk-col .wk-time {
+  flex-direction: row;
+  gap: 4px;
+  align-items: baseline;
+}
+.wk-col .wk-time small::before {
+  content: '–';
+  margin-right: 4px;
+}
+.wk-col .wk-title {
+  flex-basis: 100%;
+  white-space: normal;
+  order: 3;
+}
+.wk-col .wk-slot .x {
+  margin-left: auto;
+}
+.wk-free {
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.3;
+  margin-top: 6px;
+}
+
+/* ---------- prompter ---------- */
+.tp {
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  outline: 0;
+}
+.tp-script {
+  flex: 1;
+}
+.tp-fs .tp-script {
+  font-size: 18px;
+}
+.tp-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.tp-bar .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  gap: 4px;
+}
+.tp-bar .chip.on,
+.tp-bar .chip[aria-pressed='true']:not(.wk-full) {
+  background: var(--accent);
+  color: var(--on-accent, #000);
+}
+.tp-count {
+  margin-right: auto;
+  font-size: 11px;
+  opacity: 0.45;
+}
+.tp-bar .pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tp-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tp-group small {
+  min-width: 22px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+.tp.reading .tp-bar {
+  justify-content: center;
+}
+.tp-stage {
+  position: relative;
+  /* the card page has no height of its own, so the view needs one to scroll inside */
+  flex: none;
+  height: 176px;
+}
+.tp-fs .tp-stage {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.tp-view {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-radius: 16px;
+  padding: 0 18px;
+  background: rgb(var(--fg-rgb) / 0.08);
+  cursor: pointer;
+  /* text fades in and out at the top and bottom edges */
+  mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
+  -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
+}
+.tp-text {
+  /* room above and below so the first and last line can reach the reading line */
+  padding: 42% 0;
+  line-height: 1.45;
+  font-weight: 600;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: none;
+}
+.tp-text.mirror {
+  transform: scaleX(-1);
+}
+.tp-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--accent);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* seven groups (the campus build) would not fit the card: a slimmer rail */
+.rail.tight {
+  gap: 0;
+}
+.rail.tight .rail-ic {
+  width: 24px;
+}
+.rail.tight .rail-pg {
+  padding: 5px 7px;
+  font-size: 12px;
+}

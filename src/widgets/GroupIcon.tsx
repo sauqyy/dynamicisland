@@ -1,4 +1,4 @@
-import { FolderOpen, ListChecks, Music2, Settings2, Users, type LucideIcon } from 'lucide-react'
+import { CalendarClock, FolderOpen, ListChecks, Music2, Settings2, Users, type LucideIcon } from 'lucide-react'
 import { UiLogo } from './UiLogo'
 
 // written out, not imported, so the bundler can drop the logo from the regular build
@@ -7,6 +7,7 @@ const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
 const ICONS: Record<string, LucideIcon> = {
   home: Music2,
   tools: ListChecks,
+  plan: CalendarClock,
   files: FolderOpen,
   social: Users,
   settings: Settings2,

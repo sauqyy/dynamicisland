@@ -248,7 +248,7 @@ export function SettingsWidget({ settings, update, updater, unavailable }: Props
       <Group title="Pill">
         <div className="row">
           <span>Show in pill</span>
-          <Segmented<IdleDisplay> options={[['clock', 'Clock'], ['lyrics', 'Lyrics'], ['weather', 'Weather']]} value={settings.idle} onPick={(idle) => update({ idle })} />
+          <Segmented<IdleDisplay> options={[['clock', 'Clock'], ['lyrics', 'Lyrics'], ['weather', 'Weather'], ['deadline', 'Deadline']]} value={settings.idle} onPick={(idle) => update({ idle })} />
         </div>
         <div className="row">
           <span>Equalizer while playing</span>

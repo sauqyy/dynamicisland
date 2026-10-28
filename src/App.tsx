@@ -16,6 +16,10 @@ import { CHANGELOG, releaseToShow, type Release } from './lib/changelog'
 import { SettingsWidget } from './widgets/SettingsWidget'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
+import { PrompterWidget } from './widgets/PrompterWidget'
+import { DeadlinesWidget } from './widgets/DeadlinesWidget'
+import { ScheduleWidget } from './widgets/ScheduleWidget'
+import { dueLabel, upcoming, urgency, useDeadlines } from './lib/deadlines'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { SceleWidget } from './widgets/SceleWidget'
 import { useScele } from './lib/useScele'
@@ -207,6 +211,7 @@ export default function App() {
   const [sw, setSw] = useState<StopwatchState>({ running: false, startedAt: 0, base: 0, laps: [] })
   const [now, setNow] = useState(() => Date.now())
   const [todos, setTodos] = useState<Todo[]>(loadTodos)
+  const { deadlines, setDeadlines } = useDeadlines()
   const [battery, setBattery] = useState<number | null>(null)
   // natural height of the page on show, measured as it renders
   const [pageH, setPageH] = useState(240)
@@ -616,7 +621,7 @@ export default function App() {
 
   // fullscreen only belongs to an open chat
   useEffect(() => {
-    if (fs && !(expanded && (tab === 'friends' || tab === 'groups'))) exitFullscreen()
+    if (fs && !(expanded && (tab === 'friends' || tab === 'groups' || tab === 'prompter' || tab === 'schedule'))) exitFullscreen()
   }, [fs, expanded, tab, exitFullscreen])
 
   // what friends can see: the song or timer that is running
@@ -665,7 +670,11 @@ export default function App() {
     return null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
-  const idleExtra = idleWeather?.text ?? ''
+  // the nearest open deadline; hovering the pill lists them all
+  const openDeadlines = useMemo(() => upcoming(deadlines), [deadlines])
+  const nearest = settings.idle === 'deadline' ? openDeadlines[0] : undefined
+  const idleDeadline = nearest ? `${nearest.title} · ${dueLabel(nearest.due, now)}` : ''
+  const idleExtra = idleWeather?.text ?? idleDeadline
   const weatherGlyph = idleWeather && !idleLyric ? <WeatherIcon code={idleWeather.code} night={isNight(new Date(now).getHours())} size={15} /> : null
   const idleText = idleLyric ? lyricText : idleExtra
   const d = new Date(now)
@@ -718,6 +727,10 @@ export default function App() {
   const showVoicePeople = mode === 'incall' && hovered && voicePeople.length > 0
   const voiceRows = showVoicePeople ? Math.ceil(voicePeople.length / 2) : 0
 
+  // hovering the pill in deadline mode drops down the whole list (the first few, then a "+N more" row)
+  const dlShown = openDeadlines.slice(0, 6)
+  const dlRows = mode === 'peek' && settings.idle === 'deadline' && openDeadlines.length ? dlShown.length + (openDeadlines.length > dlShown.length ? 1 : 0) : 0
+
   const shape: Shape = useMemo(() => {
     switch (mode) {
       case 'expanded':
@@ -734,11 +747,12 @@ export default function App() {
       case 'incall':
         return voiceRows ? { w: 300, h: 42 + 14 + voiceRows * 30, r: 22 } : { w: 250, h: 42, r: 18 }
       case 'peek':
+        if (dlRows) return { w: 340, h: 14 + dlRows * 30, r: 20 }
         return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows, dlRows])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -1032,6 +1046,9 @@ export default function App() {
             )}
             {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
             {tab === 'notes' && <NotesWidget />}
+            {tab === 'prompter' && <PrompterWidget fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
+            {tab === 'deadlist' && <DeadlinesWidget deadlines={deadlines} setDeadlines={setDeadlines} now={now} />}
+            {tab === 'schedule' && <ScheduleWidget fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
             {CAMPUS && (tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
               <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} />
@@ -1233,7 +1250,21 @@ export default function App() {
       </div>
     )
   } else if (mode === 'peek') {
-    if (peekText && track) {
+    if (dlRows) {
+      contentKey = 'peek-deadlines'
+      content = (
+        <ul className="dl-peek">
+          {dlShown.map((x) => (
+            <li key={x.id} className={`u-${urgency(x.due, now)}`}>
+              <i />
+              <span>{x.title}</span>
+              <small>{dueLabel(x.due, now)}</small>
+            </li>
+          ))}
+          {openDeadlines.length > dlShown.length && <li className="more">+{openDeadlines.length - dlShown.length} more</li>}
+        </ul>
+      )
+    } else if (peekText && track) {
       contentKey = 'peek-live'
       content = (
         <div className="live peek-live">
