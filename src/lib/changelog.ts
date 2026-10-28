@@ -7,6 +7,16 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.4',
+    title: 'Classes from your course timelines',
+    items: [
+      'Classes now reads each course\'s timeline, from PDFs, slides, Word, Excel or a linked Google Sheet, and finds your class days from it.',
+      'Today and Tomorrow list your classes with their time, room and what each one covers, plus the matching course materials.',
+      'Holidays on the timeline skip the reminder, and you get a heads-up on days when a class has no time listed.',
+      'If a course\'s timeline needs a Google sign-in, Classes tells you which one so you can open it.',
+    ],
+  },
+  {
     version: '0.7.3',
     title: 'Your classes, from the syllabus',
     items: [
