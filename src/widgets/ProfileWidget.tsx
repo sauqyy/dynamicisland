@@ -39,9 +39,12 @@ function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: 
       const who = await student.verify()
       if (who.fasilkom) {
         play('success')
+      } else if (who.needs_scele) {
+        play('ready')
       } else {
         play('error', { emphasis: 'subtle' })
-        setMsg(`Signed in as ${who.name || who.username}, but the Campus pages are only for Fasilkom UI students.`)
+        // what SSO UI sent goes along, so a faculty that isn't recognised can be told apart from another one
+        setMsg(`Signed in as ${who.name || who.username}, but SSO UI doesn't list you as a Fasilkom UI student. ${who.detail}`)
       }
     } catch (e) {
       play('error', { emphasis: 'subtle' })
@@ -55,7 +58,9 @@ function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: 
   return (
     <div className="field student-card">
       <label>Universitas Indonesia</label>
-      {s ? (
+      {s?.needs_scele ? (
+        <ConfirmWithScele student={student} />
+      ) : s ? (
         <div className="student-id">
           <UiLogo size={26} color={UI_YELLOW} />
           <span>
@@ -80,6 +85,68 @@ function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: 
         </>
       )}
       {msg && <div className="form-msg">{msg}</div>}
+    </div>
+  )
+}
+
+/**
+ * SSO UI vouched for the account but didn't say which faculty (its newer endpoints leave that out).
+ * SCELE is Fasilkom's own e-learning, so signing in to it with courses there confirms Fasilkom,
+ * and connects SCELE in the same step.
+ */
+function ConfirmWithScele({ student }: { student: StudentState }) {
+  const s = student.student!
+  const [pass, setPass] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const submit = async () => {
+    if (!pass || busy) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      await student.confirm(pass)
+      play('success')
+    } catch (e) {
+      play('error', { emphasis: 'subtle' })
+      setMsg(typeof e === 'string' ? e : 'SCELE sign-in failed')
+    } finally {
+      setBusy(false)
+      setPass('')
+    }
+  }
+  return (
+    <div className="student-confirm">
+      <div className="student-id">
+        <UiLogo size={26} color={UI_YELLOW} />
+        <span>
+          <b>{s.name || s.username}</b>
+          <small>{[s.npm, 'UI account verified · faculty not confirmed yet'].filter(Boolean).join(' · ')}</small>
+        </span>
+        <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={student.forget}>
+          Remove
+        </button>
+      </div>
+      <small>SSO UI didn't say which faculty you're in. Confirm Fasilkom by signing in to SCELE, Fasilkom's e-learning, with the same account. This also connects SCELE.</small>
+      <div className="student-confirm-row">
+        <input
+          className="todo-input"
+          type="password"
+          placeholder="SSO UI password"
+          autoComplete="current-password"
+          value={pass}
+          data-cuelume-type
+          onChange={(e) => setPass(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter') submit()
+          }}
+        />
+        <button className="pill-btn" disabled={busy || !pass} data-cuelume-tap onClick={submit}>
+          {busy ? 'Checking…' : 'Confirm'}
+        </button>
+      </div>
+      {msg && <div className="form-msg">{msg}</div>}
+      {s.detail && <small className="student-detail">{s.detail}</small>}
     </div>
   )
 }

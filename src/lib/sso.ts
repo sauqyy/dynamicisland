@@ -13,6 +13,10 @@ export interface Student {
   educational_program: string
   /** a Fasilkom UI student: the Campus pages are only for them */
   fasilkom: boolean
+  /** SSO UI vouched for the account but sent no faculty: connecting SCELE confirms Fasilkom */
+  needs_scele: boolean
+  /** what SSO UI sent, shown when the faculty can't be confirmed */
+  detail: string
   verified_at: number
 }
 
@@ -27,6 +31,8 @@ const DEMO_STUDENT: Student = {
   study_program: 'Ilmu Komputer (Computer Science)',
   educational_program: 'S1 Reguler (Undergraduate Program)',
   fasilkom: true,
+  needs_scele: false,
+  detail: '',
   verified_at: 0,
 }
 
@@ -40,7 +46,8 @@ function demoSaved(): Student | null {
 
 /**
  * The SSO UI verification. `student` is undefined while it is being looked up, null when the
- * user has not verified (or is not a Fasilkom student).
+ * user has not verified (or is not a Fasilkom student). A student SSO UI gave no faculty for
+ * has `needs_scele` until `confirm` signs in to SCELE; only `fasilkom` unlocks Campus.
  */
 export function useStudent() {
   const [student, setStudent] = useState<Student | null | undefined>(() => (IS_TAURI ? undefined : demoSaved()))
@@ -48,8 +55,15 @@ export function useStudent() {
   useEffect(() => {
     if (!IS_TAURI) return
     invoke<Student | null>('sso_student')
-      .then((s) => setStudent(s?.fasilkom ? s : null))
+      .then((s) => setStudent(s?.fasilkom || s?.needs_scele ? s : null))
       .catch(() => setStudent(null))
+  }, [])
+
+  /** Confirms Fasilkom with the SCELE password (and connects SCELE in the same step). */
+  const confirm = useCallback(async (password: string) => {
+    if (!IS_TAURI) return setStudent({ ...DEMO_STUDENT, verified_at: Date.now() })
+    await invoke('scele_login', { password })
+    setStudent(await invoke<Student | null>('sso_student'))
   }, [])
 
   /** Opens SSO UI in the browser; resolves with whoever signed in, Fasilkom or not. */
@@ -64,7 +78,7 @@ export function useStudent() {
       }
       s = { ...DEMO_STUDENT, verified_at: Date.now() }
     }
-    if (s.fasilkom) setStudent(s)
+    if (s.fasilkom || s.needs_scele) setStudent(s)
     return s
   }, [])
 
@@ -79,7 +93,7 @@ export function useStudent() {
     setStudent(null)
   }, [])
 
-  return { student, verify, forget }
+  return { student, verify, confirm, forget }
 }
 
 export type StudentState = ReturnType<typeof useStudent>
