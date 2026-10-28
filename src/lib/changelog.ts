@@ -11,6 +11,17 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.7',
+    campus: true,
+    title: 'Classes, rebuilt around your next class',
+    items: [
+      'Connect SLCM in Classes to get every class\'s official time and room from your study plan. You sign in on SLCM\'s own page, and only the schedule comes back.',
+      'Each class shows the topic exactly as the lesson plan words it, a link to that page of the document, and the SCELE section and slides for that topic. If nothing matches, Classes says so instead of showing unrelated slides.',
+      'Today and Tomorrow are one list. Your next class opens first, and you can tap any other class to see what it covers.',
+      'Questions that need you, like a missing class time or a course you\'re enrolled in twice, come first, and the sources sit folded at the bottom.',
+    ],
+  },
+  {
     version: '0.7.6',
     title: 'Prompter, deadlines and your week',
     items: [
