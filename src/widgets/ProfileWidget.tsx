@@ -8,6 +8,9 @@ import { DEMO_SOCIAL } from '../lib/useDemo'
 import { Avatar } from './Avatar'
 import { play } from 'cuelume'
 import { disclosureCue } from '../lib/sound'
+import type { StudentState } from '../lib/sso'
+import { BadgeCheck } from 'lucide-react'
+import { UI_YELLOW, UiLogo } from './UiLogo'
 
 const EMOJIS = ['🙂', '😎', '🤖', '🦊', '🐼', '🐸', '🦄', '🐙', '🌵', '🚀', '🎧', '🔥', '🌙', '🍕', '👾', '🐱']
 
@@ -17,6 +20,68 @@ interface Props {
   update: (patch: Partial<Settings>) => void
   /** keep the card open while a system dialog (file picker) has the pointer */
   onHold: (on: boolean) => void
+  /** SSO UI verification, which unlocks the Campus pages */
+  student: StudentState
+}
+
+/** "Verify Student" with SSO UI. Separate from the friends account, so it works without one. */
+function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: boolean) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const s = student.student
+
+  const verify = async () => {
+    setBusy(true)
+    setMsg(null)
+    // the browser takes the pointer while the user signs in; keep the card open for when they come back
+    onHold(true)
+    try {
+      const who = await student.verify()
+      if (who.fasilkom) {
+        play('success')
+      } else {
+        play('error', { emphasis: 'subtle' })
+        setMsg(`Signed in as ${who.name || who.username}, but the Campus pages are only for Fasilkom UI students.`)
+      }
+    } catch (e) {
+      play('error', { emphasis: 'subtle' })
+      setMsg(typeof e === 'string' ? e : 'SSO UI sign-in failed')
+    } finally {
+      setBusy(false)
+      onHold(false)
+    }
+  }
+
+  return (
+    <div className="field student-card">
+      <label>Universitas Indonesia</label>
+      {s ? (
+        <div className="student-id">
+          <UiLogo size={26} color={UI_YELLOW} />
+          <span>
+            <b>
+              {s.name || s.username} <BadgeCheck size={13} strokeWidth={2.2} className="student-check" aria-label="Verified with SSO UI" />
+            </b>
+            <small>
+              {s.npm} · Fasilkom UI{s.study_program ? ` · ${s.study_program.replace(/\s*\(.*\)$/, '')}` : ''}
+            </small>
+          </span>
+          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={student.forget}>
+            Remove
+          </button>
+        </div>
+      ) : (
+        <>
+          <small>Verify with SSO UI to unlock Campus: SCELE deadlines, class reminders and course updates. For Fasilkom UI students.</small>
+          <button className="pill-btn student-btn" disabled={busy || student.student === undefined} data-cuelume-tap onClick={verify}>
+            <UiLogo size={15} color={UI_YELLOW} /> {busy ? 'Waiting for SSO UI…' : 'Verify Student'}
+          </button>
+          {busy && <small>Sign in on the SSO UI page that opened in your browser.</small>}
+        </>
+      )}
+      {msg && <div className="form-msg">{msg}</div>}
+    </div>
+  )
 }
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
@@ -390,6 +455,7 @@ export function ProfileWidget(props: Props) {
   return (
     <div className="scroll-panel" onClick={(e) => e.stopPropagation()}>
       {body}
+      <StudentCard student={props.student} onHold={props.onHold} />
     </div>
   )
 }
