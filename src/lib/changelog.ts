@@ -7,6 +7,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.3',
+    title: 'Your classes, from the syllabus',
+    items: [
+      'Classes now reads your class days from each course\'s syllabus when the course page doesn\'t list them.',
+      'Only this term\'s courses are used, so old courses SCELE still shows are left out.',
+      'Courses you TA are marked TA. Tap TA or Hide on any course in Classes to change it.',
+    ],
+  },
+  {
     version: '0.7.2',
     title: 'Verify Student for assistants',
     items: ['Fasilkom UI students whom SSO UI also lists as staff, such as teaching assistants, can now verify and use Campus.'],
