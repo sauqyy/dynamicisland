@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 180" width="800" height="180" font-family="'Segoe UI', -apple-system, Inter, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14203a" />
+      <stop offset="0.6" stop-color="#1d3a5c" />
+      <stop offset="1" stop-color="#2f5f86" />
+    </linearGradient>
+    <linearGradient id="avatar" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbbf24" />
+      <stop offset="1" stop-color="#f472b6" />
+    </linearGradient>
+    <clipPath id="frame"><rect width="800" height="180" rx="20" /></clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="800" height="180" fill="url(#wall)" />
+
+    <!-- green glow while the call rings -->
+    <rect x="206" y="28" width="388" height="92" rx="46" fill="none" stroke="#4ade80" stroke-width="3" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" keyTimes="0;.14;.2;.26;.32;.38;.44;.5;.54;1" values="0;0;.7;.15;.7;.15;.7;.15;0;0" />
+    </rect>
+
+    <!-- the island: idle -> incoming call -> in-call pill -> idle -->
+    <rect y="32" fill="#050509" stroke="#ffffff" stroke-opacity="0.08">
+      <animate attributeName="width" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.06;.12;.14;.54;.6;.62;.88;.94;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="140;140;392;380;380;232;240;240;140;140" />
+      <animate attributeName="x" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.06;.12;.14;.54;.6;.62;.88;.94;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="330;330;204;210;210;284;280;280;330;330" />
+      <animate attributeName="height" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.06;.12;.14;.54;.6;.62;.88;.94;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="36;36;88;84;84;38;40;40;36;36" />
+      <animate attributeName="rx" dur="8s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.06;.12;.14;.54;.6;.62;.88;.94;1" keySplines=".3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1;.3 0 .2 1" values="18;18;42;42;42;19;20;20;18;18" />
+    </rect>
+
+    <!-- incoming call -->
+    <g>
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" keyTimes="0;.13;.16;.52;.54;1" values="0;0;1;1;0;0" />
+      <circle cx="262" cy="74" r="26" fill="url(#avatar)" />
+      <text x="262" y="81" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">A</text>
+      <text x="302" y="70" font-size="16" font-weight="600" fill="#ffffff">Alya</text>
+      <text x="302" y="90" font-size="12.5" fill="#ffffff" fill-opacity="0.55">Incoming call…</text>
+      <circle cx="488" cy="74" r="20" fill="#f87171" />
+      <path d="M478 76 q10 -8 20 0 l-2 4 l-5 -2 v-3 q-3 -1 -6 0 v3 l-5 2 z" fill="#ffffff" />
+      <circle cx="538" cy="74" r="20" fill="#4ade80">
+        <animate attributeName="r" dur="8s" repeatCount="indefinite" keyTimes="0;.48;.5;.52;1" values="20;20;17;20;20" />
+      </circle>
+      <path d="M530 67 q2 -3 5 0 l2 4 q-1 2 -3 3 q2 4 6 6 q1 -2 3 -3 l4 2 q3 3 0 5 q-5 3 -12 -3 q-7 -7 -5 -14 z" fill="#ffffff" />
+    </g>
+
+    <!-- in call -->
+    <g>
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" keyTimes="0;.61;.64;.86;.88;1" values="0;0;1;1;0;0" />
+      <circle cx="298" cy="52" r="4" fill="#4ade80">
+        <animate attributeName="opacity" values="1;.35;1" dur="1.4s" repeatCount="indefinite" />
+      </circle>
+      <text x="310" y="57" font-size="13" font-weight="600" fill="#ffffff" font-family="Consolas, 'Cascadia Mono', ui-monospace, monospace">00:14</text>
+      <g fill="#4ade80" transform="translate(366 58)">
+        <rect x="0" y="-12" width="3" height="12" rx="1.5"><animateTransform attributeName="transform" type="scale" values="1 .3;1 1;1 .4;1 .3" dur="0.6s" repeatCount="indefinite" /></rect>
+        <rect x="5" y="-12" width="3" height="12" rx="1.5"><animateTransform attributeName="transform" type="scale" values="1 .8;1 .3;1 1;1 .8" dur="0.5s" repeatCount="indefinite" /></rect>
+        <rect x="10" y="-12" width="3" height="12" rx="1.5"><animateTransform attributeName="transform" type="scale" values="1 .4;1 .9;1 .3;1 .4" dur="0.7s" repeatCount="indefinite" /></rect>
+      </g>
+      <rect x="434" y="46" width="3" height="10" rx="1.5" fill="none" stroke="#ffffff" stroke-width="2" transform="translate(-1 -1) scale(1)" />
+      <path d="M430 54 q5 6 10 0 M435 60 v3" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" />
+      <rect x="454" y="42" width="56" height="20" rx="10" fill="#f87171" />
+      <path d="M472 54 q10 -7 20 0 l-2 3 l-4 -1.5 v-2.5 q-4 -1 -8 0 v2.5 l-4 1.5 z" fill="#ffffff" />
+    </g>
+
+    <text x="400" y="150" text-anchor="middle" font-size="13" fill="#ffffff" fill-opacity="0.7">Calls ring in the island, then shrink to a pill with the timer, mute and hang up</text>
+  </g>
+</svg>
