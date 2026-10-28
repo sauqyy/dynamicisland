@@ -11,6 +11,9 @@ export const TAB_ANIMS: TabAnim[] = ['fade', 'slide', 'liquid', 'zoom', 'stack',
 export type Theme = 'dark' | 'light' | 'glass' | 'auto'
 export type IdleDisplay = 'clock' | 'lyrics' | 'weather'
 /** cuelume's themes; 'basic' is the one cuelume calls 'default' */
+/** how the music-is-playing mark moves */
+export type EqStyle = 'bars' | 'wave' | 'pulse'
+export const EQ_STYLES: EqStyle[] = ['bars', 'wave', 'pulse']
 export type SoundPack = 'mech' | 'basic' | 'bubble' | 'press'
 
 export const SOUND_PACKS: SoundPack[] = ['mech', 'basic', 'bubble', 'press']
@@ -35,6 +38,10 @@ export interface Settings {
   idle: IdleDisplay
   /** equalizer bars next to the idle text while music plays */
   idleBars: boolean
+  /** look of the equalizer: bouncing bars, a flowing wave or pulsing dots */
+  eqStyle: EqStyle
+  /** its colour: 'art' (the album), 'accent', or a hex colour */
+  eqColor: string
   /** play a sound when a chat message arrives */
   messageSound: boolean
   /** small sounds for clicks, typing, pages and alerts; off = muted */
@@ -110,6 +117,8 @@ const DEFAULTS: Settings = {
   shareActivity: false,
   idle: 'lyrics',
   idleBars: true,
+  eqStyle: 'bars',
+  eqColor: 'art',
   messageSound: true,
   uiSounds: true,
   soundPack: 'mech',

@@ -5,7 +5,8 @@ import { listen } from '@tauri-apps/api/event'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import { PAGE_VARIANTS } from './lib/pageAnim'
 import { GooFilter, Island, type Shape } from './island/Island'
-import { Art, Bars, MediaWidget } from './widgets/MediaWidget'
+import { Art, MediaWidget } from './widgets/MediaWidget'
+import { Bars, EqContext } from './widgets/Equalizer'
 import { Ring } from './widgets/TimerWidget'
 import { TimerTab, type ClockMode } from './widgets/TimerTab'
 import { TodoWidget } from './widgets/TodoWidget'
@@ -619,6 +620,7 @@ export default function App() {
   }, [meId, settings.shareActivity, activityText, publishActivity])
 
   const theme = useResolvedTheme(settings.theme)
+  const eqLook = useMemo(() => ({ style: settings.eqStyle, color: settings.eqColor }), [settings.eqStyle, settings.eqColor])
   const accent = settings.accentFromMusic && playing && track ? `hsl(${track.hue} 78% 62%)` : settings.accent
   const onAcc = settings.accentFromMusic && playing && track ? '#000' : onAccent(settings.accent)
 
@@ -1250,6 +1252,7 @@ export default function App() {
   }
 
   return (
+    <EqContext.Provider value={eqLook}>
     <div
       className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''} ${fs || fsWin ? 'fullchat' : ''}`}
       style={{
@@ -1257,6 +1260,8 @@ export default function App() {
         ['--on-accent' as string]: onAcc,
         ['--scale' as string]: settings.scale,
         ['--clock-size' as string]: `${settings.clockSize}px`,
+        // a fixed-height card gives the lyrics whatever room the header and timeline leave
+        ...(settings.cardFit ? {} : { ['--ly-h' as string]: `${Math.max(96, Math.min(CARD_MAX, settings.cardH) - CARD_TOP - CARD_PAD - 108)}px` }),
       }}
       onClick={() => !IS_TAURI && setExpanded(false)}
       onDragOver={(e) => {
@@ -1429,5 +1434,6 @@ export default function App() {
         </div>
       )}
     </div>
+    </EqContext.Provider>
   )
 }

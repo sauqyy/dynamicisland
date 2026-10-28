@@ -1,24 +1,14 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Music2, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { currentLineIndex } from '../lib/lyrics'
 import type { Track } from '../types'
 
-/** Height of one lyric line in the Playing page (must match .ly-line in App.css). */
-const LINE = 28
+/** Where the current lyric line sits in the lyrics window, as a share of its height from the top. */
+const ANCHOR = 0.3
 
 export function fmt(sec: number) {
   const s = Math.max(0, Math.floor(sec))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-}
-
-export function Bars({ active, hue }: { active: boolean; hue: number }) {
-  return (
-    <div className="bars" style={{ ['--hue' as string]: hue }}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <span key={i} className={active ? 'on' : ''} style={{ animationDelay: `${i * 0.13}s` }} />
-      ))}
-    </div>
-  )
 }
 
 export function Art({ track, size }: { track: Track; size: number }) {
@@ -47,8 +37,66 @@ interface Props {
   onSkip: (dir: -1 | 1) => void
 }
 
+/**
+ * Synced lyrics, read like a page: the current line is large and bright a third of the way
+ * down, the lines around it fade with distance, long lines wrap, and clicking a line seeks to it.
+ */
+function Lyrics({ track, idx, onSeek, lyricOffset }: { track: Track; idx: number; onSeek: (t: number) => void; lyricOffset: number }) {
+  const box = useRef<HTMLDivElement>(null)
+  const stack = useRef<HTMLDivElement>(null)
+  const [shift, setShift] = useState(0)
+  const lines = track.lyrics
+
+  // lines wrap to different heights, so the offset comes from the line itself, not its index
+  useLayoutEffect(() => {
+    const place = () => {
+      const b = box.current
+      const s = stack.current
+      if (!b || !s) return
+      const line = s.children[Math.max(0, idx)] as HTMLElement | undefined
+      if (!line) return
+      const target = b.clientHeight * ANCHOR - (idx < 0 ? -line.offsetHeight : 0)
+      setShift(Math.round(target - line.offsetTop))
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    if (box.current) ro.observe(box.current)
+    return () => ro.disconnect()
+  }, [idx, track.id, lines?.length])
+
+  if (!lines) {
+    return (
+      <div className="ly" ref={box}>
+        <div className="ly-none">{track.lyricsLoading ? 'Finding lyrics…' : 'No synced lyrics for this song'}</div>
+      </div>
+    )
+  }
+  return (
+    <div className="ly" ref={box}>
+      <div className="ly-stack" ref={stack} style={{ transform: `translateY(${shift}px)` }}>
+        {lines.map((l, i) => {
+          const away = Math.min(3, Math.abs(i - idx))
+          return (
+            <button
+              key={i}
+              className={`ly-line d${away} ${i === idx ? 'now' : ''} ${i < idx ? 'past' : ''}`}
+              data-cuelume-select
+              data-cuelume-emphasis="subtle"
+              title="Play from this line"
+              onClick={() => onSeek(Math.max(0, l.t - lyricOffset))}
+            >
+              {l.text || '♪'}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggle, onSeek, onSkip }: Props) {
   const barRef = useRef<HTMLDivElement>(null)
+  const [seeking, setSeeking] = useState(false)
 
   if (!track) {
     return (
@@ -62,8 +110,7 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
     )
   }
 
-  const lines = track.lyrics
-  const idx = lines ? currentLineIndex(lines, position + lyricOffset) : -1
+  const idx = track.lyrics ? currentLineIndex(track.lyrics, position + lyricOffset) : -1
   const canSeek = track.duration > 0
   const progress = canSeek ? Math.min(100, (position / track.duration) * 100) : 0
 
@@ -77,57 +124,54 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   return (
     <div className="np-page" onClick={(e) => e.stopPropagation()}>
       <div className="np">
-        <Art track={track} size={56} />
+        <Art track={track} size={46} />
         <div className="np-meta">
           <b>{track.title}</b>
           <span>{track.artist}</span>
         </div>
       </div>
 
-      {/* a three-line window: the current line in the middle, sliding up as the song goes on */}
-      <div className="ly">
-        {lines ? (
-          <div className="ly-stack" style={{ transform: `translateY(${(1 - idx) * LINE}px)` }}>
-            {lines.map((l, i) => (
-              <div key={i} className={`ly-line ${i === idx ? 'now' : ''}`}>
-                {l.text || '♪'}
-              </div>
-            ))}
+      <Lyrics track={track} idx={idx} onSeek={onSeek} lyricOffset={lyricOffset} />
+
+      {/* one row: the three buttons on the left, the timeline with both times on the right */}
+      <div className="np-transport">
+        <div className="np-buttons">
+          <button className="np-skip" onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">
+            <SkipBack size={16} fill="currentColor" aria-hidden />
+          </button>
+          <button className="np-play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
+            {playing ? <Pause size={16} fill="currentColor" aria-hidden /> : <Play size={16} fill="currentColor" aria-hidden />}
+          </button>
+          <button className="np-skip" onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">
+            <SkipForward size={16} fill="currentColor" aria-hidden />
+          </button>
+        </div>
+        <span className="np-time">{fmt(position)}</span>
+        <div
+          className={`np-scrub ${seeking ? 'seeking' : ''} ${canSeek ? '' : 'live'}`}
+          ref={barRef}
+          role="slider"
+          aria-label="Position"
+          aria-valuemin={0}
+          aria-valuemax={Math.round(track.duration)}
+          aria-valuenow={Math.round(position)}
+          data-cuelume-select
+          data-cuelume-emphasis="subtle"
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            setSeeking(true)
+            seekFromEvent(e.clientX)
+          }}
+          onPointerMove={(e) => e.buttons === 1 && seekFromEvent(e.clientX)}
+          onPointerUp={() => setSeeking(false)}
+          onPointerCancel={() => setSeeking(false)}
+        >
+          <div className="np-track">
+            <div className="np-fill" style={{ width: `${progress}%` }} />
           </div>
-        ) : (
-          <div className="ly-none">{track.lyricsLoading ? 'Finding lyrics…' : 'No synced lyrics found'}</div>
-        )}
-      </div>
-
-      <div
-        className="scrub"
-        ref={barRef}
-        data-cuelume-select
-        data-cuelume-emphasis="subtle"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId)
-          seekFromEvent(e.clientX)
-        }}
-        onPointerMove={(e) => e.buttons === 1 && seekFromEvent(e.clientX)}
-      >
-        <div className="scrub-fill" style={{ width: `${progress}%` }} />
-        <div className="scrub-knob" style={{ left: `${progress}%` }} />
-      </div>
-      <div className="times">
-        <span>{fmt(position)}</span>
-        <span>{canSeek ? `-${fmt(track.duration - position)}` : ''}</span>
-      </div>
-
-      <div className="np-controls">
-        <button onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">
-          <SkipBack size={18} fill="currentColor" aria-hidden />
-        </button>
-        <button className="np-play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
-          {playing ? <Pause size={18} fill="currentColor" aria-hidden /> : <Play size={18} fill="currentColor" aria-hidden />}
-        </button>
-        <button onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">
-          <SkipForward size={18} fill="currentColor" aria-hidden />
-        </button>
+          <div className="np-knob" style={{ left: `${progress}%` }} />
+        </div>
+        <span className="np-time end">{canSeek ? fmt(track.duration) : 'Live'}</span>
       </div>
     </div>
   )

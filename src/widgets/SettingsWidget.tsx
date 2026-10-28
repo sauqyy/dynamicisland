@@ -6,12 +6,13 @@ import { ColorPicker } from './ColorPicker'
 import { invoke } from '@tauri-apps/api/core'
 import { useUpdater } from '../lib/useUpdater'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { ACCENTS, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
+import { ACCENTS, EQ_STYLES, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, type Anim, type IdleDisplay, type GlassTint, type Settings, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
 import { PAGES } from '../types'
 import { play } from 'cuelume'
 import { disclosureCue, previewPack } from '../lib/sound'
+import { Bars } from './Equalizer'
 
 interface Props {
   settings: Settings
@@ -93,6 +94,9 @@ const CLEAR_OPTIONS: [number, string][] = [
 ]
 
 const capital = (s: string) => s[0].toUpperCase() + s.slice(1)
+
+/** Album hue the equalizer previews use when their colour follows the music. */
+const PREVIEW_HUE = 265
 
 export function SettingsWidget({ settings, update, updater }: Props) {
   const { state: update_, version, check: checkUpdate, install: downloadUpdate } = updater
@@ -200,6 +204,49 @@ export function SettingsWidget({ settings, update, updater }: Props) {
           <span>Equalizer while playing</span>
           <Toggle on={settings.idleBars} onChange={(v) => update({ idleBars: v })} />
         </div>
+        <div className="row">
+          <span>Equalizer style</span>
+          <div className="eq-picks" role="radiogroup" aria-label="Equalizer style">
+            {EQ_STYLES.map((v) => (
+              <button
+                key={v}
+                role="radio"
+                aria-checked={settings.eqStyle === v}
+                className={`eq-pick ${settings.eqStyle === v ? 'active' : ''}`}
+                data-cuelume-select
+                onClick={() => update({ eqStyle: v })}
+              >
+                <Bars active hue={PREVIEW_HUE} variant={v} />
+                <small>{capital(v)}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="row">
+          <span>Equalizer colour</span>
+          <Segmented<'art' | 'accent' | 'custom'>
+            options={[['art', 'Album'], ['accent', 'Accent'], ['custom', 'Custom']]}
+            value={settings.eqColor === 'art' || settings.eqColor === 'accent' ? settings.eqColor : 'custom'}
+            onPick={(v) => update({ eqColor: v === 'custom' ? (settings.eqColor.startsWith('#') ? settings.eqColor : ACCENTS[0]) : v })}
+          />
+        </div>
+        {settings.eqColor.startsWith('#') && (
+          <div className="row">
+            <span />
+            <div className="swatches">
+              {ACCENTS.map((c) => (
+                <button
+                  key={c}
+                  aria-label={c}
+                  className={settings.eqColor === c ? 'active' : ''}
+                  data-cuelume-select
+                  style={{ background: c }}
+                  onClick={() => update({ eqColor: c })}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         <Slider
           label="Text size"
           value={settings.clockSize}
