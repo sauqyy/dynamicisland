@@ -173,7 +173,10 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
         <section className="sc-next">
           <div className="sc-next-head">
             <span>
-              <small>{live ? 'In class now' : 'Next class'}</small>
+              <small>
+                {live ? 'In class now' : 'Next class'}
+                {next.slot.teaching && ' · you TA this'}
+              </small>
               <b>{course.full}</b>
             </span>
             <span className="sc-when">
@@ -189,7 +192,7 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
               <b>{topic.section.name}</b>
               {topic.section.summary && <p>{topic.section.summary}</p>}
               <small className={`sc-src ${topic.source}`}>{SOURCE[topic.source]}</small>
-              {topic.section.modules.slice(0, 3).map((m) => (
+              {topic.section.modules.filter((m) => m.mod !== 'label').slice(0, 3).map((m) => (
                 <button key={m.id} className="sc-mat" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(m.url)}>
                   <BookOpen size={12} aria-hidden /> {m.name}
                 </button>
@@ -251,7 +254,7 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
         </h4>
         {adding && <AddSlot scele={scele} onAdded={() => setAdding(false)} />}
         {!scele.slots.length && !adding && !scele.duplicates.length && (
-          <div className="empty">No class times on your course pages yet. Add yours to get a heads-up and the day's topic before each class.</div>
+          <div className="empty">No class times found on this term's course pages or syllabi yet. Add yours to get a heads-up and the day's topic before each class.</div>
         )}
         {[...scele.slots]
           .sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || a.start.localeCompare(b.start))
@@ -276,6 +279,8 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
         ))}
       </section>
 
+      <TermCourses scele={scele} />
+
       {scele.slots.length > 0 && (
         <div className="sc-lead">
           <span>Remind me</span>
@@ -293,6 +298,63 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
   )
 }
 
+/**
+ * This term's courses and what the schedule found for each, so a missing one is visible, with the
+ * user's say: TA (teaching it, not taking it) and Hide (leave it out). Earlier terms' courses that
+ * SCELE still lists as in progress are named but left out.
+ */
+function TermCourses({ scele }: { scele: SceleState }) {
+  const [showHidden, setShowHidden] = useState(false)
+  if (!scele.status.length) return null
+  const hidden = scele.status.filter((s) => s.hidden)
+  const rows = scele.status.filter((s) => !s.hidden || showHidden)
+  return (
+    <section>
+      <h4>
+        This term's courses
+        {hidden.length > 0 && (
+          <button className="chip ghost" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => setShowHidden((v) => !v)}>
+            {showHidden ? 'Hide hidden' : `${hidden.length} hidden`}
+          </button>
+        )}
+      </h4>
+      {rows.map(({ course: c, found, source, teaching, hidden: off }) => (
+        <div key={c.id} className={`sc-row static sc-course ${off ? 'off' : ''}`}>
+          <span className="sc-main">
+            <b title={c.full}>{c.full.replace(/^\s*\[[^\]]*\]\s*/, '')}</b>
+            <small>
+              {off
+                ? 'Hidden from the schedule'
+                : found
+                  ? `${found} class${found > 1 ? 'es' : ''} a week · from the ${source === 'syllabus' ? 'syllabus' : 'course page'}`
+                  : 'No class times found · add them with + Add'}
+            </small>
+          </span>
+          <span className="sc-chips">
+            <button
+              className={`chip ${teaching ? 'on' : ''}`}
+              aria-pressed={teaching}
+              title="You're a teaching assistant for this course"
+              data-cuelume-toggle
+              onClick={() => scele.setTeaching(c.id, !teaching)}
+            >
+              TA
+            </button>
+            <button className="chip ghost" data-cuelume-toggle data-cuelume-emphasis="subtle" onClick={() => scele.setHidden(c.id, !off)}>
+              {off ? 'Show' : 'Hide'}
+            </button>
+          </span>
+        </div>
+      ))}
+      {scele.earlier.length > 0 && (
+        <small className="sc-earlier" title={scele.earlier.map((c) => c.full).join('\n')}>
+          Left out, from an earlier term: {scele.earlier.map((c) => c.short).join(', ')}
+        </small>
+      )}
+    </section>
+  )
+}
+
 function SlotRow({ slot, name, onRemove }: { slot: ClassSlot; name: string; onRemove: () => void }) {
   return (
     <div className="sc-row static">
@@ -302,9 +364,14 @@ function SlotRow({ slot, name, onRemove }: { slot: ClassSlot; name: string; onRe
         <small>
           {slot.start}–{slot.end}
           {slot.room && ` · ${slot.room}`}
-          {slot.auto && <span className="sc-auto" title="Read from the SCELE course page; it updates when the page does"> · from SCELE</span>}
+          {slot.auto && (
+            <span className="sc-auto" title="Read from SCELE; it updates when the course does">
+              {slot.source === 'syllabus' ? ' · from the syllabus' : ' · from the course page'}
+            </span>
+          )}
         </small>
       </span>
+      {slot.teaching && <span className="sc-ta" title="You teach this course (TA)">TA</span>}
       <button className="x" aria-label={slot.auto ? 'Hide this class' : 'Remove class'} title={slot.auto ? 'Not my class' : 'Remove'} data-cuelume-close data-cuelume-emphasis="subtle" onClick={onRemove}>
         ×
       </button>
