@@ -63,6 +63,79 @@ pub async fn scele_file(app: AppHandle, url: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// A document a course links to, read for its timeline.
+#[derive(Serialize)]
+pub struct WebDoc {
+    /// the media type it came as
+    mime: String,
+    /// a file name to tell its kind by ("sheet.csv", or the Drive file's own name)
+    name: String,
+    /// its bytes, base64
+    data: String,
+}
+
+/// The Google id in a docs/drive link: the part after `/d/`, or an `id=` query value.
+fn google_id(url: &str) -> Option<String> {
+    let id = url
+        .split_once("/d/")
+        .map(|(_, rest)| rest)
+        .or_else(|| url.split_once("id=").map(|(_, rest)| rest))?
+        .split(['/', '?', '&', '#'])
+        .next()?;
+    (id.len() >= 10 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')).then(|| id.to_string())
+}
+
+/// Reads a Google Sheet (as CSV), Doc or Slides (as text) or Drive file that a course links to as
+/// its timeline. Only those addresses are fetched. One that isn't shared publicly answers with
+/// Google's sign-in page, which is reported as "signin".
+#[tauri::command]
+pub async fn web_doc(url: String) -> Result<WebDoc, String> {
+    use base64::Engine;
+    use std::io::Read;
+    let id = google_id(&url).ok_or_else(|| "unsupported link".to_string())?;
+    let (export, name) = if url.starts_with("https://docs.google.com/spreadsheets/") {
+        // the tab the link points at, else the first one
+        let gid: String = url.split_once("gid=").map(|(_, g)| g.chars().take_while(char::is_ascii_digit).collect()).unwrap_or_default();
+        let tab = if gid.is_empty() { String::new() } else { format!("&gid={gid}") };
+        (format!("https://docs.google.com/spreadsheets/d/{id}/export?format=csv{tab}"), "sheet.csv".to_string())
+    } else if url.starts_with("https://docs.google.com/document/") {
+        (format!("https://docs.google.com/document/d/{id}/export?format=txt"), "doc.txt".to_string())
+    } else if url.starts_with("https://docs.google.com/presentation/") {
+        (format!("https://docs.google.com/presentation/d/{id}/export/txt"), "slides.txt".to_string())
+    } else if url.starts_with("https://drive.google.com/") {
+        (format!("https://drive.google.com/uc?export=download&id={id}"), String::new())
+    } else {
+        return Err("unsupported link".into());
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let resp = ureq::get(&export)
+            .timeout(std::time::Duration::from_secs(30))
+            .call()
+            .map_err(|e| match e {
+                ureq::Error::Status(401 | 403 | 404, _) => "signin".to_string(),
+                _ => "link unavailable".to_string(),
+            })?;
+        let mime = resp.header("Content-Type").unwrap_or("").to_string();
+        // an export that comes back as a web page is Google asking to sign in
+        if mime.starts_with("text/html") {
+            return Err("signin".into());
+        }
+        let name = if name.is_empty() {
+            resp.header("Content-Disposition")
+                .and_then(|d| d.split("filename=").nth(1))
+                .map(|f| f.trim_matches(|c| c == '"' || c == ';' || c == ' ').to_string())
+                .unwrap_or_default()
+        } else {
+            name
+        };
+        let mut bytes = Vec::new();
+        resp.into_reader().take(FILE_LIMIT).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+        Ok(WebDoc { mime, name, data: base64::engine::general_purpose::STANDARD.encode(bytes) })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[derive(Clone, Serialize)]
 pub struct SceleAccount {
     userid: i64,
