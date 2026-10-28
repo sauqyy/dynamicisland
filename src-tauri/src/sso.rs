@@ -190,13 +190,13 @@ fn check_ticket(ticket: &str) -> Result<Student, String> {
         v.contains("ilmu komputer") || v.contains("fasilkom") || v.contains("computer science")
     });
     let faculty = if parts.len() == 4 { Some(parts[2] == "12") } else if names_fasilkom { Some(true) } else { None };
-    // a student: the role says so, or (no role sent) there is an NPM
-    let student = if role.is_empty() { None } else { Some(role.to_lowercase().contains("mahasiswa")) };
-    let student = student.or(if get("npm").is_empty() { None } else { Some(true) });
+    // a student: the role says so, or there is an NPM. The NPM counts even beside another role:
+    // SSO UI gives students who also hold a position (e.g. teaching assistants) peran_user=staff.
+    let student = role.to_lowercase().contains("mahasiswa") || !get("npm").is_empty();
 
-    let fasilkom = faculty == Some(true) && student == Some(true);
+    let fasilkom = faculty == Some(true) && student;
     // nothing contradicts it, SSO UI just didn't say: let SCELE (Fasilkom's own) confirm it
-    let needs_scele = !fasilkom && faculty != Some(false) && student != Some(false);
+    let needs_scele = !fasilkom && faculty != Some(false);
     let names: Vec<&str> = attrs.iter().map(|(n, _)| n.as_str()).collect();
     let detail = format!(
         "SSO UI sent {}{}{}",
