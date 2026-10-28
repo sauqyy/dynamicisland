@@ -12,6 +12,9 @@ import type { StudentState } from '../lib/sso'
 import { BadgeCheck } from 'lucide-react'
 import { UI_YELLOW, UiLogo } from './UiLogo'
 
+// written out, not imported, so the bundler can drop the campus card from the regular build
+const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
+
 const EMOJIS = ['🙂', '😎', '🤖', '🦊', '🐼', '🐸', '🦄', '🐙', '🌵', '🚀', '🎧', '🔥', '🌙', '🍕', '👾', '🐱']
 
 interface Props {
@@ -522,7 +525,7 @@ export function ProfileWidget(props: Props) {
   return (
     <div className="scroll-panel" onClick={(e) => e.stopPropagation()}>
       {body}
-      <StudentCard student={props.student} onHold={props.onHold} />
+      {CAMPUS && <StudentCard student={props.student} onHold={props.onHold} />}
     </div>
   )
 }

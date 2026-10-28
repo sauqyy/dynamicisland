@@ -57,4 +57,15 @@ $('launch').addEventListener('click', () => tauri.core.invoke('launch'))
 $('close').addEventListener('click', () => win?.close())
 $('min').addEventListener('click', () => win?.minimize())
 
+// the Universitas Indonesia build of Setup wears the makara and its own name
+tauri?.core
+  .invoke('variant')
+  .then((v) => {
+    if (v !== 'ui') return
+    root.dataset.variant = 'ui'
+    document.title = 'Dynamic Island UI Setup'
+    document.querySelectorAll('.app-name').forEach((el) => (el.textContent = 'Dynamic Island UI'))
+  })
+  .catch(() => {})
+
 tauri?.core.invoke('version').then((v) => ($('version').textContent = `Version ${v}`)).catch(() => {})

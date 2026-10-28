@@ -1,0 +1,11 @@
+{
+  "productName": "Dynamic Island UI",
+  "identifier": "com.dynamicisland.ui",
+  "build": {
+    "beforeDevCommand": "npm run dev:ui",
+    "beforeBuildCommand": "npm run build:ui"
+  },
+  "bundle": {
+    "publisher": "Dynamic Island UI"
+  }
+}

@@ -1,13 +1,18 @@
+import { CAMPUS } from './campus'
+
 export interface Release {
   version: string
   title: string
   items: string[]
+  /** only for the Universitas Indonesia build */
+  campus?: boolean
 }
 
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
     version: '0.7.4',
+    campus: true,
     title: 'Classes from your course timelines',
     items: [
       'Classes now reads each course\'s timeline, from PDFs, slides, Word, Excel or a linked Google Sheet, and finds your class days from it.',
@@ -18,6 +23,7 @@ export const CHANGELOG: Release[] = [
   },
   {
     version: '0.7.3',
+    campus: true,
     title: 'Your classes, from the syllabus',
     items: [
       'Classes now reads your class days from each course\'s syllabus when the course page doesn\'t list them.',
@@ -27,11 +33,13 @@ export const CHANGELOG: Release[] = [
   },
   {
     version: '0.7.2',
+    campus: true,
     title: 'Verify Student for assistants',
     items: ['Fasilkom UI students whom SSO UI also lists as staff, such as teaching assistants, can now verify and use Campus.'],
   },
   {
     version: '0.7.1',
+    campus: true,
     title: 'Verify Student fixed',
     items: [
       'Verify Student now works for Fasilkom UI students even when SSO UI leaves out which faculty you are in.',
@@ -40,6 +48,7 @@ export const CHANGELOG: Release[] = [
   },
   {
     version: '0.7.0',
+    campus: true,
     title: 'Campus for Fasilkom UI',
     items: [
       'Fasilkom UI students: tap Verify Student on the Profile page and sign in with SSO UI to unlock Campus.',
@@ -163,5 +172,6 @@ export function releaseToShow(current: string): Release | null {
   } catch {
     return null
   }
-  return CHANGELOG.find((r) => r.version === current) ?? null
+  const r = CHANGELOG.find((x) => x.version === current)
+  return r && (CAMPUS || !r.campus) ? r : null
 }

@@ -32,6 +32,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { UiLogo } from '../widgets/UiLogo'
+// written out, not imported, so the bundler can drop the logo from the regular build
+const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
 
 /** Alerts are raised with an emoji; known ones are drawn as line icons, anything else shows the emoji. */
 const BY_EMOJI: Record<string, LucideIcon> = {
@@ -95,7 +97,7 @@ export const alertTone = (icon: string) => TONE[icon] ?? 'var(--text-1)'
 
 export function AlertIcon({ icon, size = 15 }: { icon: string; size?: number }) {
   // a class about to start is marked with Universitas Indonesia's makara
-  if (icon === '🎓') return <UiLogo size={size + 1} />
+  if (CAMPUS && icon === '🎓') return <UiLogo size={size + 1} />
   const Icon = BY_EMOJI[icon]
   if (!Icon) return <span className="al-emoji">{icon}</span>
   return <Icon size={size} strokeWidth={2} aria-hidden />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { IS_TAURI } from './useMedia'
+import { CAMPUS } from './campus'
 
 /** Who SSO UI says the user is (see sso.rs). */
 export interface Student {
@@ -50,10 +51,10 @@ function demoSaved(): Student | null {
  * has `needs_scele` until `confirm` signs in to SCELE; only `fasilkom` unlocks Campus.
  */
 export function useStudent() {
-  const [student, setStudent] = useState<Student | null | undefined>(() => (IS_TAURI ? undefined : demoSaved()))
+  const [student, setStudent] = useState<Student | null | undefined>(() => (!CAMPUS ? null : IS_TAURI ? undefined : demoSaved()))
 
   useEffect(() => {
-    if (!IS_TAURI) return
+    if (!CAMPUS || !IS_TAURI) return
     invoke<Student | null>('sso_student')
       .then((s) => setStudent(s?.fasilkom || s?.needs_scele ? s : null))
       .catch(() => setStudent(null))
@@ -97,3 +98,11 @@ export function useStudent() {
 }
 
 export type StudentState = ReturnType<typeof useStudent>
+
+/** the regular build has no verification */
+export const NO_STUDENT: StudentState = {
+  student: null,
+  verify: () => Promise.reject(new Error('Campus is not part of this build')),
+  confirm: () => Promise.reject(new Error('Campus is not part of this build')),
+  forget: () => {},
+}

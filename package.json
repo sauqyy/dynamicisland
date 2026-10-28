@@ -3,9 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "sideEffects": ["**/*.css"],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:ui": "tsc -b && vite build --mode ui",
+    "dev:ui": "vite --mode ui",
+    "tauri:ui": "tauri dev --config src-tauri/tauri.ui.conf.json -- --features campus",
+    "tauri:build:ui": "tauri build --bundles nsis --config src-tauri/tauri.ui.conf.json -- --features campus",
     "lint": "oxlint",
     "preview": "vite preview",
     "tauri": "tauri"

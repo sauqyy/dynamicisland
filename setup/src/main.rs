@@ -12,8 +12,12 @@ const PAYLOAD: &[u8] = include_bytes!("../payload/installer.exe");
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const DETACHED_PROCESS: u32 = 0x0000_0008;
 
+/// The Universitas Indonesia build of Setup installs its own copy of the app, next to the regular one.
+const UI_BUILD: bool = cfg!(feature = "ui");
+
 fn install_dir() -> PathBuf {
-    PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Dynamic Island")
+    let name = if UI_BUILD { "Dynamic Island UI" } else { "Dynamic Island" };
+    PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join(name)
 }
 
 fn app_exe() -> PathBuf {
@@ -30,6 +34,11 @@ fn close_running_app() {
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .creation_flags(CREATE_NO_WINDOW)
         .status();
+}
+
+#[tauri::command]
+fn variant() -> &'static str {
+    if UI_BUILD { "ui" } else { "main" }
 }
 
 #[tauri::command]
@@ -70,7 +79,7 @@ fn launch(app: AppHandle) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![version, install, launch])
+        .invoke_handler(tauri::generate_handler![version, variant, install, launch])
         .run(tauri::generate_context!())
         .expect("error while running setup");
 }

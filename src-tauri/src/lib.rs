@@ -1,5 +1,7 @@
 mod auth;
+#[cfg(feature = "campus")]
 mod scele;
+#[cfg(feature = "campus")]
 mod sso;
 #[cfg(windows)]
 mod files;
@@ -367,14 +369,23 @@ pub fn run() {
             set_dragging,
             auth::oauth_wait,
             auth::open_url,
+            #[cfg(feature = "campus")]
             scele::scele_login,
+            #[cfg(feature = "campus")]
             scele::scele_account,
+            #[cfg(feature = "campus")]
             scele::scele_logout,
+            #[cfg(feature = "campus")]
             scele::scele_call,
+            #[cfg(feature = "campus")]
             scele::scele_file,
+            #[cfg(feature = "campus")]
             scele::web_doc,
+            #[cfg(feature = "campus")]
             sso::sso_verify,
+            #[cfg(feature = "campus")]
             sso::sso_student,
+            #[cfg(feature = "campus")]
             sso::sso_forget,
             set_hide_on_fullscreen,
             monitor_count,

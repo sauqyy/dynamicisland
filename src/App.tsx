@@ -19,7 +19,7 @@ import { NotesWidget } from './widgets/NotesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { SceleWidget } from './widgets/SceleWidget'
 import { useScele } from './lib/useScele'
-import { useStudent } from './lib/sso'
+import { NO_STUDENT, useStudent } from './lib/sso'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
@@ -86,7 +86,11 @@ function loadTodos(): Todo[] {
 }
 
 const TAB_KEY = 'di.tab'
+/** The Universitas Indonesia build (VITE_CAMPUS=1). Written out here, not imported, so the bundler can drop the campus modules from the regular build. */
+const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
 const CAMPUS_PAGES: Tab[] = ['deadlines', 'classes', 'inbox']
+/** what the campus hook returns in the regular build, where it is never called */
+const NO_SCELE = { deadlines: [], notices: [] } as unknown as ReturnType<typeof useScele>
 
 /** The page that was open last time, so the card comes back where it was left. */
 function loadTab(): Tab {
@@ -219,7 +223,7 @@ export default function App() {
   const tabRef = useRef(tab)
   tabRef.current = tab
   // the Campus pages only exist for a Fasilkom student verified with SSO UI on the Profile page
-  const student = useStudent()
+  const student = CAMPUS ? useStudent() : NO_STUDENT
   const campus = Boolean(student.student?.fasilkom)
   const pages = useMemo(
     () => PAGES.filter((p) => (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) && (campus || !CAMPUS_PAGES.includes(p.id))),
@@ -297,7 +301,7 @@ export default function App() {
     if (cue) play(cue, opts)
   }, [])
 
-  const scele = useScele(pushAlert, student.student === undefined ? undefined : campus)
+  const scele = CAMPUS ? useScele(pushAlert, student.student === undefined ? undefined : campus) : NO_SCELE
   // a Campus page left open from before is not there once the verification is removed
   useEffect(() => {
     if (student.student === null && CAMPUS_PAGES.includes(tab)) setTab('profile')
@@ -1029,7 +1033,7 @@ export default function App() {
             {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
             {tab === 'notes' && <NotesWidget />}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
-            {(tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
+            {CAMPUS && (tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
               <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} />
             )}
             {tab === 'clipboard' && (
