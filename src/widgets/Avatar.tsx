@@ -14,8 +14,12 @@ export function Avatar({ profile, size = 36, presence }: { profile: Look; size?:
     </span>
   )
   if (!presence) return face
+  const dot = Math.min(18, Math.max(8, Math.round(size * 0.36)))
+  // centred on the circle's edge at the bottom right (1 - 1/√2 of the radius in from the corner),
+  // so it sits on the rim of a big picture as well as a small one
+  const at = Math.round(size * 0.1464 - dot / 2)
   return (
-    <span className="avatar-wrap" style={{ ['--dot' as string]: `${Math.min(18, Math.max(8, Math.round(size * 0.36)))}px` }}>
+    <span className="avatar-wrap" style={{ ['--dot' as string]: `${dot}px`, ['--dot-at' as string]: `${at}px` }}>
       {face}
       <i className={`presence-dot ${presence}`} title={SHOWN_LABEL[presence]} />
     </span>

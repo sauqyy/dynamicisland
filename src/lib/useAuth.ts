@@ -73,9 +73,16 @@ export function useAuth() {
     }
   }, [])
 
+  /** Signs out on this computer. Resolves to an error message, or null when signed out. */
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
-  }, [])
+    // friends see you as offline at once, instead of when the last heartbeat runs out
+    if (user) await supabase.from('profiles').update({ last_seen: new Date(0).toISOString() }).eq('id', user.id).then(() => {}, () => {})
+    const { error } = await supabase.auth.signOut()
+    if (!error) return null
+    // offline, or the server didn't answer: the session can't be ended there, but this computer still forgets it
+    const local = await supabase.auth.signOut({ scope: 'local' })
+    return local.error?.message ?? null
+  }, [user])
 
   const saveProfile = useCallback(
     async (patch: Partial<Omit<Profile, 'id'>>) => {
