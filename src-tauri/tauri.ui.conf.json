@@ -1,6 +1,6 @@
 {
   "productName": "Dynamic Island UI",
-  "version": "0.7.10",
+  "version": "0.7.11",
   "identifier": "com.dynamicisland.ui",
   "build": {
     "beforeDevCommand": "npm run dev:ui",
