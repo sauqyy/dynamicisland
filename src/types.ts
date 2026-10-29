@@ -20,27 +20,6 @@ export type Tab =
   | 'profile'
   | 'settings'
 
-export const PAGES: { id: Tab; title: string }[] = [
-  { id: 'media', title: 'Now Playing' },
-  { id: 'weather', title: 'Weather' },
-  { id: 'timer', title: 'Timer' },
-  { id: 'todo', title: 'To-do' },
-  { id: 'notes', title: 'Notes' },
-  { id: 'prompter', title: 'Prompter' },
-  { id: 'deadlist', title: 'Deadlines' },
-  { id: 'schedule', title: 'Schedule' },
-  { id: 'clipboard', title: 'Clipboard' },
-  { id: 'deadlines', title: 'SCELE Deadlines' },
-  { id: 'classes', title: 'SCELE Classes' },
-  { id: 'inbox', title: 'SCELE Inbox' },
-  { id: 'shelf', title: 'Shelf' },
-  { id: 'apps', title: 'Apps' },
-  { id: 'friends', title: 'Friends' },
-  { id: 'groups', title: 'Groups' },
-  { id: 'profile', title: 'Profile' },
-  { id: 'settings', title: 'Settings' },
-]
-
 /** Pages are grouped so the card has 5 places to go instead of 11 pages in a row. */
 export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[] = [
   { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
@@ -51,6 +30,30 @@ export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[]
   { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'groups', 'profile'] },
   { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
 ]
+
+const TITLES: Record<Tab, string> = {
+  media: 'Now Playing',
+  weather: 'Weather',
+  timer: 'Timer',
+  todo: 'To-do',
+  notes: 'Notes',
+  prompter: 'Prompter',
+  deadlist: 'Deadlines',
+  schedule: 'Schedule',
+  clipboard: 'Clipboard',
+  deadlines: 'SCELE Deadlines',
+  classes: 'SCELE Classes',
+  inbox: 'SCELE Inbox',
+  shelf: 'Shelf',
+  apps: 'Apps',
+  friends: 'Friends',
+  groups: 'Groups',
+  profile: 'Profile',
+  settings: 'Settings',
+}
+
+/** Every page, in the order the bar shows them, which is also the order the arrow keys step through. */
+export const PAGES: { id: Tab; title: string }[] = GROUPS.flatMap((g) => g.pages).map((id) => ({ id, title: TITLES[id] }))
 
 /** Short names for the tabs inside a group. */
 export const SHORT: Record<Tab, string> = {
