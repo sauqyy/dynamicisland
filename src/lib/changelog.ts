@@ -11,6 +11,19 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.11',
+    campus: true,
+    title: 'Know what\'s left to hand in',
+    items: [
+      'Due shows where each assignment stands: Not submitted, Draft, not submitted, Submitted or Graded. A draft isn\'t handed in until you press Submit on SCELE, so it stays marked.',
+      'Once you hand something in, the island says well done, moves it to Submitted and stops reminding you about it.',
+      'Reminders now come 3 days, 2 days, 24 hours, 12 hours, 6 hours, 3 hours and 1 hour before a deadline.',
+      'Recent grades are on Due, hidden until you press Show. The alert for a new grade never shows the score.',
+      'Syncing is lighter: a course page is only read again when SCELE says something on it changed, so new materials show up within about 10 minutes.',
+      'Drag the island to the bottom of the screen and it sits on the taskbar, opening upwards. Double-click it to send it back to the top.',
+    ],
+  },
+  {
     version: '0.7.10',
     campus: true,
     title: 'Every week shows what\'s next',
