@@ -11,7 +11,7 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
-    version: '0.7.8',
+    version: '0.7.9',
     title: 'Profiles and Apple Music lyrics',
     items: [
       "Click someone's picture in Friends, requests, chats and groups to open their profile, then click their photo to see it full size.",
@@ -19,6 +19,19 @@ export const CHANGELOG: Release[] = [
       'Lyrics now show for songs playing in Apple Music on Windows.',
       'New group and Join a group are now clear buttons at the top of Groups.',
       'Settings shows which version you have installed, next to Version.',
+    ],
+  },
+  {
+    version: '0.7.8',
+    campus: true,
+    title: 'SLCM signs you in',
+    items: [
+      'Get times from SLCM now asks for your SSO UI password (the same one as SCELE) and signs in to SLCM for you, in the background. The password isn\'t saved.',
+      'Classes shows how far it got. SLCM\'s site can be slow, and the island reloads it if it stops halfway.',
+      'If SLCM needs you, for example after a wrong password, its window opens so you can finish there. You can also open it yourself, or stop.',
+      'Topics are found week by week in lesson plans and RPS, in English or Indonesian: dated rows (26-Aug-2026 too, even with last year\'s year), "Week 07", "Minggu ke-3", "Pertemuan 5" or a numbered column.',
+      'A lesson plan with one date per week gives that week\'s topic to every class that week, and weeks are counted from when the term really started.',
+      'Section names like "Topic 15" are no longer shown as a topic. Classes shows what the section holds instead, or nothing.',
     ],
   },
   {

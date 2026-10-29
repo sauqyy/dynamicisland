@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { play } from 'cuelume'
 import { BookOpen, CalendarCheck, CalendarClock, ChevronDown, Clock, FileText, FolderOpen, Inbox, Lock, LogOut, Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import { browserUrl, courseTitle, dayName, openScele, relTime, syllabusLinks, type ClassSlot, type Deadline } from '../lib/scele'
@@ -193,14 +193,16 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
   const isOpen = (m: Meeting) => open[meetingKey(m)] ?? (next !== undefined && meetingKey(m) === meetingKey(next))
   const toggle = (m: Meeting) => setOpen((o) => ({ ...o, [meetingKey(m)]: !isOpen(m) }))
   const setTime = (slot: ClassSlot) => setAdding({ courseId: slot.courseId, day: slot.day })
+  // "Get times from SLCM" on a class opens the sign-in in the card at the top
+  const [askSlcm, setAskSlcm] = useState(0)
   const later = next && dayStart(next.start) >= today + 2 * DAY ? next : null
   const row = (m: Meeting) => (
-    <MeetingRow key={meetingKey(m)} m={m} now={now} isNext={m === next} open={isOpen(m)} onToggle={() => toggle(m)} scele={scele} onSetTime={setTime} />
+    <MeetingRow key={meetingKey(m)} m={m} now={now} isNext={m === next} open={isOpen(m)} onToggle={() => toggle(m)} scele={scele} onSetTime={setTime} onAskSlcm={() => setAskSlcm((n) => n + 1)} />
   )
 
   return (
     <div className="sc-list">
-      <NeedsYou scele={scele} />
+      <NeedsYou scele={scele} askSlcm={askSlcm} />
       {scele.slots.length > 0 && (
         <>
           {[
@@ -279,30 +281,123 @@ const titleOf = (scele: SceleState, s: ClassSlot) => {
   return c ? courseTitle(c) : (s.name ?? '?')
 }
 
-/** What the schedule can't settle alone, asked once, at the top. */
-function NeedsYou({ scele }: { scele: SceleState }) {
+const SLCM_STAGE = {
+  loading: 'Opening SLCM. Its site is slow, so this can take a few minutes…',
+  'signing-in': 'Signing in to SSO UI…',
+  'needs-you': 'SLCM needs you: finish signing in in its window.',
+}
+
+/**
+ * Connecting SLCM: a button that asks for the SSO UI password, then the progress of the hidden SLCM
+ * window, which signs in with it and reads the study plan. The password is used once and not kept.
+ */
+function SlcmConnect({ scele, label, primary, open = false }: { scele: SceleState; label: string; primary?: boolean; open?: boolean }) {
+  const [asking, setAsking] = useState(open)
+  const [pass, setPass] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const untimed = new Set(scele.slots.filter((s) => !s.start).map((s) => s.courseId)).size
-  const connect = () => {
+  // signed in once already: SLCM loading again is it reading the schedule
+  const [signedIn, setSignedIn] = useState(false)
+  const stage = scele.slcmStage
+  useEffect(() => {
+    if (stage === 'signing-in') setSignedIn(true)
+    if (stage === null) setSignedIn(false)
+  }, [stage])
+  const start = (password: string | null) => {
     setError(null)
-    scele.connectSlcm().catch((e) => setError(typeof e === 'string' ? e : 'Could not open SLCM'))
+    setAsking(false)
+    setPass('')
+    scele
+      .connectSlcm(password)
+      .then((ok) => {
+        if (ok) play('success')
+        else setError('The SLCM window closed before your schedule came through.')
+      })
+      .catch((e) => {
+        play('error')
+        setError(typeof e === 'string' ? e : 'Could not open SLCM')
+      })
   }
+  if (stage)
+    return (
+      <div className="sc-slcm">
+        <small className={stage === 'needs-you' ? 'sc-warn' : 'sc-progress'}>{stage === 'loading' && signedIn ? 'Signed in. Reading your schedule…' : SLCM_STAGE[stage]}</small>
+        <span className="sc-chips">
+          <button className={`chip ${stage === 'needs-you' ? 'on' : ''}`} data-cuelume-open onClick={() => scele.showSlcm()}>
+            Show window
+          </button>
+          <button className="chip ghost" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => scele.cancelSlcm()}>
+            Stop
+          </button>
+        </span>
+      </div>
+    )
+  if (asking)
+    return (
+      <div className="sc-slcm" onKeyDown={(e) => e.stopPropagation()}>
+        <div className="sc-slcm-row">
+          <input
+            className="todo-input"
+            type="password"
+            aria-label="SSO UI password"
+            placeholder="SSO UI password"
+            autoComplete="current-password"
+            autoFocus
+            value={pass}
+            data-cuelume-type
+            onChange={(e) => setPass(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && pass && start(pass)}
+          />
+          <button className="pill-btn" disabled={!pass} onClick={() => start(pass)}>
+            Sign in
+          </button>
+        </div>
+        <small className="sc-hint">
+          Signs in as <b>{scele.account?.username}</b> on login.ui.ac.id, the same password as SCELE. It isn't saved.
+          {scele.slcm && (
+            <>
+              {' '}
+              <button className="sc-inline-link" onClick={() => start(null)}>
+                Still signed in? Read without it
+              </button>
+            </>
+          )}
+        </small>
+        <button className="chip ghost sc-slcm-cancel" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAsking(false)}>
+          Cancel
+        </button>
+      </div>
+    )
+  return (
+    <div className="sc-slcm">
+      <span className="sc-chips">
+        <button className={`chip ${primary ? 'on' : ''}`} data-cuelume-open onClick={() => setAsking(true)}>
+          {label}
+        </button>
+      </span>
+      {error && <small className="sc-error">{error}</small>}
+    </div>
+  )
+}
+
+/** What the schedule can't settle alone, asked once, at the top. */
+function NeedsYou({ scele, askSlcm }: { scele: SceleState; askSlcm: number }) {
+  const card = useRef<HTMLElement>(null)
+  const untimed = new Set(scele.slots.filter((s) => !s.start).map((s) => s.courseId)).size
+  useEffect(() => {
+    if (askSlcm) card.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [askSlcm])
   return (
     <>
       {untimed > 0 && !scele.slcm && (
-        <section className="sc-ask">
+        <section className="sc-ask" ref={card}>
           <span>
             <b>
               {untimed} course{untimed > 1 ? 's don’t' : ' doesn’t'} list a class time
             </b>
-            <small>Your study plan in SLCM has the times and rooms. Sign in there once and the island reads them.</small>
-            {error && <small className="sc-error">{error}</small>}
+            <small>Your study plan in SLCM has the times and rooms. The island signs in to SLCM for you and reads them.</small>
           </span>
-          <div className="sc-chips">
-            <button className="chip on" data-cuelume-open disabled={scele.slcmBusy} onClick={connect}>
-              {scele.slcmBusy ? 'Waiting for SLCM…' : 'Get times from SLCM'}
-            </button>
-          </div>
+          {/* a class's "Get times from SLCM" opens it here, already asking */}
+          <SlcmConnect key={askSlcm} scele={scele} label="Get times from SLCM" primary open={askSlcm > 0} />
         </section>
       )}
       {scele.duplicates.map((q) => (
@@ -343,7 +438,16 @@ function NeedsYou({ scele }: { scele: SceleState }) {
 }
 
 /** One meeting: a row that opens to what it covers. The next class starts open. */
-function MeetingRow(props: { m: Meeting; now: number; isNext: boolean; open: boolean; onToggle: () => void; scele: SceleState; onSetTime: (s: ClassSlot) => void }) {
+function MeetingRow(props: {
+  m: Meeting
+  now: number
+  isNext: boolean
+  open: boolean
+  onToggle: () => void
+  scele: SceleState
+  onSetTime: (s: ClassSlot) => void
+  onAskSlcm: () => void
+}) {
   const { m, now, isNext, open, onToggle } = props
   const live = Boolean(m.slot.start) && m.start <= now && m.end > now
   const past = Boolean(m.slot.start) && m.end <= now
@@ -375,7 +479,7 @@ function MeetingRow(props: { m: Meeting; now: number; isNext: boolean; open: boo
  * that is written, at its page, with how sure it is), then the course page's section and materials
  * for it. Nothing is listed rather than something unrelated.
  */
-function MeetingDetail({ m, now, scele, onSetTime }: { m: Meeting; now: number; scele: SceleState; onSetTime: (s: ClassSlot) => void }) {
+function MeetingDetail({ m, now, scele, onSetTime, onAskSlcm }: { m: Meeting; now: number; scele: SceleState; onSetTime: (s: ClassSlot) => void; onAskSlcm: () => void }) {
   const due = m.course ? scele.deadlines.filter((d) => d.courseId === m.course!.id && d.due > now).slice(0, 2) : []
   const syllabus = !m.topic && m.course ? syllabusLinks(scele.contents[m.course.id] ?? []) : []
   const where = [m.slot.room && `Room ${m.slot.room}`, m.slot.source && `times from the ${SOURCE_NAME[m.slot.source]}`].filter(Boolean).join(' · ')
@@ -387,8 +491,8 @@ function MeetingDetail({ m, now, scele, onSetTime }: { m: Meeting; now: number; 
         <div className="sc-fix">
           <small>Time not listed on SCELE</small>
           {!scele.slcm && (
-            <button className="chip" data-cuelume-open disabled={scele.slcmBusy} onClick={() => scele.connectSlcm().catch(() => {})}>
-              Get times from SLCM
+            <button className="chip" data-cuelume-open disabled={scele.slcmBusy} onClick={onAskSlcm}>
+              {scele.slcmBusy ? 'Reading SLCM…' : 'Get times from SLCM'}
             </button>
           )}
           <button className="chip ghost" data-cuelume-open onClick={() => onSetTime(m.slot)}>
@@ -471,14 +575,9 @@ function MeetingDetail({ m, now, scele, onSetTime }: { m: Meeting; now: number; 
  */
 function Sources({ scele }: { scele: SceleState }) {
   const [showHidden, setShowHidden] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const missing = scele.status.filter((s) => !s.hidden && !s.found && !s.teaching && !s.waiting).length
   const hidden = scele.status.filter((s) => s.hidden)
   const rows = scele.status.filter((s) => !s.hidden || showHidden)
-  const connect = () => {
-    setError(null)
-    scele.connectSlcm().catch((e) => setError(typeof e === 'string' ? e : 'Could not open SLCM'))
-  }
   return (
     <details className="sc-sources">
       <summary>
@@ -492,24 +591,17 @@ function Sources({ scele }: { scele: SceleState }) {
         <span className="sc-main">
           <b>SLCM study plan</b>
           <small>
-            {scele.slcmBusy
-              ? 'Waiting for you to sign in to SLCM…'
-              : scele.slcm
-                ? `${scele.slcm.classes.length} weekly classes · read ${relTime(scele.slcm.at, Date.now())}`
-                : 'Official class times and rooms. Sign in once in the window it opens.'}
+            {scele.slcm ? `${scele.slcm.classes.length} weekly classes · read ${relTime(scele.slcm.at, Date.now())}` : 'Official class times and rooms, from your study plan.'}
           </small>
-          {error && <small className="sc-error">{error}</small>}
+          <SlcmConnect scele={scele} label={scele.slcm ? 'Read again' : 'Connect'} primary={!scele.slcm} />
         </span>
-        <span className="sc-chips">
-          <button className={`chip ${scele.slcm ? '' : 'on'}`} data-cuelume-open disabled={scele.slcmBusy} onClick={connect}>
-            {scele.slcm ? 'Read again' : 'Connect'}
-          </button>
-          {scele.slcm && (
+        {scele.slcm && !scele.slcmBusy && (
+          <span className="sc-chips">
             <button className="chip ghost" data-cuelume-close data-cuelume-emphasis="subtle" onClick={scele.forgetSlcm}>
               Forget
             </button>
-          )}
-        </span>
+          </span>
+        )}
       </div>
 
       <h4>

@@ -156,19 +156,36 @@ export async function slcmSaved(): Promise<SlcmSchedule | null> {
   return raw ? parseSlcm(raw) : null
 }
 
-/** Opens SLCM; resolves with the schedule once its page has loaded it, or null if the window is closed first. */
-export function slcmConnect(): Promise<SlcmSchedule | null> {
-  if (!IS_TAURI) return new Promise((done) => setTimeout(() => done(parseSlcm(DEMO_SLCM)), 700))
+/** How far reading SLCM has got: its slow site loading, signing in to UI's login, or the window waiting for the user. */
+export type SlcmStage = 'loading' | 'signing-in' | 'needs-you'
+
+/**
+ * Opens SLCM in a hidden window and, with the SSO UI password, signs in for the user (the password
+ * is used once, on UI's login page, and not kept). Resolves with the schedule once SLCM's page has
+ * loaded it, or null if the window is closed first. `onStage` follows the progress.
+ */
+export function slcmConnect(password: string | null, onStage: (s: SlcmStage) => void = () => {}): Promise<SlcmSchedule | null> {
+  if (!IS_TAURI) {
+    onStage('loading')
+    return new Promise((done) => {
+      setTimeout(() => onStage('signing-in'), 500)
+      setTimeout(() => done(parseSlcm(DEMO_SLCM)), 1200)
+    })
+  }
   return new Promise((done, fail) => {
     const off: (() => void)[] = []
     const finish = (v: SlcmSchedule | null) => {
       off.forEach((f) => f())
       done(v)
     }
-    Promise.all([listen<Raw>('slcm', (e) => finish(parseSlcm(e.payload))), listen('slcm-closed', () => finish(null))])
+    Promise.all([
+      listen<Raw>('slcm', (e) => finish(parseSlcm(e.payload))),
+      listen('slcm-closed', () => finish(null)),
+      listen<SlcmStage>('slcm-status', (e) => onStage(e.payload)),
+    ])
       .then((fns) => {
         off.push(...fns)
-        return invoke('slcm_open')
+        return invoke('slcm_open', { password })
       })
       .catch((e) => {
         off.forEach((f) => f())
@@ -177,6 +194,10 @@ export function slcmConnect(): Promise<SlcmSchedule | null> {
   })
 }
 
+/** Shows the SLCM window, to see what it's doing or finish signing in there. */
+export const slcmShow = () => (IS_TAURI ? invoke('slcm_show') : Promise.resolve())
+/** Closes the SLCM window, giving up on this reading. */
+export const slcmCancel = () => (IS_TAURI ? invoke('slcm_cancel') : Promise.resolve())
 export const slcmForget = () => (IS_TAURI ? invoke('slcm_forget') : Promise.resolve())
 
 /** The demo's study plan (browser preview): times for the course whose timeline gives none. */
