@@ -8,7 +8,8 @@ import { ColorPicker } from './ColorPicker'
 import { invoke } from '@tauri-apps/api/core'
 import { useUpdater } from '../lib/useUpdater'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { ACCENTS, ASSISTANT_MODELS, CLOUD_MODEL, LOCAL_MODELS, CLOUD_VOICES, EQ_STYLES, ACCESSORY_SLOTS, toggleAccessory, type MascotAccessory, PERSONAS, TOOLS, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, toolOn, type Anim, type ChatAnim, type IdleDisplay, type GlassTint, type AssistantModel, type Persona, type Settings, type ToolId, type TalkMode, type Theme } from '../lib/settings'
+import { CAMPUS } from '../lib/campus'
+import { ACCENTS, ASSISTANT_MODELS, CLOUD_MODEL, LOCAL_MODELS, CLOUD_VOICES, EQ_STYLES, ACCESSORY_SLOTS, toggleAccessory, type MascotAccessory, PERSONAS, TOOLS, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TEXT_SIZE_DEFAULT, TAB_ANIMS, toolOn, type Anim, type ChatAnim, type IdleDisplay, type GlassTint, type AssistantModel, type Persona, type Settings, type ToolId, type TalkMode, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
 import { PAGES, type Tab } from '../types'
@@ -39,6 +40,9 @@ interface Props {
 }
 
 /** The sidebar of the full-screen settings, and which titled card belongs to which entry. */
+/** Cards the Universitas Indonesia build leaves out: Astra and the study room aren't part of it. */
+const NOT_IN_CAMPUS = ['Buddy', 'Buddy brain and voice', 'Buddy actions', 'Study']
+
 const SYS_CATS: { id: string; label: string; color: string; Icon: ComponentType<{ size?: number | string; strokeWidth?: number | string }>; titles: string[] }[] = [
   { id: 'general', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Updates'] },
   { id: 'appearance', label: 'Appearance', color: '#0a84ff', Icon: Palette, titles: ['Appearance', 'Pill', 'Motion'] },
@@ -57,6 +61,12 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     </button>
   )
 }
+
+/**
+ * A size as people think of it: "Default" at the standard size, otherwise how much bigger or
+ * smaller than that ("90%", "115%"), not pixels.
+ */
+const relative = (base: number) => (v: number) => (Math.abs(v - base) < 1e-9 ? 'Default' : `${Math.round((v / base) * 100)}%`)
 
 function Slider({
   label,
@@ -105,6 +115,7 @@ function Segmented<T extends string | number>({ options, value, onPick }: { opti
 /** One titled card of settings. */
 function Group({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   const cat = useContext(SysCat)
+  if (CAMPUS && NOT_IN_CAMPUS.includes(title)) return null
   if (cat && !SYS_CATS.find((c) => c.id === cat)?.titles.includes(title)) return null
   return (
     <section className="set-group">
@@ -783,7 +794,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           label="Text size"
           value={settings.clockSize}
           limits={SIZE_LIMITS.clockSize}
-          format={(v) => `${v}px`}
+          format={relative(TEXT_SIZE_DEFAULT)}
           onChange={(clockSize) => update({ clockSize })}
         />
         <Slider
@@ -816,17 +827,17 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
         }
       >
         <Slider
-          label="Scale"
+          label="Island size"
           value={settings.scale}
           limits={SIZE_LIMITS.scale}
-          format={(v) => `${Math.round(v * 100)}%`}
+          format={relative(SIZE_DEFAULTS.scale)}
           onChange={(scale) => update({ scale })}
         />
         <Slider
           label="Card width"
           value={settings.cardW}
           limits={SIZE_LIMITS.cardW}
-          format={(v) => `${v}`}
+          format={relative(SIZE_DEFAULTS.cardW)}
           onChange={(cardW) => update({ cardW })}
         />
         <div className="row">
@@ -842,7 +853,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
             label="Height"
             value={settings.cardH}
             limits={SIZE_LIMITS.cardH}
-            format={(v) => `${v}`}
+            format={relative(SIZE_DEFAULTS.cardH)}
             onChange={(cardH) => update({ cardH })}
           />
         )}
@@ -1136,6 +1147,13 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           <Toggle on={autostart} onChange={toggleAutostart} />
         </div>
         <div className="row">
+          <div className="row-text">
+            <span>Catch up when I'm back</span>
+            <small>After 10 minutes away, sleep or a shutdown, one card shows what you missed</small>
+          </div>
+          <Toggle on={settings.catchUp} onChange={(v) => update({ catchUp: v })} />
+        </div>
+        <div className="row">
           <span>Hide in fullscreen apps</span>
           <Toggle on={settings.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
         </div>
@@ -1151,14 +1169,20 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           <span>Fahrenheit</span>
           <Toggle on={settings.fahrenheit} onChange={(v) => update({ fahrenheit: v })} />
         </div>
-        <div className="row">
-          <span>Display</span>
-          <Segmented<number>
-            options={Array.from({ length: monitors + 1 }, (_, i): [number, string] => [i, i === 0 ? 'Main' : String(i)])}
-            value={settings.monitor}
-            onPick={(monitor) => update({ monitor })}
-          />
-        </div>
+        {/* one screen: nothing to choose (still shown if a screen picked before is unplugged, to pick again) */}
+        {(monitors > 1 || settings.monitor > 0) && (
+          <div className="row">
+            <div className="row-text">
+              <span>Show the island on</span>
+              <small>Main screen is the one Windows uses as main. The others are numbered as Windows lists them.</small>
+            </div>
+            <Segmented<number>
+              options={Array.from({ length: monitors + 1 }, (_, i): [number, string] => [i, i === 0 ? 'Main screen' : `Screen ${i}`])}
+              value={settings.monitor}
+              onPick={(monitor) => update({ monitor })}
+            />
+          </div>
+        )}
       </Group>
 
       <Group title="Updates">
@@ -1192,7 +1216,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
         </button>
         <b className="sys-title">Settings</b>
         <nav>
-          {SYS_CATS.map(({ id, label, color, Icon }) => (
+          {SYS_CATS.filter((c) => !(CAMPUS && c.id === 'astra')).map(({ id, label, color, Icon }) => (
             <button key={id} className={`sys-item ${id === current.id ? 'on' : ''}`} aria-current={id === current.id ? 'page' : undefined} data-cuelume-select onClick={() => setCat(id)}>
               <span className="sys-ic" style={{ background: color }}>
                 <Icon size={13} strokeWidth={2.3} aria-hidden />

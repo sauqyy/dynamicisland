@@ -29,6 +29,12 @@ import { DEFAULT_LABEL, studyActivity, useStudyBoard, useStudyLog, type StudySes
 import { useStudyRoom, type StudyRoom } from './lib/useStudyRoom'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { SceleWidget } from './widgets/SceleWidget'
+import { TodayWidget } from './widgets/TodayWidget'
+import { CatchUpCard, needsYou, type UnreadFrom } from './widgets/CatchUpCard'
+import { useCatchUp } from './lib/useCatchUp'
+import { CampusSetup } from './widgets/CampusSetup'
+import { demoForgetSlcmSession } from './lib/slcm'
+import { UI_YELLOW, UiLogo } from './widgets/UiLogo'
 import { useScele } from './lib/useScele'
 import { demoPostGrade, demoResetScele, demoSubmitLab } from './lib/scele'
 import { NO_STUDENT, useStudent } from './lib/sso'
@@ -122,7 +128,56 @@ function loadTab(): Tab {
   } catch {
     /* ignore */
   }
-  return 'media'
+  // the Universitas Indonesia build opens on the day at a glance
+  return CAMPUS ? 'today' : 'media'
+}
+
+/** the day the "Verify your SSO UI" alert was last shown */
+const VERIFY_NUDGE_KEY = 'di.ui.verifyNudge'
+/** set once connecting Universitas Indonesia is finished and its "all set" has been seen */
+const SETUP_DONE_KEY = 'di.ui.setupDone'
+
+/** What verifying with SSO UI has opened up, each a tap away. */
+const UNLOCKED: { tab: Tab; title: string; text: string }[] = [
+  { tab: 'today', title: 'Today', text: "Your next class, what's due and your to-dos, in one place." },
+  { tab: 'classes', title: 'Classes', text: "Your week of classes, with each one's room, topic and slides." },
+  { tab: 'deadlines', title: 'Due', text: "SCELE assignments and whether they're submitted, your own deadlines, and grades." },
+  { tab: 'inbox', title: 'Inbox', text: "Course announcements and new materials as they're posted." },
+]
+
+/**
+ * Shown once, right after SSO UI verification succeeds: the Universitas Indonesia features that
+ * just unlocked, and SCELE as the next step, since Classes, Due and Inbox are filled from it.
+ */
+function Welcome({ name, sceleConnected, onGo, onClose }: { name: string; sceleConnected: boolean; onGo: (t: Tab) => void; onClose: () => void }) {
+  const first = name.split(' ')[0]
+  return (
+    <div className="whatsnew welcome" onClick={(e) => e.stopPropagation()}>
+      <UiLogo size={34} color={UI_YELLOW} />
+      <small>Verified with SSO UI</small>
+      <b>{first ? `Welcome, ${first}` : 'Welcome'}</b>
+      <p className="welcome-lede">Campus is unlocked. Here's what's new for you:</p>
+      <ul className="welcome-list">
+        {UNLOCKED.map((u) => (
+          <li key={u.tab}>
+            <button data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => onGo(u.tab)}>
+              <b>{u.title}</b>
+              <span>{u.text}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {!sceleConnected && <p className="welcome-note">One step left: connect SCELE and your timetable on Today, with your SSO UI password once.</p>}
+      <div className="welcome-acts">
+        <button className="pill-btn" data-cuelume-close data-cuelume-emphasis="subtle" onClick={onClose}>
+          Later
+        </button>
+        <button className="pill-btn primary" data-cuelume-open onClick={() => onGo('today')}>
+          {sceleConnected ? 'Show me Today' : 'Continue setup'}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /** The open card's height follows its page, within these bounds (design px). */
@@ -264,6 +319,11 @@ export default function App() {
   const fsTimer = useRef(0)
   const [notes, setNotes] = useState<Release | null>(null) // "What's new" card after an update
   const afterIntro = useRef<Release | null>(null) // the update notes that wait behind it
+  // the welcome after SSO UI verification succeeds, and Today's "Verify" sending the user to Profile
+  const [welcome, setWelcome] = useState(false)
+  // how tall the catch-up's content is, so the island fits it
+  const [catchUpH, setCatchUpH] = useState(0)
+  const [spotlight, setSpotlight] = useState(0)
   // the browser demo's button panel can be dragged out of the way by its title
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 })
   const panelDrag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
@@ -339,7 +399,9 @@ export default function App() {
         (p) =>
           (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) &&
           (campus || !CAMPUS_PAGES.includes(p.id)) &&
-          (p.id !== 'astra' || settings.assistant),
+          (p.id !== 'astra' || settings.assistant) &&
+          // once Campus is unlocked, your own deadlines are on Due with SCELE's
+          !(CAMPUS && campus && p.id === 'deadlist'),
       ),
     [settings.hiddenPages, campus, settings.assistant],
   )
@@ -457,11 +519,127 @@ export default function App() {
     logStudy(s.label, Math.min((Date.now() - s.startedAt) / 60_000, s.maxMin), s.startedAt, Boolean(s.gid))
     if (s.gid) leaveRoomRef.current(s.gid)
   }, [logStudy])
-  const scele = CAMPUS ? useScele(pushAlert, student.student === undefined ? undefined : campus) : NO_SCELE
+  // away and back: everything keeps running while the user is away (alerts, sounds, SCELE's sync),
+  // and what came in meanwhile is noted, to greet them with as one catch-up when they return, once
+  // SCELE has synced again
+  const sceleRef = useRef<ReturnType<typeof useScele> | null>(null)
+  const catchUp = useCatchUp({
+    enabled: settings.catchUp,
+    ready: (since) => {
+      const sc = sceleRef.current
+      return !CAMPUS || !sc?.account || (sc.syncedAt >= since && !sc.syncing)
+    },
+    onReturn: () => sceleRef.current?.syncSoon?.(),
+  })
+  const { hold } = catchUp
+  /** An alert now, or (the user being away) kept for the catch-up. */
+  const alertOrHold = useCallback(
+    (a: Omit<IslandAlert, 'id'>, cue?: SoundName, opts?: PlayOptions) => {
+      if (hold(a)) return
+      pushAlert(a, cue, opts)
+    },
+    [hold, pushAlert],
+  )
+  const scele = CAMPUS ? useScele(alertOrHold, student.student === undefined ? undefined : campus) : NO_SCELE
+  sceleRef.current = CAMPUS ? scele : null
   // a Campus page left open from before is not there once the verification is removed
   useEffect(() => {
     if (student.student === null && CAMPUS_PAGES.includes(tab)) setTab('profile')
   }, [student.student, tab])
+  // Deadlines left open from before Campus unlocked: they're on Due now
+  useEffect(() => {
+    if (CAMPUS && campus && tab === 'deadlist') setTab('deadlines')
+  }, [campus, tab])
+
+  // Universitas Indonesia: verifying with SSO UI is the way in, so the island points there until
+  // it's done, and says what has opened up the moment it is
+  const sawUnverified = useRef(false)
+  useEffect(() => {
+    if (!CAMPUS || student.student === undefined) return
+    if (!student.student?.fasilkom) {
+      sawUnverified.current = true
+      return
+    }
+    // verified just now, not found verified at start-up
+    if (!sawUnverified.current) return
+    sawUnverified.current = false
+    setWelcome(true)
+    setExpanded(true)
+    setTab('today')
+  }, [student.student])
+  // not verified: a word about it once a day, a moment after the island starts
+  useEffect(() => {
+    if (!CAMPUS || student.student !== null) return
+    const today = new Date().toDateString()
+    try {
+      if (localStorage.getItem(VERIFY_NUDGE_KEY) === today) return
+    } catch {
+      return
+    }
+    const id = setTimeout(() => {
+      try {
+        localStorage.setItem(VERIFY_NUDGE_KEY, today)
+      } catch {
+        /* ignore */
+      }
+      pushAlert({ icon: '🎓', text: 'Verify your SSO UI', sub: 'Unlock your classes and SCELE deadlines', openTab: 'profile' }, 'ready')
+    }, 2500)
+    return () => clearTimeout(id)
+  }, [student.student, pushAlert])
+  /** From Today's "Verify with SSO UI": to the Universitas Indonesia card on Profile, lit up. */
+  const goVerify = useCallback(() => {
+    setTab('profile')
+    setSpotlight((n) => n + 1)
+  }, [])
+
+  // Connecting Universitas Indonesia (SSO UI, SCELE, SLCM) as one setup on Today, until it's done
+  // and seen. An install that is already fully connected when it starts never shows it.
+  const [setupDone, setSetupDone] = useState(() => {
+    try {
+      return localStorage.getItem(SETUP_DONE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const finishSetup = useCallback(() => {
+    setSetupDone(true)
+    try {
+      localStorage.setItem(SETUP_DONE_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+  }, [])
+  const setupSeenOpen = useRef(false)
+  useEffect(() => {
+    if (!CAMPUS || setupDone || student.student === undefined) return
+    // still finding out what's connected
+    if (campus && (scele.account === undefined || !scele.slcmKnown)) return
+    const complete = campus && Boolean(scele.account) && Boolean(scele.slcm)
+    if (!complete) setupSeenOpen.current = true
+    else if (!setupSeenOpen.current) finishSetup()
+  }, [setupDone, student.student, campus, scele.account, scele.slcm, scele.slcmKnown, finishSetup])
+  /** SSO UI from the setup card: in the browser, with the island kept open for the way back. */
+  const verifyFromSetup = useCallback(async () => {
+    setHoldOpen(true)
+    try {
+      const who = await student.verify()
+      if (!who.fasilkom && !who.needs_scele) throw `Signed in as ${who.name || who.username}, but SSO UI doesn't list you as a Fasilkom UI student.`
+    } finally {
+      setHoldOpen(false)
+    }
+  }, [student])
+  /** Profile's "Disconnect everything": SSO UI, SCELE (its token too), SLCM and UI's sessions, all at once. */
+  const disconnectCampus = useCallback(() => {
+    student.forget()
+    if (!IS_TAURI) demoForgetSlcmSession()
+    setSetupDone(false)
+    setupSeenOpen.current = false
+    try {
+      localStorage.removeItem(SETUP_DONE_KEY)
+    } catch {
+      /* ignore */
+    }
+  }, [student])
   // what is still due before midnight, for the badge on the pill
   const dueToday = useMemo(() => {
     const midnight = new Date(now).setHours(24, 0, 0, 0)
@@ -612,14 +790,14 @@ export default function App() {
       setTimer({ endsAt: start + total, total })
       setNow(start) // so the ring shows the new phase full straight away instead of waiting for the next tick
       if (next.phase === 'focus') beginStudy(taskRef.current, { maxMin: POMO_MIN.focus, deadlineId: taskDeadline.current })
-      pushAlert(
+      alertOrHold(
         next.phase === 'focus'
           ? { icon: '🎯', text: 'Focus time', sub: taskRef.current ? `${taskRef.current} · session ${next.done + 1}` : `Session ${next.done + 1}` }
           : { icon: '☕', text: next.phase === 'long' ? 'Long break' : 'Break time', sub: next.phase === 'long' ? `${next.done} done · stretch your legs` : `${next.done} done` },
         'attention',
       )
     },
-    [pushAlert, endStudy, beginStudy],
+    [alertOrHold, endStudy, beginStudy],
   )
 
   useEffect(() => {
@@ -630,9 +808,10 @@ export default function App() {
       const wasRoom = Boolean(studyRef.current?.gid)
       endStudy()
       setTimer(null)
-      pushAlert(wasRoom ? { icon: '📚', text: 'Study session done' } : { icon: '⏰', text: 'Timer done' }, 'attention')
+      // the goal the timer was set for, so the alert says what the time was for
+      alertOrHold(wasRoom ? { icon: '📚', text: 'Study session done' } : timer.goal ? { icon: '⏰', text: "Time's up", sub: timer.goal } : { icon: '⏰', text: 'Timer done' }, 'attention')
     }
-  }, [now, timer, pomo, pushAlert, advancePomo, endStudy])
+  }, [now, timer, pomo, alertOrHold, advancePomo, endStudy])
 
   // when class or a focus session ends, say what came in while the island was quiet
   const wasSilent = useRef(false)
@@ -725,7 +904,7 @@ export default function App() {
         wasCharging = b.charging
         if (!b.charging && b.percent <= LOW_BATTERY && !warned) {
           warned = true
-          pushAlert({ icon: '🪫', text: 'Low battery', sub: `${b.percent}%`, value: b.percent }, 'warning')
+          alertOrHold({ icon: '🪫', text: 'Low battery', sub: `${b.percent}%`, value: b.percent }, 'warning')
         } else if (b.charging || b.percent > LOW_BATTERY + 5) warned = false
       }),
       listen<{ caps: boolean; num: boolean }>('lockkeys', (e) => {
@@ -812,7 +991,26 @@ export default function App() {
     describePaths(DEFAULT_APPS).then(addApps).catch(() => {})
   }, [addApps])
 
-  // Files dragged onto the island: open it on the shelf (or the apps page) and collect them.
+  // the to-do whose details are open: files dropped on the island are attached to it
+  const todoOpen = useRef<number | null>(null)
+  const onTodoOpen = useCallback((id: number | null) => {
+    todoOpen.current = id
+  }, [])
+  const attachToTodo = useCallback((id: number, items: FileItem[]) => {
+    const add = items.map((f) => ({ id: f.id, name: f.name, path: f.path, size: f.size, isDir: f.isDir }))
+    setTodos((list) => list.map((t) => (t.id === id ? { ...t, attachments: [...(t.attachments ?? []), ...add] } : t)))
+  }, [])
+  /** Where dropped files go: the open to-do, else the apps page or the shelf. */
+  const takeFiles = useCallback(
+    (items: FileItem[]) => {
+      if (tabRef.current === 'todo' && todoOpen.current !== null) attachToTodo(todoOpen.current, items)
+      else if (tabRef.current === 'apps') addApps(items)
+      else addShelf(items)
+    },
+    [attachToTodo, addApps, addShelf],
+  )
+
+  // Files dragged onto the island: open it on the shelf (or the apps page, or the open to-do) and collect them.
   useEffect(() => {
     if (!IS_TAURI) return
     const un = getCurrentWebview().onDragDropEvent(async (e) => {
@@ -820,21 +1018,19 @@ export default function App() {
       if (ev.type === 'enter') {
         setDragging(true)
         setExpanded(true)
-        setTab((t) => (t === 'apps' ? 'apps' : 'shelf'))
+        setTab((t) => (t === 'apps' ? 'apps' : t === 'todo' && todoOpen.current !== null ? 'todo' : 'shelf'))
       } else if (ev.type === 'leave') {
         setDragging(false)
       } else if (ev.type === 'drop') {
         setDragging(false)
         play('tap', { emphasis: 'strong' })
-        const items = await describePaths(ev.paths).catch(() => [] as FileItem[])
-        if (tabRef.current === 'apps') addApps(items)
-        else addShelf(items)
+        takeFiles(await describePaths(ev.paths).catch(() => [] as FileItem[]))
       }
     })
     return () => {
       un.then((f) => f())
     }
-  }, [addShelf, addApps])
+  }, [takeFiles])
 
   // Browser demo only: plain HTML5 file drop so the shelf can be tried without Tauri.
   const onBrowserDrop = (e: React.DragEvent) => {
@@ -848,16 +1044,15 @@ export default function App() {
       size: f.size,
       isDir: false,
     }))
-    if (tabRef.current === 'apps') addApps(items)
-    else addShelf(items)
+    takeFiles(items)
   }
 
   // Clicking outside can't be detected when click-through, so collapse when the cursor leaves.
   useEffect(() => {
-    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes || astraIntro) return
+    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes || astraIntro || welcome || catchUp.digest) return
     const id = setTimeout(() => setExpanded(false), 700)
     return () => clearTimeout(id)
-  }, [expanded, hovered, holdOpen, fs, notes, astraIntro])
+  }, [expanded, hovered, holdOpen, fs, notes, astraIntro, welcome, catchUp.digest])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -880,7 +1075,8 @@ export default function App() {
     getVersion()
       .then((v) => {
         const r = releaseToShow(v)
-        if (!astraIntroSeen()) {
+        // (the Universitas Indonesia build has no Astra, so no welcome for her)
+        if (!CAMPUS && !astraIntroSeen()) {
           // Astra comes first; the notes follow once she has been answered
           afterIntro.current = r
           setAstraIntro(true)
@@ -922,6 +1118,36 @@ export default function App() {
   const unreadCount =
     Object.values(social.unread).reduce((a, b) => a + b, 0) +
     (DEMO_SOCIAL ? 0 : Object.values(groupChats.unread).reduce((a, b) => a + b, 0) + groupChats.invites.length)
+  // who wrote while the user was away, for the catch-up: friends, then groups
+  const unreadFrom = useMemo<UnreadFrom[]>(
+    () => [
+      ...social.friends
+        .filter((f) => social.unread[f.profile.id])
+        .map((f) => ({ key: f.profile.id, who: f.profile.display_name || f.profile.username, count: social.unread[f.profile.id], chatWith: f.profile.id })),
+      ...(DEMO_SOCIAL ? [] : groupChats.groups.filter((g) => groupChats.unread[g.id]).map((g) => ({ key: `g${g.id}`, who: g.name, count: groupChats.unread[g.id], group: true }))),
+    ],
+    [social.friends, social.unread, groupChats.groups, groupChats.unread],
+  )
+  // what to call the user: their SSO UI name (Universitas Indonesia), else their profile's
+  const firstName = ((CAMPUS && student.student?.name) || auth.profile?.display_name || '').trim().split(/\s+/)[0] ?? ''
+  // a catch-up opens the island; a welcome back with nothing new and nothing needing the user isn't shown
+  // ("All quiet while you were away" is for when something still needs them, like a deadline today)
+  const digest = catchUp.digest
+  const { dismiss: dismissCatchUp } = catchUp
+  useEffect(() => {
+    if (!digest) return
+    const t = Date.now()
+    const quiet = !digest.held.length && !unreadFrom.length
+    const needed = needsYou(t, CAMPUS && campus && scele.upcoming ? scele.upcoming(t, 2) : [], CAMPUS && campus ? scele.deadlines : [], deadlines, todos).length > 0
+    if (digest.kind === 'back' && quiet && !needed) {
+      dismissCatchUp()
+      return
+    }
+    setExpanded(true)
+    play('ready')
+    // only when a new catch-up arrives
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [digest])
   const { publishActivity } = social
   useEffect(() => {
     if (!meId) return
@@ -1054,8 +1280,10 @@ export default function App() {
 
   // the card fits the page it shows; a page taller than the card scrolls inside it
   const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
-  const expandedHeight = notes || astraIntro
+  const expandedHeight = notes || astraIntro || welcome
     ? CARD_MAX
+    : catchUp.digest
+      ? Math.min(CARD_MAX, Math.max(CARD_MIN, catchUpH || CARD_MAX))
     : settings.cardFit
       ? Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
       : Math.min(CARD_MAX, settings.cardH)
@@ -1155,10 +1383,10 @@ export default function App() {
     soundState.current = { expanded, tab }
   }, [expanded, tab])
 
-  const startTimer = (minutes: number) => {
+  const startTimer = (minutes: number, goal?: string) => {
     endStudy()
     setPomo(null)
-    setTimer({ endsAt: Date.now() + minutes * 60_000, total: minutes * 60_000 })
+    setTimer({ endsAt: Date.now() + minutes * 60_000, total: minutes * 60_000, goal: goal?.trim() || undefined })
   }
   const stopTimer = () => {
     endStudy()
@@ -1524,7 +1752,21 @@ export default function App() {
                 onPomoSkip={skipPomo}
               />
             )}
-            {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
+            {CAMPUS && tab === 'today' && (
+              <TodayWidget
+                now={now}
+                scele={campus ? scele : null}
+                deadlines={deadlines}
+                todos={todos}
+                setTodos={setTodos}
+                slots={slots}
+                timer={pomo ? null : timer}
+                pages={pages.map((p) => p.id)}
+                go={setTab}
+                setup={student.student !== undefined && !setupDone ? <CampusSetup student={student} scele={scele} verify={verifyFromSetup} onDone={finishSetup} /> : undefined}
+              />
+            )}
+            {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} onOpen={onTodoOpen} />}
             {tab === 'notes' && <NotesWidget />}
             {tab === 'prompter' && <PrompterWidget fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
             {tab === 'deadlist' && <DeadlinesWidget deadlines={deadlines} setDeadlines={setDeadlines} now={now} onStart={startOnDeadline} studyingId={study?.deadlineId} />}
@@ -1550,7 +1792,7 @@ export default function App() {
               />
             )}
             {CAMPUS && (tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
-              <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} />
+              <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} own={{ deadlines, setDeadlines }} />
             )}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
             {tab === 'clipboard' && (
@@ -1597,7 +1839,18 @@ export default function App() {
                 onFullscreen={toggleFullscreen}
               />
             )}
-            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} student={student} />}
+            {tab === 'profile' && (
+              <ProfileWidget
+                auth={auth}
+                settings={settings}
+                update={update}
+                onHold={setHoldOpen}
+                student={student}
+                spotlight={spotlight}
+                kept={CAMPUS ? { scele: scele.account ? scele.account.username : null, slcm: scele.slcm ? { at: scele.slcm.at, classes: scele.slcm.classes.length } : null } : undefined}
+                onDisconnect={CAMPUS ? disconnectCampus : undefined}
+              />
+            )}
             {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} unavailable={campus ? [] : CAMPUS_PAGES} />}
             </div>
             </motion.div>
@@ -1649,9 +1902,50 @@ export default function App() {
             </button>
           </div>
         )}
+        {catchUp.digest && !welcome && (
+          <CatchUpCard
+            digest={catchUp.digest}
+            name={firstName}
+            now={now}
+            unread={unreadFrom}
+            meetings={CAMPUS && campus && scele.upcoming ? scele.upcoming(now, 2) : []}
+            sceleDue={CAMPUS && campus ? scele.deadlines : []}
+            ownDue={deadlines}
+            todos={todos}
+            onGo={(t) => {
+              catchUp.dismiss()
+              setTab(t)
+            }}
+            onChat={(id) => {
+              catchUp.dismiss()
+              setPendingChat(id)
+            }}
+            onClose={catchUp.dismiss}
+            onHeight={setCatchUpH}
+            onToday={
+              CAMPUS
+                ? () => {
+                    catchUp.dismiss()
+                    setTab('today')
+                  }
+                : undefined
+            }
+          />
+        )}
+        {CAMPUS && welcome && (
+          <Welcome
+            name={student.student?.name || student.student?.username || ''}
+            sceleConnected={Boolean(scele.account)}
+            onGo={(t) => {
+              setWelcome(false)
+              setTab(t)
+            }}
+            onClose={() => setWelcome(false)}
+          />
+        )}
         {dragging && (
           <div className="drop-overlay">
-            {tab === 'apps' ? 'Release to pin' : 'Release to add to Shelf'}
+            {tab === 'apps' ? 'Release to pin' : tab === 'todo' && todoOpen.current !== null ? 'Release to attach to this task' : 'Release to add to Shelf'}
           </div>
         )}
       </div>
@@ -1912,7 +2206,7 @@ export default function App() {
         if (!dragging) {
           setDragging(true)
           setExpanded(true)
-          setTab((t) => (t === 'apps' ? 'apps' : 'shelf'))
+          setTab((t) => (t === 'apps' ? 'apps' : t === 'todo' && todoOpen.current !== null ? 'todo' : 'shelf'))
         }
       }}
       onDragLeave={(e) => !IS_TAURI && e.relatedTarget === null && setDragging(false)}
@@ -2099,6 +2393,62 @@ export default function App() {
             <button onClick={() => pushAlert({ icon: '📣', text: 'PPW: Perubahan deadline Lab 8', sub: 'Deadline Lab 8 diundur ke Jumat 23.55.', openTab: 'inbox' }, 'ready')}>Announcement</button>
             <button onClick={() => pushAlert({ icon: '📄', text: 'New in SDA', sub: 'Slide AVL Tree', openTab: 'inbox' }, 'ready')}>New material</button>
           </div>}
+          {CAMPUS && <div className="demo-row">
+            <span>SSO UI</span>
+            {/* the onboarding: unverified (Today points to Profile, the daily alert), then verified (the welcome) */}
+            <button
+              onClick={() => {
+                // like a fresh install: nothing connected, the setup from the start
+                disconnectCampus()
+                try {
+                  localStorage.removeItem(VERIFY_NUDGE_KEY)
+                } catch {
+                  /* ignore */
+                }
+                setTab('today')
+                setExpanded(true)
+                pushAlert({ icon: '🎓', text: 'Verify your SSO UI', sub: 'Unlock your classes and SCELE deadlines', openTab: 'profile' }, 'ready')
+              }}
+            >
+              Start unverified
+            </button>
+            <button onClick={goVerify}>Go to Verify Student</button>
+            {/* UI's login session running out: reading SLCM again asks for the password */}
+            <button onClick={() => demoForgetSlcmSession()}>Expire UI sign-in</button>
+            <button
+              onClick={() => {
+                setExpanded(true)
+                student.verify().then(() => play('success'))
+              }}
+            >
+              Verify (succeeds)
+            </button>
+          </div>}
+          <div className="demo-row">
+            <span>Away</span>
+            {/* as if the user left and is back now; what would have popped up meanwhile is held for the catch-up */}
+            <button
+              onClick={() =>
+                catchUp.simulate('back', 40, [
+                  { icon: '📅', text: 'PBD: Lab 8: Todo app', sub: 'Due in 2h 30m · still a draft', openTab: 'deadlines' },
+                  { icon: '📣', text: 'OS: Lab moved to Lab 2', sub: 'The 1 Nov lab is in Lab 2 instead', openTab: 'inbox' },
+                  { icon: '🏅', text: 'New grade in OS', sub: 'Quiz 2 · open Due to see it', openTab: 'deadlines' },
+                ])
+              }
+            >
+              Back from AFK (40 min)
+            </button>
+            <button
+              onClick={() =>
+                catchUp.simulate('hello', 9 * 60, [
+                  { icon: '📄', text: 'New in SP', sub: 'Week 9 · Hypothesis testing.pdf', openTab: 'inbox' },
+                  { icon: '📅', text: 'SP: Tugas Pemrograman 2', sub: 'Due in 2 days', openTab: 'deadlines' },
+                ])
+              }
+            >
+              Laptop turned on (overnight)
+            </button>
+          </div>
           {CAMPUS && campus && <div className="demo-row">
             <span>SCELE work</span>
             {/* these change the demo's SCELE data and sync, so the Due page and alerts react as they would to the real thing */}
@@ -2152,7 +2502,8 @@ export default function App() {
               What's new
             </button>
             <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
-            <button
+            {!CAMPUS && (
+<button
               onClick={() => {
                 setNotes(null)
                 demoStt('reset')
@@ -2162,6 +2513,7 @@ export default function App() {
             >
               Astra welcome
             </button>
+)}
           </div>
         </div>
       )}

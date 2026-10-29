@@ -1,7 +1,9 @@
 import type { LyricLine } from './lib/lyrics'
+import { CAMPUS } from './lib/campus'
 
 export type Tab =
   | 'astra'
+  | 'today'
   | 'media'
   | 'weather'
   | 'timer'
@@ -22,8 +24,25 @@ export type Tab =
   | 'profile'
   | 'settings'
 
+type Group = { id: string; title: string; icon: string; pages: Tab[] }
+
+/**
+ * The Universitas Indonesia build, grouped by what you're doing rather than where things come from:
+ * your day at a glance, your courses, getting something done, and people. Your own deadlines are on
+ * Due with SCELE's (Deadlines is only there before Campus unlocks), and the pages most students
+ * don't need start hidden (see settings.ts).
+ */
+const CAMPUS_GROUPS: Group[] = [
+  { id: 'home', title: 'Today', icon: '🏠', pages: ['today', 'media', 'weather'] },
+  { id: 'campus', title: 'Campus', icon: '🎓', pages: ['classes', 'deadlines', 'inbox'] },
+  { id: 'focus', title: 'Focus', icon: '🎯', pages: ['todo', 'timer', 'notes', 'clipboard', 'deadlist', 'schedule', 'prompter'] },
+  { id: 'social', title: 'People', icon: '👥', pages: ['friends', 'groups', 'profile'] },
+  { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps'] },
+  { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
+]
+
 /** Pages are grouped so the card has 5 places to go instead of 11 pages in a row. */
-export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[] = [
+const REGULAR_GROUPS: Group[] = [
   { id: 'astra', title: 'Astra', icon: '✨', pages: ['astra'] },
   { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
   { id: 'tools', title: 'Tools', icon: '🛠️', pages: ['todo', 'notes', 'prompter'] },
@@ -34,8 +53,11 @@ export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[]
   { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
 ]
 
+export const GROUPS: Group[] = CAMPUS ? CAMPUS_GROUPS : REGULAR_GROUPS
+
 const TITLES: Record<Tab, string> = {
   astra: 'Chat with Astra',
+  today: 'Today',
   media: 'Now Playing',
   weather: 'Weather',
   timer: 'Timer',
@@ -63,6 +85,7 @@ export const PAGES: { id: Tab; title: string }[] = GROUPS.flatMap((g) => g.pages
 /** Short names for the tabs inside a group. */
 export const SHORT: Record<Tab, string> = {
   astra: 'Astra',
+  today: 'Today',
   media: 'Playing',
   weather: 'Weather',
   timer: 'Timer',
@@ -119,6 +142,8 @@ export interface IslandAlert {
 export interface TimerState {
   endsAt: number
   total: number
+  /** what the timer is for, written when it was set: "Finish the OS report" */
+  goal?: string
 }
 
 export interface StopwatchState {
@@ -129,10 +154,26 @@ export interface StopwatchState {
   laps: number[]
 }
 
+/** Something attached to a to-do: a file on this computer, or a web address. */
+export interface TodoAttachment {
+  id: string
+  name: string
+  /** a file or folder dropped on the island */
+  path?: string
+  /** a link added by hand */
+  url?: string
+  size?: number
+  isDir?: boolean
+}
+
 export interface Todo {
   id: number
   text: string
   done: boolean
+  /** a longer description, written in the to-do's details */
+  note?: string  /** when it's due, ms; none for most to-dos */
+  due?: number
+  attachments?: TodoAttachment[]
 }
 
 export type PomoPhase = 'focus' | 'break' | 'long'

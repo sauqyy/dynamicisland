@@ -10,7 +10,7 @@ import { Avatar } from './Avatar'
 import { play } from 'cuelume'
 import { disclosureCue } from '../lib/sound'
 import type { StudentState } from '../lib/sso'
-import { BadgeCheck } from 'lucide-react'
+import { BadgeCheck, LogOut } from 'lucide-react'
 import { UI_YELLOW, UiLogo } from './UiLogo'
 
 // written out, not imported, so the bundler can drop the campus card from the regular build
@@ -27,13 +27,94 @@ interface Props {
   onHold: (on: boolean) => void
   /** SSO UI verification, which unlocks the Campus pages */
   student: StudentState
+  /** bumped when Today's "Verify with SSO UI" sends the user here: the Universitas Indonesia card lights up */
+  spotlight?: number
+  /** what the Universitas Indonesia connections keep on this computer, for the list on the card */
+  kept?: Kept
+  /** forgets SSO UI, SCELE, SLCM and UI's sessions at once */
+  onDisconnect?: () => void
+}
+
+/** What's kept on this computer for the Universitas Indonesia connections. */
+export interface Kept {
+  /** the SCELE account the token is for; null when SCELE isn't connected */
+  scele: string | null
+  /** when the timetable was read from SLCM, and how many classes; null when it hasn't been */
+  slcm: { at: number; classes: number } | null
+}
+
+/**
+ * Everything the Universitas Indonesia connections keep on this computer, said plainly, and one
+ * button that removes all of it (asked once first). Passwords aren't on the list: none is kept.
+ */
+function KeptList({ kept, onDisconnect }: { kept: Kept; onDisconnect: () => void }) {
+  const [asking, setAsking] = useState(false)
+  const since = (t: number) => new Date(t).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })
+  return (
+    <div className="kept">
+      <b className="kept-title">What's kept on this computer</b>
+      <ul>
+        <li>
+          <span>SSO UI</span>
+          <small>Your name, NPM and study programme, in the island's settings folder</small>
+        </li>
+        <li>
+          <span>SCELE</span>
+          <small>{kept.scele ? `A sign-in token for ${kept.scele}, in your system's credential store (Windows Credential Manager)` : 'Nothing: not connected'}</small>
+        </li>
+        <li>
+          <span>SLCM</span>
+          <small>
+            {kept.slcm
+              ? `Your timetable (${kept.slcm.classes} classes, read ${since(kept.slcm.at)}), and UI's sign-in session so it can be read again without a password`
+              : 'Nothing: not read yet'}
+          </small>
+        </li>
+        <li>
+          <span>Courses</span>
+          <small>Deadlines, grades and course pages from SCELE, so they show while you're offline</small>
+        </li>
+        <li>
+          <span>Passwords</span>
+          <small>None. A password you type is used once and forgotten.</small>
+        </li>
+      </ul>
+      {asking ? (
+        <div className="kept-confirm">
+          <small>This signs you out of SSO UI, SCELE and SLCM here and deletes everything above. Campus locks until you verify again.</small>
+          <span className="kept-acts">
+            <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAsking(false)}>
+              Cancel
+            </button>
+            <button className="chip danger" data-cuelume-close onClick={onDisconnect}>
+              Disconnect everything
+            </button>
+          </span>
+        </div>
+      ) : (
+        <button className="chip danger kept-go" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => setAsking(true)}>
+          Disconnect everything
+        </button>
+      )}
+    </div>
+  )
 }
 
 /** "Verify Student" with SSO UI. Separate from the friends account, so it works without one. */
-function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: boolean) => void }) {
+function StudentCard({ student, onHold, spotlight = 0, kept, onDisconnect }: { student: StudentState; onHold: (on: boolean) => void; spotlight?: number; kept?: Kept; onDisconnect?: () => void }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const s = student.student
+  const card = useRef<HTMLDivElement>(null)
+  const [lit, setLit] = useState(false)
+  // sent here to verify: bring the card into view and light it up for a moment
+  useEffect(() => {
+    if (!spotlight) return
+    card.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    setLit(true)
+    const id = setTimeout(() => setLit(false), 1800)
+    return () => clearTimeout(id)
+  }, [spotlight])
 
   const verify = async () => {
     setBusy(true)
@@ -61,7 +142,7 @@ function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: 
   }
 
   return (
-    <div className="field student-card">
+    <div ref={card} className={`field student-card ${lit ? 'spot' : ''}`}>
       <label>Universitas Indonesia</label>
       {s?.needs_scele ? (
         <ConfirmWithScele student={student} />
@@ -76,9 +157,6 @@ function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: 
               {s.npm} · Fasilkom UI{s.study_program ? ` · ${s.study_program.replace(/\s*\(.*\)$/, '')}` : ''}
             </small>
           </span>
-          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={student.forget}>
-            Remove
-          </button>
         </div>
       ) : (
         <>
@@ -89,6 +167,7 @@ function StudentCard({ student, onHold }: { student: StudentState; onHold: (on: 
           {busy && <small>Sign in on the SSO UI page that opened in your browser.</small>}
         </>
       )}
+      {s?.fasilkom && <KeptList kept={kept ?? { scele: null, slcm: null }} onDisconnect={onDisconnect ?? student.forget} />}
       {msg && <div className="form-msg">{msg}</div>}
     </div>
   )
@@ -556,11 +635,6 @@ function Editor({ auth, settings, update, onHold }: Props) {
           {status.trim() && <span className="profile-status">{status.trim()}</span>}
           <small>{auth.user?.email}</small>
         </div>
-        {p && (
-          <button className="chip" data-cuelume-close onClick={auth.signOut}>
-            Sign out
-          </button>
-        )}
       </div>
 
       {source && cropping && <PhotoCropper source={source} crop={crop} onChange={setCrop} onDone={() => setCropping(false)} />}
@@ -830,6 +904,64 @@ function Editor({ auth, settings, update, onHold }: Props) {
           <Toggle on={settings.shareActivity} onChange={(v) => update({ shareActivity: v })} />
         </div>
       )}
+
+      <SignOut auth={auth} />
+    </div>
+  )
+}
+
+/**
+ * Signing out of the friends account, at the end of the profile. Asks once first: it ends chats and
+ * calls on this computer, and is shown whether or not a profile has been made yet.
+ */
+function SignOut({ auth }: { auth: Auth }) {
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  const signOut = async () => {
+    setBusy(true)
+    setMsg(null)
+    const err = await auth.signOut()
+    setBusy(false)
+    if (err) {
+      play('error', { emphasis: 'subtle' })
+      setMsg(`Couldn't sign out: ${err}`)
+    }
+  }
+
+  return (
+    <div className="field">
+      <label>Account</label>
+      <div className="row share-row signout-row">
+        {asking ? (
+          <>
+            <div>
+              <span>Sign out of this account?</span>
+              <small>Friends see you as offline. Your chats, groups and profile come back when you sign in again.</small>
+            </div>
+            <div className="signout-acts">
+              <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" disabled={busy} onClick={() => setAsking(false)}>
+                Cancel
+              </button>
+              <button className="chip danger" data-cuelume-close disabled={busy} onClick={signOut}>
+                {busy ? 'Signing out…' : 'Sign out'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <span>Signed in as {auth.user?.email || 'you'}</span>
+              <small>Sign out to switch accounts or stop sharing your status on this computer.</small>
+            </div>
+            <button className="chip signout-btn" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => setAsking(true)}>
+              <LogOut size={11} aria-hidden /> Sign out
+            </button>
+          </>
+        )}
+      </div>
+      {msg && <div className="form-msg">{msg}</div>}
     </div>
   )
 }
@@ -852,10 +984,14 @@ export function ProfileWidget(props: Props) {
     // remount when the profile first appears so the form fields start from saved values
     body = <Editor key={auth.profile?.id ?? 'new'} {...props} />
   }
+  // not verified yet: the Universitas Indonesia card comes first, as the way in to Campus
+  const first = CAMPUS && props.student.student !== undefined && !props.student.student?.fasilkom
+  const studentCard = CAMPUS && <StudentCard student={props.student} onHold={props.onHold} spotlight={props.spotlight} kept={props.kept} onDisconnect={props.onDisconnect} />
   return (
     <div className="scroll-panel" onClick={(e) => e.stopPropagation()}>
+      {first && studentCard}
       {body}
-      {CAMPUS && <StudentCard student={props.student} onHold={props.onHold} />}
+      {!first && studentCard}
     </div>
   )
 }

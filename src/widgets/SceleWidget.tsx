@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { play } from 'cuelume'
-import { BookOpen, CalendarCheck, CalendarClock, ChevronDown, Clock, Eye, EyeOff, FileText, FolderOpen, Inbox, Lock, LogOut, Plus, RefreshCw, RotateCcw } from 'lucide-react'
+import { BookOpen, CalendarCheck, CalendarClock, Check, ChevronDown, Clock, Eye, EyeOff, FileText, FolderOpen, Inbox, Lock, LogOut, Plus, RefreshCw, RotateCcw } from 'lucide-react'
 import { browserUrl, courseTitle, dayName, openScele, relTime, syllabusLinks, type ClassSlot, type Deadline, type Submission } from '../lib/scele'
 import type { Meeting, SceleState } from '../lib/useScele'
+import type { Deadline as OwnDeadline } from '../lib/deadlines'
+import { AddDeadline } from './DeadlinesWidget'
 
 interface Props {
   page: 'deadlines' | 'classes' | 'inbox'
@@ -10,19 +12,21 @@ interface Props {
   now: number
   /** the SSO UI username verified on the Profile page; SCELE uses the same account */
   username: string
+  /** the user's own deadlines, listed on Due beside SCELE's */
+  own?: { deadlines: OwnDeadline[]; setDeadlines: (d: OwnDeadline[]) => void }
 }
 
 const H = 3600_000
 const time = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 const dayLabel = (t: number) => new Date(t).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
 
-export function SceleWidget({ page, scele, now, username }: Props) {
+export function SceleWidget({ page, scele, now, username, own }: Props) {
   if (scele.account === undefined) return <div className="scele center"><div className="timer-label">Loading SCELE…</div></div>
   if (!scele.account) return <SceleLogin scele={scele} username={username} />
   return (
     <div className="scele" onClick={(e) => e.stopPropagation()}>
       <SyncRow scele={scele} now={now} />
-      {page === 'deadlines' && <Deadlines scele={scele} now={now} />}
+      {page === 'deadlines' && <Deadlines scele={scele} now={now} own={own} />}
       {page === 'classes' && <Classes scele={scele} now={now} />}
       {page === 'inbox' && <InboxPage scele={scele} now={now} />}
     </div>
@@ -62,9 +66,9 @@ function SceleLogin({ scele, username }: { scele: SceleState; username: string }
       <button className="pill-btn" disabled={busy || !pass} onClick={submit}>
         {busy ? 'Connecting…' : 'Connect'}
       </button>
-      <small className="sc-note">
-        SCELE doesn't accept SSO sign-in from apps, so it needs your password once to issue a token. The password goes only to scele.cs.ui.ac.id; only the token is
-        kept, on this computer.
+      <small className="sc-note sc-secure">
+        <Lock size={10} aria-hidden /> Sent only to <b>scele.cs.ui.ac.id</b>, over an encrypted connection, and not saved. SCELE doesn't take SSO UI sign-in from apps, so
+        it asks once and gives back a token, kept in your system's credential store.
       </small>
     </div>
   )
@@ -136,14 +140,46 @@ function DeadlineRow({ d, now }: { d: Deadline; now: number }) {
   )
 }
 
-function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
-  const { groups, handedIn } = useMemo(() => {
+/** A deadline of the user's own on Due: ticked off by hand, and removable. */
+function OwnRow({ d, now, onToggle, onDelete }: { d: OwnDeadline; now: number; onToggle: () => void; onDelete: () => void }) {
+  return (
+    <div className={`sc-row sc-own ${d.done ? 'read' : ''}`}>
+      <button className={`check ${d.done ? 'on' : ''}`} aria-label={d.done ? 'Mark as not done' : 'Mark as done'} aria-pressed={d.done} data-cuelume-toggle onClick={onToggle}>
+        {d.done ? <Check size={11} strokeWidth={3} aria-hidden /> : null}
+      </button>
+      <span className="sc-main">
+        <b>{d.title}</b>
+        <small>Yours</small>
+      </span>
+      <span className="sc-when">
+        <b>{d.done ? 'Done' : relTime(d.due, now)}</b>
+        <small>
+          {dayLabel(d.due)} {time(d.due)}
+        </small>
+      </span>
+      <button className="x" aria-label={`Delete ${d.title}`} data-cuelume-close data-cuelume-emphasis="subtle" onClick={onDelete}>
+        ×
+      </button>
+    </div>
+  )
+}
+
+type DueItem = { kind: 'scele'; due: number; d: Deadline } | { kind: 'own'; due: number; d: OwnDeadline }
+
+/**
+ * Everything with a deadline in one list: SCELE's activities and the user's own, by date. What's
+ * handed in or ticked off sinks to the bottom, so the dated groups are only what's left to do.
+ */
+function Deadlines({ scele, now, own }: { scele: SceleState; now: number; own?: Props['own'] }) {
+  const mine = own?.deadlines ?? []
+  const { groups, handedIn, ticked } = useMemo(() => {
     const end = new Date(now)
     end.setHours(24, 0, 0, 0)
     const today = end.getTime()
-    const sorted = [...scele.deadlines].sort((a, b) => a.due - b.due)
-    // what's handed in sinks to its own group, so the dated groups are only what's left to do
-    const open = sorted.filter((d) => d.submission !== 'submitted')
+    const open: DueItem[] = [
+      ...scele.deadlines.filter((d) => d.submission !== 'submitted').map((d): DueItem => ({ kind: 'scele', due: d.due, d })),
+      ...mine.filter((d) => !d.done).map((d): DueItem => ({ kind: 'own', due: d.due, d })),
+    ].sort((a, b) => a.due - b.due)
     return {
       groups: [
         { label: 'Overdue', items: open.filter((d) => d.due < now) },
@@ -152,23 +188,39 @@ function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
         { label: 'This week', items: open.filter((d) => d.due >= today + 24 * H && d.due < today + 7 * 24 * H) },
         { label: 'Later', items: open.filter((d) => d.due >= today + 7 * 24 * H) },
       ].filter((g) => g.items.length),
-      handedIn: sorted.filter((d) => d.submission === 'submitted' && d.due >= now),
+      handedIn: scele.deadlines.filter((d) => d.submission === 'submitted' && d.due >= now).sort((a, b) => a.due - b.due),
+      // the latest few ticked off, newest deadline first
+      ticked: mine.filter((d) => d.done).sort((a, b) => b.due - a.due).slice(0, 5),
     }
-  }, [scele.deadlines, now])
+  }, [scele.deadlines, mine, now])
+
+  const setMine = (list: OwnDeadline[]) => own?.setDeadlines(list)
+  const row = (item: DueItem) =>
+    item.kind === 'scele' ? (
+      <DeadlineRow key={`s${item.d.id}`} d={item.d} now={now} />
+    ) : (
+      <OwnRow
+        key={`o${item.d.id}`}
+        d={item.d}
+        now={now}
+        onToggle={() => setMine(mine.map((x) => (x.id === item.d.id ? { ...x, done: !x.done } : x)))}
+        onDelete={() => setMine(mine.filter((x) => x.id !== item.d.id))}
+      />
+    )
+
   return (
     <div className="sc-list">
+      {own && <AddDeadline onAdd={(title, due) => setMine([...mine, { id: Date.now(), title, due, done: false }])} />}
       {!groups.length && (
         <div className="empty">
           <CalendarCheck size={20} strokeWidth={1.7} aria-hidden />
-          {handedIn.length ? 'Everything due is submitted' : 'Nothing due in the next two weeks'}
+          {handedIn.length || ticked.length ? 'Everything due is done' : 'Nothing due in the next two weeks'}
         </div>
       )}
       {groups.map((g) => (
         <section key={g.label}>
           <h4>{g.label}</h4>
-          {g.items.map((d) => (
-            <DeadlineRow key={d.id} d={d} now={now} />
-          ))}
+          {g.items.map(row)}
         </section>
       ))}
       {handedIn.length > 0 && (
@@ -177,6 +229,12 @@ function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
           {handedIn.map((d) => (
             <DeadlineRow key={d.id} d={d} now={now} />
           ))}
+        </section>
+      )}
+      {ticked.length > 0 && (
+        <section>
+          <h4>Done</h4>
+          {ticked.map((d) => row({ kind: 'own', due: d.due, d }))}
         </section>
       )}
       <Grades scele={scele} now={now} />
@@ -192,6 +250,8 @@ const GRADES_SHOWN_MS = 30 * 24 * H
  * or on a projector. Each time the page opens they start hidden again.
  */
 function Grades({ scele, now }: { scele: SceleState; now: number }) {
+  // folded, and the scores hidden, each time the page opens: what's graded is the user's to open
+  const [open, setOpen] = useState(false)
   const [shown, setShown] = useState(false)
   const recent = useMemo(() => {
     const short = new Map(scele.courses.map((c) => [c.id, c.short]))
@@ -204,45 +264,56 @@ function Grades({ scele, now }: { scele: SceleState; now: number }) {
   }, [scele.grades, scele.courses, now])
   if (!recent.length) return null
   return (
-    <section>
+    <section className={`sc-grades ${open ? 'open' : ''}`}>
       <h4>
-        Recent grades
-        <button
-          className="chip sc-eye"
-          aria-pressed={shown}
-          aria-label={shown ? 'Hide grades' : 'Show grades'}
-          title={shown ? 'Hide grades' : 'Show grades'}
-          data-cuelume-toggle
-          data-cuelume-emphasis="subtle"
-          onClick={() => setShown((v) => !v)}
-        >
-          {shown ? <EyeOff size={11} aria-hidden /> : <Eye size={11} aria-hidden />} {shown ? 'Hide' : 'Show'}
+        <button className="sc-fold" aria-expanded={open} data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => setOpen((v) => !v)}>
+          <ChevronDown size={12} aria-hidden className="sc-fold-chev" />
+          Recent grades
+          <span className="sc-fold-count">{recent.length}</span>
         </button>
+        {open && (
+          <button
+            className="chip sc-eye"
+            aria-pressed={shown}
+            aria-label={shown ? 'Hide grades' : 'Show grades'}
+            title={shown ? 'Hide grades' : 'Show grades'}
+            data-cuelume-toggle
+            data-cuelume-emphasis="subtle"
+            onClick={() => setShown((v) => !v)}
+          >
+            {shown ? <EyeOff size={11} aria-hidden /> : <Eye size={11} aria-hidden />} {shown ? 'Hide' : 'Show'}
+          </button>
+        )}
       </h4>
-      {recent.map((g) => (
-        <button key={`${g.courseId}:${g.id}`} className="sc-row" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(g.url)} title="Open in SCELE">
-          <i className="sc-dot done" />
-          <span className="sc-main">
-            <b>{g.name}</b>
-            <small>
-              {g.course}
-              {g.at ? ` · graded ${relTime(g.at, now)}` : ''}
-            </small>
-          </span>
-          <span className="sc-when">
-            {shown ? (
-              <b className="sc-grade">
-                {g.value}
-                {g.max > 0 && /^\d/.test(g.value) ? <small> / {Number(g.max.toFixed(2))}</small> : null}
-              </b>
-            ) : (
-              <b className="sc-grade hidden" aria-label="Grade hidden">
-                ••••
-              </b>
-            )}
-          </span>
-        </button>
-      ))}
+      {/* folded to no height (and out of reach of Tab) until opened */}
+      <div className="todo-fold sc-grades-fold" inert={!open}>
+        <div className="todo-fold-in">
+          {recent.map((g) => (
+            <button key={`${g.courseId}:${g.id}`} className="sc-row" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(g.url)} title="Open in SCELE">
+              <i className="sc-dot done" />
+              <span className="sc-main">
+                <b>{g.name}</b>
+                <small>
+                  {g.course}
+                  {g.at ? ` · graded ${relTime(g.at, now)}` : ''}
+                </small>
+              </span>
+              <span className="sc-when">
+                {shown ? (
+                  <b className="sc-grade">
+                    {g.value}
+                    {g.max > 0 && /^\d/.test(g.value) ? <small> / {Number(g.max.toFixed(2))}</small> : null}
+                  </b>
+                ) : (
+                  <b className="sc-grade hidden" aria-label="Grade hidden">
+                    ••••
+                  </b>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
     </section>
   )
 }
@@ -399,11 +470,14 @@ const SLCM_STAGE = {
   loading: 'Opening SLCM. Its site is slow, so this can take a few minutes…',
   'signing-in': 'Signing in to SSO UI…',
   'needs-you': 'SLCM needs you: finish signing in in its window.',
+  'needs-password': 'Your sign-in to UI has run out. Enter your password to read SLCM again.',
 }
 
 /**
  * Connecting SLCM: a button that asks for the SSO UI password, then the progress of the hidden SLCM
  * window, which signs in with it and reads the study plan. The password is used once and not kept.
+ * Once SLCM has been read, UI's login keeps a session, so reading again tries that first and asks
+ * for the password only if it has run out.
  */
 function SlcmConnect({ scele, label, primary, open = false }: { scele: SceleState; label: string; primary?: boolean; open?: boolean }) {
   const [asking, setAsking] = useState(open)
@@ -416,15 +490,18 @@ function SlcmConnect({ scele, label, primary, open = false }: { scele: SceleStat
     if (stage === 'signing-in') setSignedIn(true)
     if (stage === null) setSignedIn(false)
   }, [stage])
-  const start = (password: string | null) => {
+  const start = (password: string | null, quiet = false) => {
     setError(null)
     setAsking(false)
     setPass('')
     scele
-      .connectSlcm(password)
-      .then((ok) => {
-        if (ok) play('success')
-        else setError('The SLCM window closed before your schedule came through.')
+      .connectSlcm(password, quiet)
+      .then((r) => {
+        if (r === 'ok') play('success')
+        else if (r === 'needs-password') {
+          setAsking(true)
+          setError('Your sign-in to UI has run out. Enter your password to read SLCM again.')
+        } else setError('The SLCM window closed before your schedule came through.')
       })
       .catch((e) => {
         play('error')
@@ -465,16 +542,9 @@ function SlcmConnect({ scele, label, primary, open = false }: { scele: SceleStat
             Sign in
           </button>
         </div>
-        <small className="sc-hint">
-          Signs in as <b>{scele.account?.username}</b> on login.ui.ac.id, the same password as SCELE. It isn't saved.
-          {scele.slcm && (
-            <>
-              {' '}
-              <button className="sc-inline-link" onClick={() => start(null)}>
-                Still signed in? Read without it
-              </button>
-            </>
-          )}
+        {error && <small className="sc-error">{error}</small>}
+        <small className="sc-hint sc-secure">
+          <Lock size={10} aria-hidden /> Typed only into <b>login.ui.ac.id</b>, UI's own sign-in page, in the island's SLCM window, as <b>{scele.account?.username}</b>. Not saved.
         </small>
         <button className="chip ghost sc-slcm-cancel" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAsking(false)}>
           Cancel
@@ -484,7 +554,8 @@ function SlcmConnect({ scele, label, primary, open = false }: { scele: SceleStat
   return (
     <div className="sc-slcm">
       <span className="sc-chips">
-        <button className={`chip ${primary ? 'on' : ''}`} data-cuelume-open onClick={() => setAsking(true)}>
+        {/* read before: UI's login most likely still has a session, so try that before asking */}
+        <button className={`chip ${primary ? 'on' : ''}`} data-cuelume-open onClick={() => (scele.slcm ? start(null, true) : setAsking(true))}>
           {label}
         </button>
       </span>

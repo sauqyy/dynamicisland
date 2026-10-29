@@ -964,6 +964,10 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   const refresh = useCallback(() => {
     if (account) sync(account, true, true)
   }, [account, sync])
+  /** A regular sync now rather than at the next 10 minutes: the user is back and wants what's new. */
+  const syncSoon = useCallback(() => {
+    if (account) sync(account, false)
+  }, [account, sync])
 
   const addSlot = useCallback((s: Omit<ClassSlot, 'id'>) => {
     setManual((l) => (l.some((x) => slotKey(x) === slotKey(s)) ? l : [...l, { ...s, id: `${slotKey(s)}-${Date.now()}` }]))
@@ -997,17 +1001,18 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     setLeadState(m)
     write(LEAD_KEY, m)
   }, [])
-  /** Opens SLCM to read the study plan's class times; resolves false if the window was closed first. */
   /**
-   * Reads the study plan from SLCM, signing in with the SSO UI password (used once, not kept);
-   * resolves false if the SLCM window was closed first.
+   * Reads the study plan from SLCM, signing in with the SSO UI password (used once, not kept), or
+   * with `quiet` and no password, UI's saved login session. Resolves 'ok', 'closed' if the SLCM
+   * window was closed first, or 'needs-password' when the saved session has run out.
    */
-  const connectSlcm = useCallback(async (password: string | null) => {
+  const connectSlcm = useCallback(async (password: string | null, quiet = false): Promise<'ok' | 'closed' | 'needs-password'> => {
     setSlcmStage('loading')
     try {
-      const got = await slcmConnect(password, setSlcmStage)
+      const got = await slcmConnect(password, setSlcmStage, quiet)
+      if (got === 'needs-password') return got
       if (got) setSlcm(got)
-      return Boolean(got)
+      return got ? 'ok' : 'closed'
     } finally {
       setSlcmStage(null)
     }
@@ -1030,6 +1035,8 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     unplanned,
     upcoming,
     slcm: slcm ?? null,
+    /** the saved SLCM timetable has been looked up (slcm is null until then too) */
+    slcmKnown: slcm !== undefined,
     slcmStage,
     slcmBusy: slcmStage !== null,
     connectSlcm,
@@ -1044,6 +1051,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     login,
     logout,
     refresh,
+    syncSoon,
     addSlot,
     removeSlot,
     chooseClass,
