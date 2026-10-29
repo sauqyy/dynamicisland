@@ -24,11 +24,39 @@ function inkOn(color: string): string {
 
 /** How long a group takes to open (must match .rail-pages in App.css). */
 const OPEN_MS = 340
+/** Width of the fade at a scrolled edge (must match .rail-in.more-* in App.css). */
+const FADE = 28
+
+/**
+ * Moves the highlight onto the active page's label, cut to the part of it that is in view (a
+ * label scrolled half out shows half a highlight), and fades the side of the labels with more.
+ */
+function placeLit(el: HTMLElement, hl: HTMLElement, astra = false) {
+  // Astra's highlight wraps her icon as well as her label, and has nothing to scroll
+  const b = el.querySelector<HTMLElement>(astra ? '.rail-g.on' : '.rail-pg.on')
+  const c = astra ? b : b?.parentElement
+  if (!b || !c) return
+  if (!astra) {
+    c.classList.toggle('more-l', c.scrollLeft > 1)
+    c.classList.toggle('more-r', c.scrollLeft + c.clientWidth < c.scrollWidth - 1)
+  }
+  // the island is scaled by the Size setting, so convert screen pixels back to layout pixels
+  const r = el.getBoundingClientRect()
+  const q = b.getBoundingClientRect()
+  const v = astra ? q : c.getBoundingClientRect()
+  const s = r.width / el.offsetWidth || 1
+  const left = Math.max(q.left, v.left)
+  const right = Math.min(q.right, v.right)
+  hl.style.transform = `translateX(${(left - r.left) / s}px)`
+  hl.style.width = `${Math.max(0, right - left) / s}px`
+}
 
 /**
  * The one navigator of the open card: an icon per group, and the active group opened up
  * to show its pages as labels. A highlight slides to the active page; while a group is
  * opening it follows the label every frame, so it stays locked to it as the pill grows.
+ * A group with more labels than the card has room for scrolls them sideways, with the
+ * active one kept in view and a fade on the side where there are more.
  */
 export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: Props) {
   const astraColor = color || '#8fa8ff'
@@ -41,18 +69,23 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
     const el = rail.current
     const hl = lit.current
     if (!el || !hl) return
-    const place = () => {
-      // Astra's highlight wraps her icon as well as her label
-      const b = el.querySelector<HTMLElement>(active === 'astra' ? '.rail-g.on' : '.rail-pg.on')
-      if (!b) return
-      // the island is scaled by the Size setting, so convert screen pixels back to layout pixels
-      const r = el.getBoundingClientRect()
+    // scroll the active label clear of the fades, measured on screen and scaled back like placeLit
+    const reveal = () => {
+      if (active === 'astra') return
+      const b = el.querySelector<HTMLElement>('.rail-pg.on')
+      const c = b?.parentElement
+      if (!b || !c) return
+      const s = el.getBoundingClientRect().width / el.offsetWidth || 1
       const q = b.getBoundingClientRect()
-      const s = r.width / el.offsetWidth || 1
-      hl.style.transform = `translateX(${(q.left - r.left) / s}px)`
-      hl.style.width = `${q.width / s}px`
+      const v = c.getBoundingClientRect()
+      if (q.left < v.left + FADE) c.scrollLeft -= (v.left + FADE - q.left) / s
+      else if (q.right > v.right - FADE) c.scrollLeft += (q.right - v.right + FADE) / s
+    }
+    const place = () => {
+      placeLit(el, hl, active === 'astra')
     }
     if (lastGroup.current === active) {
+      reveal()
       place()
       return
     }
@@ -61,6 +94,7 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
     const end = performance.now() + OPEN_MS
     let raf = 0
     const loop = () => {
+      reveal()
       place()
       if (performance.now() < end) raf = requestAnimationFrame(loop)
       else hl.classList.remove('follow')
@@ -85,7 +119,14 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
             {dots.includes(g.id) && <i className="rail-dot" />}
           </button>
           <span className="rail-pages">
-            <span className="rail-in">
+            <span
+              className="rail-in"
+              onScroll={() => rail.current && lit.current && placeLit(rail.current, lit.current)}
+              // a mouse wheel scrolls the labels sideways
+              onWheel={(e) => {
+                if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
+              }}
+            >
               {g.pages.map((p) => (
                 <button key={p} className={`rail-pg ${p === tab ? 'on' : ''}`} aria-current={p === tab ? 'page' : undefined} tabIndex={g.id === active ? 0 : -1} onClick={() => onPage(p)}>
                   {SHORT[p]}
