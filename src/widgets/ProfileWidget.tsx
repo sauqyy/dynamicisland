@@ -13,7 +13,8 @@ import { BadgeCheck } from 'lucide-react'
 import { UI_YELLOW, UiLogo } from './UiLogo'
 
 // written out, not imported, so the bundler can drop the campus card from the regular build
-const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
+// also the browser dev server, for the SCELE demo (see campus.ts)
+const CAMPUS = (import.meta.env.VITE_CAMPUS === '1' || (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window) && !location.search.includes('nocampus')))
 
 const EMOJIS = ['🙂', '😎', '🤖', '🦊', '🐼', '🐸', '🦄', '🐙', '🌵', '🚀', '🎧', '🔥', '🌙', '🍕', '👾', '🐱']
 

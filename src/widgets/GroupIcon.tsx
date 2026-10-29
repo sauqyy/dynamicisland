@@ -2,7 +2,8 @@ import { CalendarClock, FolderOpen, ListChecks, Music2, Settings2, Users, type L
 import { UiLogo } from './UiLogo'
 
 // written out, not imported, so the bundler can drop the logo from the regular build
-const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
+// also the browser dev server, for the SCELE demo (see campus.ts)
+const CAMPUS = (import.meta.env.VITE_CAMPUS === '1' || (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window) && !location.search.includes('nocampus')))
 
 const ICONS: Record<string, LucideIcon> = {
   home: Music2,
