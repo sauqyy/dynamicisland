@@ -237,6 +237,12 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* the whole page scrolls, so the new-task form can open as tall as it needs (with the date picker) */
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.todo::-webkit-scrollbar {
+  display: none;
 }
 .todo-input {
   width: 100%;
@@ -257,17 +263,34 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
-  flex: 1;
-  scrollbar-width: none;
+  flex: none;
 }
 .todo-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 2px;
+  flex-direction: column;
   font-size: 14px;
+}
+/* the row: picked up anywhere to reorder, ticked off by a click on the circle or the text */
+.todo-row {
+  display: flex;
+  /* the circle, arrow and × line up with the task's first line, not the middle of task + due date */
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 8px;
   cursor: grab;
+  touch-action: none;
+}
+/* one 20px line: the circle's height */
+.todo-row .todo-text {
+  line-height: 20px;
+}
+.todo-row > .todo-more-btn {
+  margin-top: -1px;
+}
+.todo-row > .x {
+  flex: none;
+  height: 20px;
+  line-height: 20px;
 }
 .check {
   flex: none;
@@ -286,13 +309,432 @@
   border-color: var(--accent, #4ade80);
   color: var(--on-accent, #000);
 }
-.todo-text {
+.todo-main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.todo-main:focus-visible {
+  outline: 2px solid var(--accent, #4ade80);
+  outline-offset: 2px;
+}
+.todo-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.todo-item.done .todo-text {
+/* under the task when it's closed: how many attachments, and the description's first line */
+.todo-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.todo-clip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.todo-note-line {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-more-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-2);
+  transition: background 0.15s, transform 0.2s;
+}
+.todo-more-btn:hover {
+  background: var(--raised);
+}
+.todo-item.open .todo-more-btn {
+  transform: rotate(180deg);
+}
+/* folding parts: the description and due date under a new task, and an open to-do's details.
+   They stay in the page and ease between no height and their own, so what's below glides along */
+.todo-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.4, 1),
+    opacity 0.2s ease;
+}
+.todo-item.open > .todo-fold,
+.todo-new.open > .todo-fold,
+.todo-fold.on {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.todo-fold-in {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* margins, not padding, so a folded part takes no room at all */
+.todo-fold-in > :first-child {
+  margin-top: 2px;
+}
+.todo-fold-in > :last-child {
+  margin-bottom: 10px;
+}
+/* an open to-do and its details read as one card */
+.todo-item {
+  border-radius: 14px;
+  transition: background 0.2s;
+}
+.todo-item.open {
+  background: var(--raised);
+}
+.todo-row {
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+.todo-item:not(.open) > .todo-row:hover {
+  background: rgb(var(--fg-rgb) / 0.05);
+}
+.todo-more {
+  padding: 0 10px 0 38px;
+}
+.todo-note {
+  resize: none;
+  min-height: 0;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  border-radius: 12px;
+  overflow-y: auto;
+}
+/* the new task: a field that opens into a short form */
+.todo-new {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  transition: background 0.2s;
+}
+.todo-new.open {
+  background: var(--raised);
+}
+.todo-new.open .todo-new-title {
+  background: transparent;
+}
+.todo-new .todo-fold-in {
+  padding: 0 10px;
+}
+.todo-new-add {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 12.5px;
+}
+.todo-due-add {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.todo-due-add:hover {
+  background: var(--pressed);
+}
+/* ---------- picking a due date (DuePicker) ---------- */
+.dp {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.todo-due-add.on,
+.dp-pill.on {
+  background: var(--pressed);
+  color: var(--text-1);
+}
+.dp-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.dp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: var(--text-1);
+  font-size: 12px;
+  transition: background 0.15s;
+}
+.dp-pill:hover {
+  background: var(--pressed);
+}
+.dp-pill b {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dp-pill small {
+  color: var(--text-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.dp-panel {
+  gap: 10px;
+}
+.dp-panel > :first-child {
+  margin-top: 10px;
+}
+.dp-type {
+  position: relative;
+  display: flex;
+}
+.dp-type .todo-input {
+  padding: 8px 36px 8px 12px;
+  font-size: 12.5px;
+  border-radius: 12px;
+}
+.dp-use {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+}
+.dp-read {
+  margin-top: -4px;
+  padding-left: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent, #4ade80);
+}
+.dp-read.bad {
+  font-weight: 500;
+  color: var(--text-3);
+}
+.dp-chips,
+.dp-times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.dp-chip {
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.15s, color 0.15s;
+}
+.dp-chip:hover {
+  background: var(--pressed);
+  color: var(--text-1);
+}
+.dp-chip.on {
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+}
+/* two weeks at a time: most deadlines are within them, and it fits the card */
+.dp-cal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dp-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dp-nav {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--text-2);
+}
+.dp-nav:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--text-1);
+}
+.dp-nav:disabled {
+  opacity: 0.3;
+}
+.dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+.dp-wd {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+.dp-day {
+  height: 30px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+  transition: background 0.15s, color 0.15s;
+}
+.dp-day:hover:not(:disabled):not(.on) {
+  background: var(--raised);
+}
+.dp-day.today {
+  box-shadow: inset 0 0 0 1.5px var(--accent, #4ade80);
+}
+.dp-day.on {
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+}
+.dp-day.past {
+  color: var(--text-3);
+  opacity: 0.45;
+}
+.dp-time {
+  width: 74px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.dp-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+.dp-done {
+  padding: 5px 14px;
+  font-size: 12px;
+}
+/* adding a deadline on Due: the title and Add, then when */
+.dl-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* the due date under a task: amber within a day, red once it's passed */
+.todo-due {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.todo-due.soon {
+  color: var(--warn);
+}
+.todo-due.late {
+  color: var(--danger);
+}
+.todo-link-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-3);
+}
+.todo-link-add .todo-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .todo-fold {
+    transition: none;
+  }
+}
+.todo-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.todo-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.todo-file-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--raised);
+  font-size: 12px;
+  text-align: left;
+  transition: background 0.15s;
+}
+.todo-file-open:hover {
+  background: var(--pressed);
+}
+.todo-file-open span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-file-open small {
+  flex: none;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.todo-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.todo-item.done .todo-text,
+.todo-item.done .todo-meta {
   text-decoration: line-through;
   opacity: 0.45;
 }
@@ -729,8 +1171,8 @@
 .todo {
   gap: 14px;
 }
-.todo-item {
-  padding: 8px 2px;
+.todo-row {
+  padding: 8px 8px;
 }
 .settings {
   padding: 2px 0 8px;
@@ -1358,6 +1800,33 @@
   font-size: 11px;
   opacity: 0.55;
 }
+/* signing out of the friends account, at the end of the profile */
+.signout-row > div:first-child {
+  min-width: 0;
+}
+.signout-row > div:first-child > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.signout-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.signout-acts {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+.chip.danger {
+  color: #ff6b6b;
+}
+.root.light .chip.danger {
+  color: #d92d3a;
+}
 .friend-meta small .handle {
   font-weight: 600;
 }
@@ -1926,12 +2395,14 @@
   width: 92px;
   height: 92px;
   border-radius: 50%;
-  overflow: hidden;
   cursor: pointer;
 }
+/* only the hover overlay is cut to the circle, so the status dot on the rim isn't */
 .avatar-overlay {
   position: absolute;
   inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2259,8 +2730,8 @@ button.ao-text:hover {
   --ring: var(--island-solid, #14161d);
   --c: #34d399;
   position: absolute;
-  right: -1px;
-  bottom: -1px;
+  right: var(--dot-at, -1px);
+  bottom: var(--dot-at, -1px);
   box-sizing: border-box;
   width: var(--dot, 10px);
   height: var(--dot, 10px);
@@ -2665,6 +3136,10 @@ button.ao-text:hover {
   padding: 3px;
   border-radius: var(--r-pill);
   background: var(--raised);
+  /* never wider than the card: the open group's labels give way and scroll instead */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 .rail-lit {
   position: absolute;
@@ -2683,8 +3158,16 @@ button.ao-text:hover {
 }
 .rail-g {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
+}
+.rail-g.on {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.rail-ic {
+  flex: none;
 }
 .rail-ic {
   position: relative;
@@ -2714,16 +3197,33 @@ button.ao-text:hover {
 }
 .rail-pages {
   display: grid;
-  grid-template-columns: 0fr;
+  min-width: 0;
+  grid-template-columns: minmax(0, 0fr);
   transition: grid-template-columns 0.34s cubic-bezier(0.3, 1.1, 0.4, 1);
 }
 .rail-g.on .rail-pages {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 .rail-in {
   display: flex;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.rail-in::-webkit-scrollbar {
+  display: none;
+}
+/* more labels past the edge: fade that side */
+.rail-in.more-r {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.rail-in.more-l {
+  mask-image: linear-gradient(90deg, transparent, #000 28px);
+}
+.rail-in.more-l.more-r {
+  mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
 }
 .rail-pg {
   position: relative;
@@ -3118,6 +3618,31 @@ button.ao-text:hover {
   justify-content: flex-start;
   margin: 0;
 }
+/* what the timer is for: typed before it starts, shown while it runs */
+.tm-side .tm-goal {
+  width: 100%;
+}
+.tm-goal-now {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.tm-goal-now small {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.tm-goal-now b {
+  font-size: var(--fs-title);
+  font-weight: 600;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .wx-chart {
   overflow-x: auto;
   scrollbar-width: none;
@@ -3197,6 +3722,19 @@ button.ao-text:hover {
   min-height: 42px;
   padding: 6px 0;
   border-bottom: 1px solid var(--line);
+}
+/* a setting's name with a line under it saying what it does */
+.settings .row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings .row-text small {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
 }
 .settings2 .set-card > .row:last-child {
   border-bottom: 0;
@@ -4333,6 +4871,54 @@ button.sc-row:hover {
 .sc-dot.done {
   background: var(--charge);
 }
+/* your own deadlines on Due: a tick circle in place of the dot */
+.sc-own .check {
+  width: 16px;
+  height: 16px;
+}
+.sc-own .check.on {
+  background: var(--accent, #4ade80);
+  border-color: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+}
+
+/* ---------- Today: the day at a glance ---------- */
+button.sc-row:disabled {
+  cursor: default;
+}
+button.sc-row:disabled:hover {
+  background: none;
+}
+.today-todo .check {
+  width: 16px;
+  height: 16px;
+}
+/* the tick shows on hover, so a to-do can be finished right from Today */
+.today-check {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.today-todo .check:hover .today-check,
+.today-todo .check:focus-visible .today-check {
+  opacity: 0.7;
+}
+.today-todo-text {
+  text-align: left;
+  border-radius: 6px;
+}
+.sc-main small.today-late {
+  color: var(--danger);
+}
+.today-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.today-empty small {
+  font-size: var(--fs-label);
+  max-width: 28ch;
+}
 /* where the user's work on an assignment stands: amber while there's still something to press */
 .sc-state.draft,
 .sc-state.reopened {
@@ -4340,6 +4926,51 @@ button.sc-row:hover {
 }
 .sc-state.submitted {
   color: var(--charge);
+}
+/* Recent grades: folded until opened, like the scores until Show */
+.sc-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: -3px -6px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.sc-fold:hover {
+  background: var(--raised);
+  color: var(--text-2);
+}
+.sc-fold-chev {
+  transition: transform 0.2s;
+  transform: rotate(-90deg);
+}
+.sc-grades.open .sc-fold-chev {
+  transform: none;
+}
+.sc-fold-count {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--raised);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-align: center;
+}
+.sc-grades.open > .sc-grades-fold {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.sc-grades-fold .todo-fold-in {
+  gap: 2px;
+}
+.sc-grades-fold .todo-fold-in > :first-child,
+.sc-grades-fold .todo-fold-in > :last-child {
+  margin: 0;
 }
 .sc-list h4 .sc-eye {
   gap: 4px;
@@ -4460,6 +5091,493 @@ button.sc-row:hover {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+/* not verified yet, the card comes first on Profile, as a card of its own like Today's way in */
+.scroll-panel > .student-card:first-child {
+  margin-top: 0;
+  padding: 14px;
+  border-top: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, #f5c400 9%, var(--raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c400 28%, transparent);
+}
+/* sent here from Today's "Verify with SSO UI": a moment of light around the card, drawn inside
+   its edge so the scrolling page can't cut it off and it stays clear of the text */
+.student-card.spot {
+  border-radius: 16px;
+  animation: student-spot 1.8s ease-out;
+}
+@keyframes student-spot {
+  0%,
+  35% {
+    box-shadow: inset 0 0 0 2px var(--accent, #4ade80), inset 0 0 22px color-mix(in srgb, var(--accent, #4ade80) 30%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c400 28%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .student-card.spot {
+    animation: none;
+  }
+}
+
+/* ---------- connecting Universitas Indonesia: the setup card on Today ---------- */
+.cs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, #f5c400 9%, var(--raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c400 28%, transparent);
+}
+.cs-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cs-head > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cs-head b {
+  font-size: var(--fs-title);
+}
+.cs-head small {
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+}
+/* the three steps are a real sequence, so they're numbered */
+.cs-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgb(var(--fg-rgb) / 0.05);
+}
+.cs-n {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgb(var(--fg-rgb) / 0.1);
+  color: var(--text-2);
+}
+.cs-step.now .cs-n {
+  background: #f5c400;
+  color: #111;
+}
+.cs-step.done .cs-n {
+  background: var(--charge);
+  color: #0b0c10;
+}
+.cs-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cs-text b {
+  font-size: var(--fs-body);
+}
+.cs-step:not(.now):not(.done) .cs-text b {
+  color: var(--text-2);
+}
+.cs-text small {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.cs-act {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-act > .pill-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cs-row {
+  display: flex;
+  gap: 6px;
+}
+.cs-row .todo-input {
+  flex: 1;
+  min-width: 0;
+}
+.cs-row .pill-btn {
+  flex: none;
+}
+/* where a password goes, said right under the field */
+.cs-secure,
+.sc-secure {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.cs-secure svg,
+.sc-secure svg {
+  vertical-align: -1px;
+  color: var(--charge);
+}
+.cs-secure b,
+.sc-secure b {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.cs-after {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+}
+.cs-done > .pill-btn {
+  align-self: flex-start;
+}
+
+/* ---------- Profile: what's kept on this computer ---------- */
+.kept {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kept-title {
+  font-size: var(--fs-label);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.kept ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kept li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  font-size: var(--fs-meta);
+}
+.kept li span {
+  font-weight: 600;
+}
+.kept li small {
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.kept-go {
+  align-self: flex-start;
+}
+.kept-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.kept-confirm small {
+  font-size: var(--fs-meta);
+  color: var(--text-1);
+  line-height: 1.4;
+}
+.kept-acts {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---------- Today, before Campus is unlocked: the way in ---------- */
+.today-unlock {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: color-mix(in srgb, #f5c400 9%, var(--raised));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #f5c400 28%, transparent);
+}
+.today-unlock-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.today-unlock-text b {
+  font-size: var(--fs-title);
+}
+.today-unlock-text small {
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.today-unlock-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+/* ---------- coming back: "Good morning, …" / "Welcome back, …" and what was missed ----------
+   in the island's own terms: the greeting, one plain sentence, what needs you as an agenda (time
+   left, then what, like the clock), what's new as short lines. Colour only where something is late. */
+.whatsnew.catchup {
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 16px;
+  padding: 22px 22px 14px;
+  text-align: left;
+}
+.cu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cu-title {
+  font-family: var(--font-ui);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.cu-sum {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.whatsnew .cu-sum b {
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.cu-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cu-body::-webkit-scrollbar {
+  display: none;
+}
+.cu-body.fades {
+  mask-image: linear-gradient(180deg, #000 calc(100% - 40px), transparent);
+}
+.cu-agenda,
+.cu-news {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* the agenda: a column of times, then what's due or starting */
+.cu-due {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  margin: 0 -8px;
+  box-sizing: content-box;
+  border-radius: 10px;
+  text-align: left;
+  transition: background 0.15s;
+}
+.cu-time {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.cu-time.hot {
+  color: var(--danger);
+}
+.cu-what {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.whatsnew .cu-what b {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.whatsnew .cu-what small,
+.whatsnew .cu-new small {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* what's new: a hairline above, then one line each */
+.cu-agenda + .cu-news {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.cu-new {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  margin: 0 -8px;
+  box-sizing: content-box;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--text-3);
+  transition: background 0.15s;
+}
+.cu-new svg {
+  flex: none;
+}
+.whatsnew .cu-new b {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.whatsnew .cu-new small {
+  flex: 1 1 0;
+}
+button.cu-due:not(:disabled):hover,
+button.cu-new:not(:disabled):hover {
+  background: var(--raised);
+}
+.cu-due:disabled,
+.cu-new:disabled {
+  cursor: default;
+}
+.cu-more {
+  align-self: flex-start;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgb(var(--fg-rgb) / 0.25);
+}
+.cu-more:hover {
+  color: var(--text-1);
+}
+.cu-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+.cu-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.cu-link:hover {
+  color: var(--text-1);
+}
+.whatsnew.catchup .cu-done {
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+/* ---------- the welcome once SSO UI verification succeeds ---------- */
+.whatsnew.welcome {
+  gap: 8px;
+  padding: 18px 28px;
+}
+.welcome-lede {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.whatsnew ul.welcome-list {
+  width: 100%;
+  max-width: 400px;
+  gap: 4px;
+  opacity: 1;
+  text-align: left;
+}
+.welcome-list button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  text-align: left;
+  transition: background 0.15s;
+}
+.welcome-list button:hover {
+  background: var(--raised);
+}
+.whatsnew .welcome-list b {
+  font-size: 13px;
+  font-weight: 700;
+}
+.welcome-list span {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.welcome-note {
+  margin: 0;
+  max-width: 380px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.welcome-acts {
+  display: flex;
+  gap: 8px;
+}
+.pill-btn.primary {
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+}
+.pill-btn.primary:hover {
+  filter: brightness(1.08);
 }
 .student-btn {
   align-self: flex-start;

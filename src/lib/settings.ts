@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { BACKEND_READY, supabase } from './supabase'
 import { IS_TAURI } from './useMedia'
+import { CAMPUS } from './campus'
 import type { Tab } from '../types'
 
 export type Anim = 'bouncy' | 'smooth' | 'snappy'
@@ -62,6 +63,8 @@ export interface Settings {
   eqColor: string
   /** play a sound when a chat message arrives */
   messageSound: boolean
+  /** coming back to the computer: a greeting or welcome back with what happened meanwhile */
+  catchUp: boolean
   /** small sounds for clicks, typing, pages and alerts; off = muted */
   uiSounds: boolean
   /** which material the interface sounds are made of */
@@ -296,6 +299,8 @@ export function clampPos(x: number, y: number) {
 }
 
 export const SIZE_DEFAULTS = { scale: 1, cardW: 440, cardH: 344, cardFit: false }
+/** the pill's standard text size (px), which Settings shows as Default */
+export const TEXT_SIZE_DEFAULT = 15
 
 const DEFAULTS: Settings = {
   monitor: 0,
@@ -321,13 +326,15 @@ const DEFAULTS: Settings = {
   eqStyle: 'bars',
   eqColor: 'art',
   messageSound: true,
+  catchUp: true,
   uiSounds: true,
   soundPack: 'mech',
   soundVolume: 1,
   typingSounds: true,
-  clockSize: 15,
+  clockSize: TEXT_SIZE_DEFAULT,
   lyricOffset: 0.35,
-  hiddenPages: [],
+  // the Universitas Indonesia build starts lean, around Campus: these can be turned back on in Settings
+  hiddenPages: CAMPUS ? ['prompter', 'apps', 'shelf', 'schedule'] : [],
   clipPaused: false,
   clipMask: false,
   clipAutoClear: 5,
@@ -396,10 +403,21 @@ function setLocalAt(ms: number) {
   }
 }
 
+/** set once the one-time "Prompter off" change has been made to an older Universitas Indonesia install */
+const PROMPTER_OFF_KEY = 'di.ui.prompterOff'
+
 function load(): Settings {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
+    // the Universitas Indonesia build has Prompter off: installs from before that default get it
+    // turned off once, and turning it back on in Settings sticks
+    if (CAMPUS && !localStorage.getItem(PROMPTER_OFF_KEY)) {
+      localStorage.setItem(PROMPTER_OFF_KEY, '1')
+      if (saved.hiddenPages && !saved.hiddenPages.includes('prompter')) saved.hiddenPages = [...saved.hiddenPages, 'prompter']
+    }
     const merged = { ...DEFAULTS, ...saved }
+    // the Universitas Indonesia build has no Astra: whatever was saved, she stays off
+    if (CAMPUS) merged.assistant = false
     // a model that is no longer offered (it did not load on every computer) falls back to the default
     if (!LOCAL_MODELS.some(([id]) => id === merged.assistantLocalModel)) merged.assistantLocalModel = DEFAULT_LOCAL_MODEL
     // brains that are no longer offered (Ollama) fall back to the built-in one
