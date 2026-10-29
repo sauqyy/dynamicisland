@@ -1117,6 +1117,12 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
               <span>Show eyes in the resting pill</span>
               <Toggle on={settings.mascotInPill} onChange={(v) => update({ mascotInPill: v })} />
             </div>
+            {settings.mascotInPill && (
+              <div className="row">
+                <span>Only the eyes (hide the clock)</span>
+                <Toggle on={settings.mascotEyesOnly} onChange={(v) => update({ mascotEyesOnly: v })} />
+              </div>
+            )}
           </>
         )}
       </Group>

@@ -1,4 +1,4 @@
--- Dynamic Island group chats: run this once in the Supabase SQL editor, after schema.sql.
+-- Astra Isle group chats: run this once in the Supabase SQL editor, after schema.sql.
 -- Safe to run again: it is how you pick up changes to the functions.
 
 create table if not exists public.groups (

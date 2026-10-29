@@ -1,4 +1,4 @@
-# Dynamic Island for Windows — Plan
+# Astra Isle for Windows — Plan
 
 A floating "island" pinned to the top-centre of the laptop screen that sits as a small black pill
 and expands with liquid, gooey animations to show live activity: media, volume, battery,

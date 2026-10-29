@@ -1,4 +1,4 @@
--- Dynamic Island: run this once in the Supabase SQL editor.
+-- Astra Isle: run this once in the Supabase SQL editor.
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users on delete cascade,

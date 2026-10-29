@@ -42,7 +42,7 @@ jobs:
       - run: npx tauri build --target universal-apple-darwin --bundles app,dmg
       - uses: actions/upload-artifact@v4
         with:
-          name: dynamic-island-macos
+          name: astra-isle-macos
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -73,7 +73,7 @@ jobs:
         run: npm run tauri:build:ui
       - uses: actions/upload-artifact@v4
         with:
-          name: dynamic-island-windows
+          name: astra-isle-windows
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/ui-v')
@@ -83,8 +83,24 @@ jobs:
         run: |
           f=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
           case "$GITHUB_REF_NAME" in
-            ui-v*) out="DynamicIslandUI_${GITHUB_REF_NAME#ui-v}_x64-setup.exe" ;;
-            *) out="DynamicIsland_${GITHUB_REF_NAME#v}_x64-setup.exe" ;;
+            ui-v*) out="AstraIsleUI_${GITHUB_REF_NAME#ui-v}_x64-setup.exe" ;;
+            *) out="AstraIsle_${GITHUB_REF_NAME#v}_x64-setup.exe" ;;
           esac
           cp "$f" "$out"
+          gh release upload "$GITHUB_REF_NAME" "$out" --clobber
+      - name: Build the custom Setup
+        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/ui-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p setup/payload
+          cp "$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)" setup/payload/installer.exe
+          case "$GITHUB_REF_NAME" in
+            ui-v*) ver="${GITHUB_REF_NAME#ui-v}"; feat="--features ui"; out="AstraIsleUI_Setup_${ver}.exe"; tdir=target-ui ;;
+            *) ver="${GITHUB_REF_NAME#v}"; feat=""; out="AstraIsle_Setup_${ver}.exe"; tdir=target ;;
+          esac
+          sed -i "0,/^version = .*/s//version = \"$ver\"/" setup/Cargo.toml
+          (cd setup && CARGO_TARGET_DIR="$tdir" cargo build --release $feat)
+          cp "setup/$tdir/release/dynamic-island-setup.exe" "$out"
           gh release upload "$GITHUB_REF_NAME" "$out" --clobber

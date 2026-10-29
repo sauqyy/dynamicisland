@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>NSAppleEventsUsageDescription</key>
-  <string>Dynamic Island shows and controls what is playing in Spotify and Music.</string>
+  <string>Astra Isle shows and controls what is playing in Spotify and Music.</string>
   <key>LSUIElement</key>
   <true/>
 </dict>

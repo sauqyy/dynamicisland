@@ -119,5 +119,6 @@ export async function converseLocal(
   let said = text
   if (!said) said = actions.length ? `${actions.join('. ')}.` : problems.length ? '' : "Sorry, I didn't get that. Could you say it again?"
   if (problems.length) said = `${said} But ${problems[0].charAt(0).toLowerCase()}${problems[0].slice(1)}.`.trim()
-  return { text: said, actions }
+  // when the reply is only the list of what was done, the chips would repeat it
+  return { text: said, actions: text ? actions : [] }
 }

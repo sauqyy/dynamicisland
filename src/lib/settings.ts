@@ -108,6 +108,8 @@ export interface Settings {
   assistantTalk: TalkMode
   /** show the sleeping mascot at the left of the resting pill */
   mascotInPill: boolean
+  /** in the resting pill, show only the eyes: no clock or other idle content */
+  mascotEyesOnly: boolean
   mascotName: string
   /** 'accent' follows the accent colour, otherwise a hex colour */
   mascotColor: string
@@ -341,6 +343,7 @@ const DEFAULTS: Settings = {
   assistantKey: 'Control+Shift+Space',
   assistantTalk: 'hold',
   mascotInPill: true,
+  mascotEyesOnly: false,
   mascotName: 'Astra',
   mascotColor: 'accent',
   mascotAccessories: [],

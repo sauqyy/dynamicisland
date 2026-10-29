@@ -334,8 +334,14 @@ export default function App() {
   const student = CAMPUS ? useStudent() : NO_STUDENT
   const campus = Boolean(student.student?.fasilkom)
   const pages = useMemo(
-    () => PAGES.filter((p) => (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) && (campus || !CAMPUS_PAGES.includes(p.id))),
-    [settings.hiddenPages, campus],
+    () =>
+      PAGES.filter(
+        (p) =>
+          (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) &&
+          (campus || !CAMPUS_PAGES.includes(p.id)) &&
+          (p.id !== 'astra' || settings.assistant),
+      ),
+    [settings.hiddenPages, campus, settings.assistant],
   )
   // the groups that still have a visible page, and which one the current page is in
   const groups = useMemo(
@@ -343,6 +349,10 @@ export default function App() {
     [pages],
   )
   const group = groups.find((g) => g.pages.includes(tab)) ?? groups[0]
+  // a saved Astra page falls back to the first visible one once talking to the island is off
+  useEffect(() => {
+    if (tab === 'astra' && !settings.assistant) setTab(pages[0]?.id ?? 'media')
+  }, [tab, settings.assistant, pages])
   // each group remembers the page you were last on, so tapping it again returns there
   const lastInGroup = useRef<Record<string, Tab>>({})
   const pagesRef = useRef(pages)
@@ -1856,6 +1866,10 @@ export default function App() {
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
           </>
+        ) : settings.assistant && settings.mascotInPill && settings.mascotEyesOnly ? (
+          <span className="idle-eyes" style={{ gridColumn: '1 / -1', justifySelf: 'center', display: 'flex' }}>
+            <MascotEyes height={15} accessories={settings.mascotAccessories} accessoryColors={settings.mascotAccessoryColors} />
+          </span>
         ) : (
           <>
             {/* the clock stays in the exact middle; bars hang off its left, dots off its right */}

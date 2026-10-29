@@ -11,6 +11,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.8.5',
+    title: 'Astra in the pill',
+    items: [
+      "Astra's eyes can be the whole resting pill: turn on Only the eyes in Settings to hide the clock.",
+      'The Astra page disappears from the rail while the assistant is off.',
+      'Updating from the old Dynamic Island now removes the old copy, so you no longer end up with both.',
+    ],
+  },
+  {
     version: '0.8.4',
     title: 'A new look for Setup',
     items: [

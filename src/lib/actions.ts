@@ -233,7 +233,8 @@ export async function fastPath(text: string, api: ActionApi): Promise<{ reply: s
   const tool: Record<Action['type'], ToolId> = { open_app: 'open_app', open_url: 'open_url', search: 'web_search', open_path: 'open_path', media: 'media', volume: 'volume', timer: 'timer', todo: 'todo', routine: 'routine', power: 'power' }
   if (!toolOn(s, tool[a.type])) return null
   const r = await runAction(a, api)
-  return { reply: `${r}.`, actions: [r] }
+  // the reply already says what was done, so a chip repeating it would show the same words twice
+  return { reply: `${r}.`, actions: [] }
 }
 
 // ---- what Claude is allowed to ask for ----
