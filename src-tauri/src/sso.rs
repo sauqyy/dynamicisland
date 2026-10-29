@@ -229,6 +229,13 @@ pub async fn sso_verify(app: AppHandle) -> Result<Student, String> {
         crate::auth::open_url(format!("{CAS}/login?service=http%3A%2F%2F127.0.0.1%3A{PORT}%2Fsso"))?;
         let ticket = wait_for_ticket(&listener)?;
         let student = check_ticket(&ticket)?;
+        // someone else signed in than the student verified before: nothing of theirs carries over
+        // (SCELE token, SLCM timetable, UI sessions)
+        if saved(&app).is_some_and(|before| before.username != student.username) {
+            crate::scele::forget_token(&app);
+            crate::slcm::forget(&app);
+            forget_ui_sessions(&app);
+        }
         if student.fasilkom || student.needs_scele {
             save(&app, &student)?;
         }
@@ -243,12 +250,33 @@ pub fn sso_student(app: AppHandle) -> Option<Student> {
     saved(&app)
 }
 
-/// Forgets the verification, and with it the SCELE connection and SLCM schedule that depend on it.
+/// Forgets the verification, and with it everything that depends on it: the SCELE connection (its
+/// token in the credential store too), the SLCM schedule, and the island's sessions with UI's sites.
+/// Async: reading the cookie store from a synchronous command can deadlock on Windows.
 #[tauri::command]
-pub fn sso_forget(app: AppHandle) {
+pub async fn sso_forget(app: AppHandle) {
     if let Ok(p) = path(&app) {
         let _ = std::fs::remove_file(p);
     }
     crate::scele::forget_token(&app);
     crate::slcm::forget(&app);
+    forget_ui_sessions(&app);
+}
+
+/// The island's web sessions with UI's own sites (UI's login, which SLCM signs in with, keeps one
+/// so a later reading needs no password). Deleted with the rest, so the next person to verify on
+/// this computer can't be signed in to SLCM as the last one. Only *.ui.ac.id cookies go: the
+/// windows share one store, and the island's own data stays.
+fn forget_ui_sessions(app: &AppHandle) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let Ok(cookies) = w.cookies() else { return };
+    for c in cookies {
+        let ours = c.domain().is_some_and(|d| {
+            let d = d.trim_start_matches('.');
+            d == "ui.ac.id" || d.ends_with(".ui.ac.id")
+        });
+        if ours {
+            let _ = w.delete_cookie(c);
+        }
+    }
 }

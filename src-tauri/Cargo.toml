@@ -16,7 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 # the Universitas Indonesia build: SCELE and SSO UI (see package.json, build:ui)
-campus = []
+campus = ["dep:zeroize"]
 
 [build-dependencies]
 tauri-build = { version = "2.7.4", features = [] }
@@ -36,6 +36,8 @@ tauri-plugin-global-shortcut = "2"
 base64 = "0.23"
 ureq = "2"
 keyring = { version = "3", features = ["windows-native", "apple-native"] }
+# campus only: passwords wiped from memory once used (the SCELE token sits in the keyring above)
+zeroize = { version = "1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
