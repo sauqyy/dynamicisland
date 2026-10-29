@@ -5459,6 +5459,7 @@ button.sc-row:hover {
   color: var(--text-2);
   background: rgb(var(--fg-rgb) / 0.1);
   font-variant-numeric: tabular-nums;
+}
 
 /* connecting SLCM: the password once, then the hidden window's progress */
 .sc-slcm {
