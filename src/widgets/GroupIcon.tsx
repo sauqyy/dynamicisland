@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { House, CalendarClock, FolderOpen, ListChecks, Settings2, Users } from 'lucide-react'
+import { House, CalendarClock, FolderOpen, ListChecks, Settings2, Target, Users } from 'lucide-react'
 import { AstraStar } from './AstraStar'
 import { UiLogo } from './UiLogo'
 
@@ -11,6 +11,7 @@ const ICONS: Record<string, ComponentType<{ size?: number | string; strokeWidth?
   astra: AstraStar,
   home: House,
   tools: ListChecks,
+  focus: Target,
   plan: CalendarClock,
   files: FolderOpen,
   social: Users,
