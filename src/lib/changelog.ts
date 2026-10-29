@@ -11,11 +11,11 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
-    version: '0.8.3',
+    version: '0.8.4',
     title: 'A new look for Setup',
     items: [
-      'The installer has a new design: a larger window with square corners and Astra's eyes, which blink and look around while it works.',
-      'The uninstaller and the installer's welcome page now carry the same look.',
+      "The installer has a new design: a larger window with square corners and Astra's eyes, which blink and look around while it works.",
+      "The uninstaller and the installer's welcome page now carry the same look.",
     ],
   },
   {
