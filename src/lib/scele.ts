@@ -34,6 +34,44 @@ export interface Deadline {
   /** 'assign', 'quiz', … */
   module: string
   overdue: boolean
+  /** the activity's own id (an assignment's, for its submission status) */
+  instance?: number
+  /** where the user's own work on an assignment stands; unknown for other activities */
+  submission?: Submission
+  /** the teacher has graded it */
+  graded?: boolean
+}
+
+/**
+ * An assignment's submission as SCELE has it: nothing yet, saved as a draft (not handed in until
+ * "Submit" is pressed), handed in, reopened for another attempt, or nothing to hand in on SCELE.
+ */
+export type Submission = 'new' | 'draft' | 'submitted' | 'reopened' | 'offline'
+
+/** One of the user's assignments, with its due date. */
+export interface Assign {
+  /** the assignment's own id */
+  id: number
+  /** its activity id on the course page */
+  cmid: number
+  courseId: number
+  name: string
+  /** ms; 0 when it has none */
+  due: number
+}
+
+/** One graded item in the user's grade report. */
+export interface Grade {
+  id: number
+  courseId: number
+  name: string
+  /** as SCELE shows it: "85", "A" */
+  value: string
+  /** the most it can be */
+  max: number
+  /** ms; when it was graded, 0 when SCELE doesn't say */
+  at: number
+  url: string
 }
 
 export interface Notice {
@@ -145,6 +183,7 @@ export async function fetchDeadlines(days = 14): Promise<Deadline[]> {
     timesort: number
     url: string
     modulename?: string
+    instance?: number
     overdue?: boolean
     course?: { id: number; shortname: string; fullname: string }
   }
@@ -162,8 +201,78 @@ export async function fetchDeadlines(days = 14): Promise<Deadline[]> {
     url: e.url,
     module: e.modulename ?? '',
     overdue: Boolean(e.overdue),
+    instance: e.instance,
   }))
 }
+
+/** The assignments of these courses, with their due dates. */
+export async function fetchAssignments(courseIds: number[]): Promise<Assign[]> {
+  if (!IS_TAURI) return demoAssigns()
+  if (!courseIds.length) return []
+  type Raw = { id: number; cmid: number; course: number; name: string; duedate?: number }
+  const r = await call<{ courses: { id: number; assignments: Raw[] }[] }>('mod_assign_get_assignments', { courseids: courseIds })
+  return r.courses.flatMap((c) => c.assignments.map((a) => ({ id: a.id, cmid: a.cmid, courseId: a.course || c.id, name: htmlText(a.name), due: (a.duedate ?? 0) * 1000 })))
+}
+
+/** Where the user's own submission to an assignment stands, and whether it has been graded. */
+export async function fetchSubmission(assignId: number): Promise<{ state: Submission; graded: boolean }> {
+  if (!IS_TAURI) return { ...(DEMO_SUBMISSIONS[assignId] ?? { state: 'new', graded: false }) }
+  type Attempt = { submission?: { status: string }; teamsubmission?: { status: string }; submissionsenabled?: boolean; gradingstatus?: string; graded?: boolean }
+  const r = await call<{ lastattempt?: Attempt; feedback?: { grade?: unknown } }>('mod_assign_get_submission_status', { assignid: assignId })
+  const a = r.lastattempt
+  // a group assignment keeps the work on the group's submission
+  const status = a?.teamsubmission?.status ?? a?.submission?.status ?? 'new'
+  const state: Submission = a && a.submissionsenabled === false ? 'offline' : status === 'submitted' || status === 'draft' || status === 'reopened' ? status : 'new'
+  return { state, graded: Boolean(r.feedback?.grade) || a?.gradingstatus === 'graded' || Boolean(a?.graded) }
+}
+
+/**
+ * What changed on a course page since `since` (ms): the activities SCELE reports as updated, each
+ * with what changed ('configuration', 'contentfiles', 'gradeitems', 'submissions', …). Far lighter
+ * than reading the whole page, so it decides whether the page needs reading at all.
+ */
+export async function fetchUpdates(courseId: number, since: number): Promise<Record<number, string[]>> {
+  if (!IS_TAURI) return {}
+  type Raw = { contextlevel: string; id: number; updates: { name: string }[] }
+  const r = await call<{ instances: Raw[] }>('core_course_get_updates_since', { courseid: courseId, since: Math.floor(since / 1000) })
+  const out: Record<number, string[]> = {}
+  for (const i of r.instances) if (i.contextlevel === 'module' && i.updates.length) out[i.id] = i.updates.map((u) => u.name)
+  return out
+}
+
+/** The user's graded items in a course, newest first; the course total is left out. */
+export async function fetchGrades(courseId: number, userid: number): Promise<Grade[]> {
+  if (!IS_TAURI) return [...(DEMO_GRADES[courseId] ?? [])]
+  type Raw = {
+    id: number
+    itemname?: string | null
+    itemtype: string
+    itemmodule?: string | null
+    cmid?: number
+    graderaw?: number | null
+    gradeformatted?: string
+    grademax?: number
+    gradedategraded?: number | null
+    gradeishidden?: boolean
+  }
+  const r = await call<{ usergrades: { gradeitems: Raw[] }[] }>('gradereport_user_get_grade_items', { courseid: courseId, userid })
+  const report = `${SCELE_URL}/grade/report/user/index.php?id=${courseId}`
+  return (r.usergrades[0]?.gradeitems ?? [])
+    .filter((g) => (g.itemtype === 'mod' || g.itemtype === 'manual') && !g.gradeishidden && g.graderaw != null && g.gradeformatted && g.gradeformatted !== '-')
+    .map((g) => ({
+      id: g.id,
+      courseId,
+      name: htmlText(g.itemname) || 'Grade',
+      value: gradeText(g.gradeformatted!),
+      max: g.grademax ?? 0,
+      at: (g.gradedategraded ?? 0) * 1000,
+      url: g.itemmodule && g.cmid ? `${SCELE_URL}/mod/${g.itemmodule}/view.php?id=${g.cmid}` : report,
+    }))
+    .sort((a, b) => b.at - a.at)
+}
+
+/** "85.00" as 85, "87.50" as 87.5; a letter or a percentage as it is. */
+const gradeText = (s: string) => (/^\d+(\.\d+)?$/.test(s.trim()) ? String(Number(s)) : s.trim())
 
 /** Recent notifications: announcements, forum posts, grading, … */
 export async function fetchNotices(userid: number): Promise<Notice[]> {
@@ -817,11 +926,48 @@ const DEMO_CONTENTS: Record<number, Section[]> = {
 }
 function demoDeadlines(): Deadline[] {
   const n = Date.now()
-  return [
-    { id: 1, name: 'Lab 8: Todo app', courseId: 101, course: 'PBD', due: n + 2.5 * 3600_000, url: SCELE_URL, module: 'assign', overdue: false },
+  // as on SCELE, an assignment handed in drops off the action events
+  const open = (d: Deadline) => !d.instance || DEMO_SUBMISSIONS[d.instance]?.state !== 'submitted'
+  return ([
+    { id: 1, name: 'Lab 8: Todo app', courseId: 101, course: 'PBD', due: n + 2.5 * 3600_000, url: SCELE_URL, module: 'assign', overdue: false, instance: 501 },
     { id: 2, name: 'Quiz 3', courseId: 102, course: 'OS', due: n + 26 * 3600_000, url: SCELE_URL, module: 'quiz', overdue: false },
-    { id: 3, name: 'Tugas Pemrograman 2', courseId: 103, course: 'SP', due: n + 4 * DAY, url: SCELE_URL, module: 'assign', overdue: false },
+    { id: 3, name: 'Tugas Pemrograman 2', courseId: 103, course: 'SP', due: n + 4 * DAY, url: SCELE_URL, module: 'assign', overdue: false, instance: 503 },
+  ] as Deadline[]).filter(open)
+}
+// Lab 8 is saved as a draft, Lab 4 of OS already handed in (so it isn't among the action events)
+function demoAssigns(): Assign[] {
+  const n = Date.now()
+  return [
+    { id: 501, cmid: 9501, courseId: 101, name: 'Lab 8: Todo app', due: n + 2.5 * 3600_000 },
+    { id: 502, cmid: 9502, courseId: 102, name: 'Lab 4: Process scheduling', due: n + 30 * 3600_000 },
+    { id: 503, cmid: 9503, courseId: 103, name: 'Tugas Pemrograman 2', due: n + 4 * DAY },
   ]
+}
+const demoSubmissions = (): Record<number, { state: Submission; graded: boolean }> => ({
+  501: { state: 'draft', graded: false },
+  502: { state: 'submitted', graded: false },
+})
+const demoGrades = (): Record<number, Grade[]> => ({
+  101: [{ id: 801, courseId: 101, name: 'Lab 7: Forms', value: '92', max: 100, at: now0 - 2 * DAY, url: SCELE_URL }],
+  102: [{ id: 802, courseId: 102, name: 'Quiz 2', value: '78.5', max: 100, at: now0 - 6 * DAY, url: SCELE_URL }],
+  103: [],
+})
+let DEMO_SUBMISSIONS = demoSubmissions()
+let DEMO_GRADES = demoGrades()
+
+/** Browser demo: hand in Lab 8 as if on SCELE; the next sync notices, as it would the real thing. */
+export function demoSubmitLab() {
+  DEMO_SUBMISSIONS[501] = { state: 'submitted', graded: false }
+}
+/** Browser demo: a teacher grades Statistics' first programming assignment. */
+export function demoPostGrade() {
+  const list = DEMO_GRADES[103]
+  list.unshift({ id: 803 + list.length, courseId: 103, name: list.length ? `Quiz ${list.length + 1}` : 'Tugas Pemrograman 1', value: String(80 + list.length * 4), max: 100, at: Date.now(), url: SCELE_URL })
+}
+/** Browser demo: Lab 8 back to a draft, Statistics without grades. */
+export function demoResetScele() {
+  DEMO_SUBMISSIONS = demoSubmissions()
+  DEMO_GRADES = demoGrades()
 }
 function demoNotices(): Notice[] {
   const n = Date.now()

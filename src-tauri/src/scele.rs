@@ -21,6 +21,7 @@ const ALLOWED: &[&str] = &[
     "mod_forum_get_forums_by_courses",
     "mod_forum_get_forum_discussions",
     "mod_assign_get_assignments",
+    "mod_assign_get_submission_status",
     "gradereport_user_get_grade_items",
     "core_group_get_course_user_groups",
     "core_user_get_course_user_profiles",

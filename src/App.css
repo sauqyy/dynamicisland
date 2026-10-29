@@ -4329,6 +4329,32 @@ button.sc-row:hover {
 .sc-dot.info {
   background: var(--info);
 }
+/* handed in, or graded */
+.sc-dot.done {
+  background: var(--charge);
+}
+/* where the user's work on an assignment stands: amber while there's still something to press */
+.sc-state.draft,
+.sc-state.reopened {
+  color: var(--warn);
+}
+.sc-state.submitted {
+  color: var(--charge);
+}
+.sc-list h4 .sc-eye {
+  gap: 4px;
+}
+.sc-grade {
+  font-variant-numeric: tabular-nums;
+}
+.sc-grade small {
+  font-weight: 500;
+  color: var(--text-3);
+}
+.sc-grade.hidden {
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+}
 .sc-day {
   flex: none;
   width: 34px;

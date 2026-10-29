@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { play } from 'cuelume'
-import { BookOpen, CalendarCheck, CalendarClock, ChevronDown, Clock, FileText, FolderOpen, Inbox, Lock, LogOut, Plus, RefreshCw, RotateCcw } from 'lucide-react'
-import { browserUrl, courseTitle, dayName, openScele, relTime, syllabusLinks, type ClassSlot, type Deadline } from '../lib/scele'
+import { BookOpen, CalendarCheck, CalendarClock, ChevronDown, Clock, Eye, EyeOff, FileText, FolderOpen, Inbox, Lock, LogOut, Plus, RefreshCw, RotateCcw } from 'lucide-react'
+import { browserUrl, courseTitle, dayName, openScele, relTime, syllabusLinks, type ClassSlot, type Deadline, type Submission } from '../lib/scele'
 import type { Meeting, SceleState } from '../lib/useScele'
 
 interface Props {
@@ -97,16 +97,33 @@ function SyncRow({ scele, now }: { scele: SceleState; now: number }) {
 }
 
 /** How pressing a deadline is: drives its dot colour. */
-const urgency = (d: Deadline, now: number) => (d.due < now ? 'over' : d.due - now <= 3 * H ? 'hot' : d.due - now <= 24 * H ? 'warm' : '')
+const urgency = (d: Deadline, now: number) => (d.submission === 'submitted' ? 'done' : d.due < now ? 'over' : d.due - now <= 3 * H ? 'hot' : d.due - now <= 24 * H ? 'warm' : '')
+
+/** Where the user's work on an assignment stands, as the row says it. */
+const SUBMISSION: Record<Submission, string> = {
+  new: 'Not submitted',
+  draft: 'Draft, not submitted',
+  reopened: 'Reopened, submit again',
+  submitted: 'Submitted',
+  offline: '',
+}
+const submissionText = (d: Deadline) => (d.submission === 'submitted' && d.graded ? 'Graded' : d.submission ? SUBMISSION[d.submission] : '')
 
 function DeadlineRow({ d, now }: { d: Deadline; now: number }) {
+  const state = submissionText(d)
   return (
-    <button className="sc-row" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(d.url)} title="Open in SCELE">
+    <button className={`sc-row ${d.submission === 'submitted' ? 'read' : ''}`} data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(d.url)} title="Open in SCELE">
       <i className={`sc-dot ${urgency(d, now)}`} />
       <span className="sc-main">
         <b>{d.name}</b>
         <small>
           {d.course} · {d.module === 'quiz' ? 'Quiz' : d.module === 'assign' ? 'Assignment' : d.module || 'Activity'}
+          {state && (
+            <>
+              {' · '}
+              <span className={`sc-state ${d.submission}`}>{state}</span>
+            </>
+          )}
         </small>
       </span>
       <span className="sc-when">
@@ -120,28 +137,32 @@ function DeadlineRow({ d, now }: { d: Deadline; now: number }) {
 }
 
 function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
-  const groups = useMemo(() => {
+  const { groups, handedIn } = useMemo(() => {
     const end = new Date(now)
     end.setHours(24, 0, 0, 0)
     const today = end.getTime()
     const sorted = [...scele.deadlines].sort((a, b) => a.due - b.due)
-    return [
-      { label: 'Overdue', items: sorted.filter((d) => d.due < now) },
-      { label: 'Today', items: sorted.filter((d) => d.due >= now && d.due < today) },
-      { label: 'Tomorrow', items: sorted.filter((d) => d.due >= today && d.due < today + 24 * H) },
-      { label: 'This week', items: sorted.filter((d) => d.due >= today + 24 * H && d.due < today + 7 * 24 * H) },
-      { label: 'Later', items: sorted.filter((d) => d.due >= today + 7 * 24 * H) },
-    ].filter((g) => g.items.length)
+    // what's handed in sinks to its own group, so the dated groups are only what's left to do
+    const open = sorted.filter((d) => d.submission !== 'submitted')
+    return {
+      groups: [
+        { label: 'Overdue', items: open.filter((d) => d.due < now) },
+        { label: 'Today', items: open.filter((d) => d.due >= now && d.due < today) },
+        { label: 'Tomorrow', items: open.filter((d) => d.due >= today && d.due < today + 24 * H) },
+        { label: 'This week', items: open.filter((d) => d.due >= today + 24 * H && d.due < today + 7 * 24 * H) },
+        { label: 'Later', items: open.filter((d) => d.due >= today + 7 * 24 * H) },
+      ].filter((g) => g.items.length),
+      handedIn: sorted.filter((d) => d.submission === 'submitted' && d.due >= now),
+    }
   }, [scele.deadlines, now])
-  if (!groups.length)
-    return (
-      <div className="empty">
-        <CalendarCheck size={20} strokeWidth={1.7} aria-hidden />
-        Nothing due in the next two weeks
-      </div>
-    )
   return (
     <div className="sc-list">
+      {!groups.length && (
+        <div className="empty">
+          <CalendarCheck size={20} strokeWidth={1.7} aria-hidden />
+          {handedIn.length ? 'Everything due is submitted' : 'Nothing due in the next two weeks'}
+        </div>
+      )}
       {groups.map((g) => (
         <section key={g.label}>
           <h4>{g.label}</h4>
@@ -150,7 +171,79 @@ function Deadlines({ scele, now }: { scele: SceleState; now: number }) {
           ))}
         </section>
       ))}
+      {handedIn.length > 0 && (
+        <section>
+          <h4>Submitted</h4>
+          {handedIn.map((d) => (
+            <DeadlineRow key={d.id} d={d} now={now} />
+          ))}
+        </section>
+      )}
+      <Grades scele={scele} now={now} />
     </div>
+  )
+}
+
+/** How far back the Due page lists grades. */
+const GRADES_SHOWN_MS = 30 * 24 * H
+
+/**
+ * Recent grades, hidden until asked: the island sits on top of the screen, often in a lecture hall
+ * or on a projector. Each time the page opens they start hidden again.
+ */
+function Grades({ scele, now }: { scele: SceleState; now: number }) {
+  const [shown, setShown] = useState(false)
+  const recent = useMemo(() => {
+    const short = new Map(scele.courses.map((c) => [c.id, c.short]))
+    return Object.values(scele.grades)
+      .flat()
+      .filter((g) => g.at >= now - GRADES_SHOWN_MS)
+      .sort((a, b) => b.at - a.at)
+      .slice(0, 6)
+      .map((g) => ({ ...g, course: short.get(g.courseId) ?? '' }))
+  }, [scele.grades, scele.courses, now])
+  if (!recent.length) return null
+  return (
+    <section>
+      <h4>
+        Recent grades
+        <button
+          className="chip sc-eye"
+          aria-pressed={shown}
+          aria-label={shown ? 'Hide grades' : 'Show grades'}
+          title={shown ? 'Hide grades' : 'Show grades'}
+          data-cuelume-toggle
+          data-cuelume-emphasis="subtle"
+          onClick={() => setShown((v) => !v)}
+        >
+          {shown ? <EyeOff size={11} aria-hidden /> : <Eye size={11} aria-hidden />} {shown ? 'Hide' : 'Show'}
+        </button>
+      </h4>
+      {recent.map((g) => (
+        <button key={`${g.courseId}:${g.id}`} className="sc-row" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => openScele(g.url)} title="Open in SCELE">
+          <i className="sc-dot done" />
+          <span className="sc-main">
+            <b>{g.name}</b>
+            <small>
+              {g.course}
+              {g.at ? ` · graded ${relTime(g.at, now)}` : ''}
+            </small>
+          </span>
+          <span className="sc-when">
+            {shown ? (
+              <b className="sc-grade">
+                {g.value}
+                {g.max > 0 && /^\d/.test(g.value) ? <small> / {Number(g.max.toFixed(2))}</small> : null}
+              </b>
+            ) : (
+              <b className="sc-grade hidden" aria-label="Grade hidden">
+                ••••
+              </b>
+            )}
+          </span>
+        </button>
+      ))}
+    </section>
   )
 }
 
@@ -537,7 +630,7 @@ function MeetingRow(props: {
  * for it. Nothing is listed rather than something unrelated.
  */
 function MeetingDetail({ m, now, scele, onSetTime, onAskSlcm }: { m: Meeting; now: number; scele: SceleState; onSetTime: (s: ClassSlot) => void; onAskSlcm: () => void }) {
-  const due = m.course ? scele.deadlines.filter((d) => d.courseId === m.course!.id && d.due > now).slice(0, 2) : []
+  const due = m.course ? scele.deadlines.filter((d) => d.courseId === m.course!.id && d.due > now && d.submission !== 'submitted').slice(0, 2) : []
   const syllabus = !m.topic && m.course ? syllabusLinks(scele.contents[m.course.id] ?? []) : []
   const where = [m.slot.room && roomText(m.slot.room), m.slot.source && capital(SOURCE_PHRASE[m.slot.source])].filter(Boolean).join(' · ')
   return (

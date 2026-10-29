@@ -1,5 +1,6 @@
 import {
   AlarmClock,
+  Award,
   BatteryFull,
   BatteryLow,
   CalendarClock,
@@ -7,6 +8,7 @@ import {
   FileText,
   Megaphone,
   CircleArrowUp,
+  CircleCheck,
   ClipboardCheck,
   Coffee,
   Download,
@@ -69,6 +71,8 @@ const BY_EMOJI: Record<string, LucideIcon> = {
   '📅': CalendarClock,
   '📣': Megaphone,
   '📄': FileText,
+  '✅': CircleCheck,
+  '🏅': Award,
 }
 
 /** Colour of an alert by what it is about (status colours from tokens.css). */
@@ -91,6 +95,8 @@ const TONE: Record<string, string> = {
   '🎓': 'var(--accent)',
   '📣': 'var(--info)',
   '📄': 'var(--info)',
+  '✅': 'var(--charge)',
+  '🏅': 'var(--accent)',
 }
 
 export const alertTone = (icon: string) => TONE[icon] ?? 'var(--text-1)'
