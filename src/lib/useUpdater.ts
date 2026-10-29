@@ -77,6 +77,11 @@ export function useUpdater() {
     }
   }, [])
 
+  // the installed version is shown in Settings right away, not only after the first check
+  useEffect(() => {
+    if (IS_TAURI) getVersion().then(setVersion).catch(() => {})
+  }, [])
+
   useEffect(() => {
     const first = setTimeout(check, FIRST_CHECK_MS)
     const every = setInterval(check, CHECK_EVERY_MS)

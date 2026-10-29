@@ -43,8 +43,16 @@ fn read_info(session: &Session, props: &Props) -> Option<MediaInfo> {
     if title.is_empty() {
         return None;
     }
-    let artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
-    let album = props.AlbumTitle().map(|s| s.to_string()).unwrap_or_default();
+    let mut artist = props.Artist().map(|s| s.to_string()).unwrap_or_default();
+    let mut album = props.AlbumTitle().map(|s| s.to_string()).unwrap_or_default();
+    // Apple Music (and iTunes) report "Artist — Album" as the artist and leave the album empty,
+    // which would make every lyrics lookup miss.
+    let source = session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default();
+    if album.is_empty() && (source.contains("AppleMusic") || source.contains("iTunes")) {
+        if let Some((a, b)) = artist.split_once(" \u{2014} ") {
+            (artist, album) = (a.trim().to_string(), b.trim().to_string());
+        }
+    }
     let playing = session
         .GetPlaybackInfo()
         .and_then(|i| i.PlaybackStatus())
