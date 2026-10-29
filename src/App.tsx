@@ -28,6 +28,10 @@ import { classState, nextClassLabel, useSchedule } from './lib/schedule'
 import { DEFAULT_LABEL, studyActivity, useStudyBoard, useStudyLog, type StudySession } from './lib/study'
 import { useStudyRoom, type StudyRoom } from './lib/useStudyRoom'
 import { WeatherWidget } from './widgets/WeatherWidget'
+import { SceleWidget } from './widgets/SceleWidget'
+import { useScele } from './lib/useScele'
+import { demoPostGrade, demoResetScele, demoSubmitLab } from './lib/scele'
+import { NO_STUDENT, useStudent } from './lib/sso'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
@@ -61,7 +65,7 @@ import {
   useStoredList,
   type FileItem,
 } from './lib/files'
-import { CLOUD_MODEL, clampPos, SPRINGS, STAGE, useSettings, useSettingsSync } from './lib/settings'
+import { CLOUD_MODEL, SPRINGS, STAGE, useSettings, useSettingsSync } from './lib/settings'
 import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
@@ -103,6 +107,12 @@ function loadTodos(): Todo[] {
 }
 
 const TAB_KEY = 'di.tab'
+/** The Universitas Indonesia build (VITE_CAMPUS=1). Written out here, not imported, so the bundler can drop the campus modules from the regular build. */
+// also the browser dev server, for the SCELE demo (see campus.ts)
+const CAMPUS = (import.meta.env.VITE_CAMPUS === '1' || (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window) && !location.search.includes('nocampus')))
+const CAMPUS_PAGES: Tab[] = ['deadlines', 'classes', 'inbox']
+/** what the campus hook returns in the regular build, where it is never called */
+const NO_SCELE = { deadlines: [], notices: [] } as unknown as ReturnType<typeof useScele>
 
 /** The page that was open last time, so the card comes back where it was left. */
 function loadTab(): Tab {
@@ -267,6 +277,9 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(loadTab)
   const [pos, setPos] = useState({ x: settings.posX, y: settings.posY })
   const [moving, setMoving] = useState(false)
+  // docked on the taskbar, growing upwards; and where the taskbar starts, in px from the top of the window
+  const [docked, setDocked] = useState(settings.posBottom)
+  const [taskbarTop, setTaskbarTop] = useState(0)
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; active: boolean } | null>(null)
   const motionRef = useRef({
     pos: { x: 0, y: 0 },
@@ -277,6 +290,7 @@ export default function App() {
     held: false,
     magX: false,
     magY: false,
+    magBottom: settings.posBottom,
   })
   const justDragged = useRef(false)
   const [clockMode, setClockMode] = useState<ClockMode>('timer')
@@ -316,9 +330,12 @@ export default function App() {
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
+  // the Campus pages only exist for a Fasilkom student verified with SSO UI on the Profile page
+  const student = CAMPUS ? useStudent() : NO_STUDENT
+  const campus = Boolean(student.student?.fasilkom)
   const pages = useMemo(
-    () => PAGES.filter((p) => p.id === 'settings' || !settings.hiddenPages.includes(p.id)),
-    [settings.hiddenPages],
+    () => PAGES.filter((p) => (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) && (campus || !CAMPUS_PAGES.includes(p.id))),
+    [settings.hiddenPages, campus],
   )
   // the groups that still have a visible page, and which one the current page is in
   const groups = useMemo(
@@ -368,8 +385,24 @@ export default function App() {
 
   // keep the live position in step with the stored one (e.g. after Reset)
   useEffect(() => {
-    if (!dragRef.current?.active && !motionRef.current.raf) setPos({ x: settings.posX, y: settings.posY })
-  }, [settings.posX, settings.posY])
+    if (dragRef.current?.active || motionRef.current.raf) return
+    setPos({ x: settings.posX, y: settings.posY })
+    setDocked(settings.posBottom)
+    motionRef.current.magBottom = settings.posBottom
+  }, [settings.posX, settings.posY, settings.posBottom])
+
+  // tell the window it's docked (it then reaches down to the taskbar and no further), and learn where
+  // the taskbar starts; looked at again now and then, as the taskbar can move or change size
+  useEffect(() => {
+    if (!IS_TAURI) return
+    const look = () =>
+      invoke<number>('set_dock_bottom', { on: docked })
+        .then((line) => line > 0 && setTaskbarTop(line))
+        .catch(() => {})
+    look()
+    const id = setInterval(look, 10_000)
+    return () => clearInterval(id)
+  }, [docked, settings.monitor])
   // tray menu → "Reset island position": the way back when the pill ends up somewhere it can't be clicked
   useEffect(() => {
     if (!IS_TAURI) return
@@ -414,6 +447,17 @@ export default function App() {
     logStudy(s.label, Math.min((Date.now() - s.startedAt) / 60_000, s.maxMin), s.startedAt, Boolean(s.gid))
     if (s.gid) leaveRoomRef.current(s.gid)
   }, [logStudy])
+  const scele = CAMPUS ? useScele(pushAlert, student.student === undefined ? undefined : campus) : NO_SCELE
+  // a Campus page left open from before is not there once the verification is removed
+  useEffect(() => {
+    if (student.student === null && CAMPUS_PAGES.includes(tab)) setTab('profile')
+  }, [student.student, tab])
+  // what is still due before midnight, for the badge on the pill
+  const dueToday = useMemo(() => {
+    const midnight = new Date(now).setHours(24, 0, 0, 0)
+    return scele.deadlines.filter((d) => d.due > now && d.due < midnight && d.submission !== 'submitted').length
+  }, [scele.deadlines, now])
+  const sceleUnread = scele.notices.some((n) => !n.read)
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
@@ -607,7 +651,7 @@ export default function App() {
         if (left <= 0 || left > URGENT_HOURS * 3600_000) continue
         const hour = left <= 3600_000
         if (hour) notified.current.add(`dl-${x.id}-3h`)
-        fire(`dl-${x.id}-${hour ? '1h' : '3h'}`, { icon: '⚠️', text: x.title, sub: `Due ${dueLabel(x.due, now)}`, openTab: 'deadlines' })
+        fire(`dl-${x.id}-${hour ? '1h' : '3h'}`, { icon: '⚠️', text: x.title, sub: `Due ${dueLabel(x.due, now)}`, openTab: 'deadlist' })
       }
     }
     const today = new Date(now).toDateString()
@@ -1253,7 +1297,7 @@ export default function App() {
       m.raf = requestAnimationFrame(stepSpring)
     } else {
       m.raf = 0
-      update({ posX: next.x, posY: next.y })
+      update({ posX: next.x, posY: next.y, posBottom: m.magBottom })
     }
   }, [update])
 
@@ -1271,6 +1315,19 @@ export default function App() {
     [stepSpring],
   )
 
+  // where the island's top goes when it rests on the taskbar, at its current height and size
+  const dockTop = () => taskbarTop - shape.h * settings.scale
+  // saved lower than resting on the taskbar (behind it, from before the taskbar dock): put it on the taskbar
+  useEffect(() => {
+    if (!taskbarTop || docked || dragRef.current?.active) return
+    if (posRef.current.y <= taskbarTop - shape.h * settings.scale) return
+    motionRef.current.magBottom = true
+    setDocked(true)
+    update({ posBottom: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskbarTop])
+  const dockAt = useMemo(() => (docked && taskbarTop > 0 ? { line: taskbarTop, scale: settings.scale } : null), [docked, taskbarTop, settings.scale])
+
   const dragHandlers = IS_TAURI
     ? {
         onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1279,7 +1336,11 @@ export default function App() {
           if (el.closest('button, input, textarea, a, .scrub, [draggable="true"]')) return
           // inside the open card only the header strip is a handle
           if (mode === 'expanded' && !el.closest('.xtop')) return
-          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy: posRef.current.y, active: false }
+          // docked, the island's top is wherever its height puts it above the taskbar
+          const oy = motionRef.current.magBottom ? Math.round(dockTop()) : posRef.current.y
+          if (oy !== posRef.current.y) setPos((p) => ({ ...p, y: oy }))
+          posRef.current = { ...posRef.current, y: oy }
+          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
         onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1294,12 +1355,19 @@ export default function App() {
             setMoving(true)
             invoke('set_dragging', { on: true }).catch(() => {})
           }
-          const { x: rawX, y: rawY } = clampPos(g.ox + dx, g.oy + dy)
+          const maxX = window.screen.width / 2 - 80
+          const rawX = Math.max(-maxX, Math.min(maxX, g.ox + dx))
+          // never lower than resting on the taskbar, so it can't slip behind it
+          const dockY = Math.max(0, Math.round(dockTop()))
+          const rawY = Math.max(0, Math.min(dockY, g.oy + dy))
           const m = motionRef.current
-          // magnets grab at 24px and let go at 44px, so they feel sticky
+          // magnets grab at 24px and let go at 44px, so they feel sticky: the centre line, the top
+          // edge, and the taskbar at the bottom
           m.magX = Math.abs(rawX) < (m.magX ? 44 : 24)
           m.magY = rawY < (m.magY ? 30 : 14)
-          glideTo(m.magX ? 0 : Math.round(rawX), m.magY ? 0 : Math.round(rawY), true)
+          m.magBottom = taskbarTop > 0 && !m.magY && rawY > dockY - (m.magBottom ? 30 : 14)
+          setDocked(m.magBottom)
+          glideTo(m.magX ? 0 : Math.round(rawX), m.magY ? 0 : m.magBottom ? dockY : Math.round(rawY), true)
         },
         onPointerUp: () => {
           const g = dragRef.current
@@ -1315,11 +1383,13 @@ export default function App() {
         },
         // double-click the pill to send it back to the centre top
         onDoubleClick: () => {
-          if (mode === 'expanded' || (!posRef.current.x && !posRef.current.y)) return
+          if (mode === 'expanded' || (!posRef.current.x && !posRef.current.y && !motionRef.current.magBottom)) return
           play('navigate', { emphasis: 'subtle', direction: 'back' })
           setExpanded(false)
           const m = motionRef.current
           m.magX = m.magY = true
+          m.magBottom = false
+          setDocked(false)
           glideTo(0, 0, false)
         },
       }
@@ -1327,6 +1397,7 @@ export default function App() {
 
   let content: React.ReactNode
   let contentKey: string
+  const dueBadge = dueToday > 0 ? <span className="sc-badge" title={`${dueToday} due today on SCELE`}>{dueToday}</span> : null
 
   if (mode === 'assistant') {
     contentKey = `assistant-${assistantShape(assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length > 0).w}-${assistant.state.phase === 'error' ? 'err' : 'ok'}`
@@ -1446,7 +1517,7 @@ export default function App() {
             {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
             {tab === 'notes' && <NotesWidget />}
             {tab === 'prompter' && <PrompterWidget fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
-            {tab === 'deadlines' && <DeadlinesWidget deadlines={deadlines} setDeadlines={setDeadlines} now={now} onStart={startOnDeadline} studyingId={study?.deadlineId} />}
+            {tab === 'deadlist' && <DeadlinesWidget deadlines={deadlines} setDeadlines={setDeadlines} now={now} onStart={startOnDeadline} studyingId={study?.deadlineId} />}
             {tab === 'schedule' && <ScheduleWidget slots={slots} setSlots={setSlots} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
             {tab === 'study' && (
               <StudyWidget
@@ -1467,6 +1538,9 @@ export default function App() {
                 onJoinRoom={joinRoom}
                 onLeave={stopTimer}
               />
+            )}
+            {CAMPUS && (tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
+              <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} />
             )}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
             {tab === 'clipboard' && (
@@ -1513,8 +1587,8 @@ export default function App() {
                 onFullscreen={toggleFullscreen}
               />
             )}
-            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
-            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
+            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} student={student} />}
+            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} unavailable={campus ? [] : CAMPUS_PAGES} />}
             </div>
             </motion.div>
           </AnimatePresence>
@@ -1529,7 +1603,7 @@ export default function App() {
                 const g = groups.find((x) => x.id === id)!
                 setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
               }}
-              dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+              dots={[...(unreadCount > 0 ? ['social'] : []), ...(sceleUnread ? ['campus'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
             />
         </div>
         {astraIntro && (
@@ -1743,7 +1817,7 @@ export default function App() {
       content = (
         <div className="peek center">
           <span className="peek-text">
-            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null]
+            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null, dueToday ? `${dueToday} due today` : null]
               .filter(Boolean)
               .join(' · ')}
           </span>
@@ -1757,8 +1831,9 @@ export default function App() {
         <Art track={track} size={22} />
         {weatherGlyph}
         <LiveText text={live} k={studyStatus ? studyStatus.key : idleLyric ? lyricIdx : live} />
-        {(unreadCount > 0 || privacy.camera || privacy.mic) && (
+        {(unreadCount > 0 || privacy.camera || privacy.mic || dueToday > 0) && (
           <span className="live-dots">
+            {dueBadge}
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1776,6 +1851,7 @@ export default function App() {
             {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
             {weatherGlyph}
             <span className={`idle-lyric ${studyStatus ? `st-${studyStatus.kind}` : ''}`}>{idleText}</span>
+            {dueBadge}
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1792,6 +1868,7 @@ export default function App() {
             </span>
             <span>{clock}</span>
             <span className="idle-side right">
+              {dueBadge}
               {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
               {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
               {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1832,8 +1909,9 @@ export default function App() {
         shape={shape}
         contentKey={contentKey}
         bubble={bubble}
-        floating={pos.y > 2}
+        floating={!docked && pos.y > 2}
         offset={pos}
+        dock={dockAt}
         centered={Boolean(fs)}
         dragHandlers={dragHandlers}
         onClick={(e) => {
@@ -2000,6 +2078,41 @@ export default function App() {
             <button onClick={playJoin}>Join sound</button>
             <button onClick={playLeave}>Leave sound</button>
           </div>
+          {CAMPUS && campus && <div className="demo-row">
+            <span>SCELE</span>
+            <button onClick={() => pushAlert({ icon: '📅', text: 'PBD: Lab 8: Todo app', sub: 'Due in 2h 30m · still a draft', openTab: 'deadlines' }, 'attention')}>Deadline</button>
+            <button onClick={() => pushAlert({ icon: '🎓', text: 'PPW in 30m · 2.2304', sub: 'Week 9: React Hooks & State', openTab: 'classes' }, 'attention')}>Class soon</button>
+            <button onClick={() => pushAlert({ icon: '📣', text: 'PPW: Perubahan deadline Lab 8', sub: 'Deadline Lab 8 diundur ke Jumat 23.55.', openTab: 'inbox' }, 'ready')}>Announcement</button>
+            <button onClick={() => pushAlert({ icon: '📄', text: 'New in SDA', sub: 'Slide AVL Tree', openTab: 'inbox' }, 'ready')}>New material</button>
+          </div>}
+          {CAMPUS && campus && <div className="demo-row">
+            <span>SCELE work</span>
+            {/* these change the demo's SCELE data and sync, so the Due page and alerts react as they would to the real thing */}
+            <button
+              onClick={() => {
+                demoSubmitLab()
+                scele.refresh()
+              }}
+            >
+              Submit Lab 8
+            </button>
+            <button
+              onClick={() => {
+                demoPostGrade()
+                scele.refresh()
+              }}
+            >
+              Post a grade
+            </button>
+            <button
+              onClick={() => {
+                demoResetScele()
+                scele.refresh()
+              }}
+            >
+              Reset
+            </button>
+          </div>}
           <div className="demo-row">
             <span>App</span>
             <button

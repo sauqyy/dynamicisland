@@ -11,7 +11,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { ACCENTS, ASSISTANT_MODELS, CLOUD_MODEL, LOCAL_MODELS, CLOUD_VOICES, EQ_STYLES, ACCESSORY_SLOTS, toggleAccessory, type MascotAccessory, PERSONAS, TOOLS, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, toolOn, type Anim, type ChatAnim, type IdleDisplay, type GlassTint, type AssistantModel, type Persona, type Settings, type ToolId, type TalkMode, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
-import { PAGES } from '../types'
+import { PAGES, type Tab } from '../types'
 import { play } from 'cuelume'
 import { disclosureCue, previewPack } from '../lib/sound'
 import { Bars } from './Equalizer'
@@ -34,6 +34,8 @@ interface Props {
   /** the settings can fill the screen as a sidebar-and-pane window, like the system settings of a Mac */
   fullscreen?: boolean
   onFullscreen?: (on: boolean) => void
+  /** pages that are not available right now (Campus before Verify Student), left out of the list */
+  unavailable: Tab[]
 }
 
 /** The sidebar of the full-screen settings, and which titled card belongs to which entry. */
@@ -618,7 +620,7 @@ function CallAudio() {
   )
 }
 
-export function SettingsWidget({ settings, update, updater, fullscreen, onFullscreen }: Props) {
+export function SettingsWidget({ settings, update, updater, fullscreen, onFullscreen, unavailable }: Props) {
   const [cat, setCat] = useState(SYS_CATS[0].id)
   const buddyColor = settings.mascotColor === 'accent' ? settings.accent : settings.mascotColor
   // a window that hot-reloaded from an older build can still hold settings without per-item colours
@@ -795,10 +797,10 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           <span>Position (drag the pill)</span>
           <button
             className="chip"
-            disabled={!settings.posX && !settings.posY}
+            disabled={!settings.posX && !settings.posY && !settings.posBottom}
             data-cuelume-tap
             data-cuelume-emphasis="subtle"
-            onClick={() => update({ posX: 0, posY: 0 })}
+            onClick={() => update({ posX: 0, posY: 0, posBottom: false })}
           >
             Reset
           </button>
@@ -949,7 +951,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
 
       <Group title="Pages">
         <div className="page-toggles">
-          {PAGES.filter((p) => p.id !== 'settings').map((p) => {
+          {PAGES.filter((p) => p.id !== 'settings' && !unavailable.includes(p.id)).map((p) => {
             const on = !settings.hiddenPages.includes(p.id)
             return (
               <button

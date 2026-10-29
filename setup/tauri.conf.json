@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Astra Isle Setup",
-  "version": "0.3.8",
+  "version": "0.8.1",
   "identifier": "com.dynamicisland.setup",
   "build": {
     "frontendDist": "./ui"

@@ -1,6 +1,6 @@
 [package]
 name = "dynamic-island-setup"
-version = "0.3.8"
+version = "0.8.1"
 description = "Setup for Astra Isle"
 edition = "2024"
 rust-version = "1.90"
@@ -14,6 +14,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [features]
+# Setup for the Universitas Indonesia build
+ui = []
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 

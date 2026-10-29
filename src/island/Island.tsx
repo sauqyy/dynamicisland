@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { AnimatePresence, animate, motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'motion/react'
 
-/** Flat top (the island hangs from the screen edge), rounded bottom. */
-function radii(r: number, floating = false) {
+/** Flat top (the island hangs from the screen edge), rounded bottom; docked on the taskbar, the other way up. */
+function radii(r: number, floating = false, docked = false) {
   return {
-    borderTopLeftRadius: floating ? r : 0,
-    borderTopRightRadius: floating ? r : 0,
-    borderBottomLeftRadius: r,
-    borderBottomRightRadius: r,
+    borderTopLeftRadius: floating || docked ? r : 0,
+    borderTopRightRadius: floating || docked ? r : 0,
+    borderBottomLeftRadius: docked ? 0 : r,
+    borderBottomRightRadius: docked ? 0 : r,
   }
 }
 
@@ -43,6 +43,11 @@ interface Props {
   glow?: 'listening' | 'thinking' | 'speaking' | 'error' | null
   /** 0-1 microphone / voice loudness, drives the listening glow without re-rendering */
   glowLevel?: MotionValue<number>
+  /**
+   * docked on the taskbar: `line` is the top of the taskbar in px from the top of the window, and
+   * the island rests its lower edge there and grows upwards; `scale` is the island's size setting
+   */
+  dock?: { line: number; scale: number } | null
 }
 
 const BUBBLE = 34
@@ -60,10 +65,25 @@ const ENTER_FROM = 220
  * The island outline as a crisp SVG path: concave ears at the top, straight sides,
  * rounded bottom corners. Drawn without the goo filter so the curves stay smooth.
  */
-function notchPath(w: number, h: number, r: number, floating: boolean) {
+function notchPath(w: number, h: number, r: number, floating: boolean, docked = false) {
   const x0 = STAGE_W / 2 - w / 2
   const x1 = STAGE_W / 2 + w / 2
   const rr = Math.max(0, Math.min(r, h / 2, w / 2))
+  if (docked) {
+    // the notch upside down, rising out of the taskbar: ears along the bottom edge, rounded top
+    const e = Math.min(EAR, Math.max(0, h - rr))
+    return [
+      `M ${x0 - e} ${h}`,
+      `A ${e} ${e} 0 0 0 ${x0} ${h - e}`,
+      `L ${x0} ${rr}`,
+      `A ${rr} ${rr} 0 0 1 ${x0 + rr} 0`,
+      `L ${x1 - rr} 0`,
+      `A ${rr} ${rr} 0 0 1 ${x1} ${rr}`,
+      `L ${x1} ${h - e}`,
+      `A ${e} ${e} 0 0 0 ${x1 + e} ${h}`,
+      'Z',
+    ].join(' ')
+  }
   if (floating) {
     return [
       `M ${x0 + rr} 0`,
@@ -101,7 +121,7 @@ function notchPath(w: number, h: number, r: number, floating: boolean) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false, ringing = false, glow = null, glowLevel }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false, ringing = false, glow = null, glowLevel, dock = null }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -113,17 +133,22 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
     h.set(shape.h)
     r.set(shape.r)
   }, [shape.w, shape.h, shape.r, w, h, r])
-  const fl = useMotionValue(floating ? 1 : 0)
-  useEffect(() => fl.set(floating ? 1 : 0), [floating, fl])
-  const d = useTransform([w, h, r, fl], ([wv, hv, rv, fv]: number[]) => notchPath(wv, hv, rv, fv > 0.5))
+  const docked = Boolean(dock)
+  // 0 hanging from the top edge, 1 floating free, 2 resting on the taskbar
+  const fl = useMotionValue(docked ? 2 : floating ? 1 : 0)
+  useEffect(() => fl.set(docked ? 2 : floating ? 1 : 0), [floating, docked, fl])
+  const d = useTransform([w, h, r, fl], ([wv, hv, rv, fv]: number[]) => notchPath(wv, hv, rv, fv === 1, fv === 2))
 
   // when the app opens the island drops in from above the screen, using the Animation setting's spring
   // (`translate` is its own CSS property, so it composes with the stage's centring/scale transform)
+  // (docked on the taskbar it rises from below instead)
   const enterY = useMotionValue(-ENTER_FROM)
   const springRef = useRef(spring)
   springRef.current = spring
+  const dockedRef = useRef(docked)
+  dockedRef.current = docked
   useEffect(() => {
-    enterY.jump(-ENTER_FROM)
+    enterY.jump(dockedRef.current ? ENTER_FROM : -ENTER_FROM)
     const c = animate(enterY, 0, { type: 'spring', ...springRef.current })
     return () => c.stop()
   }, [enterY, intro])
@@ -136,10 +161,20 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
   }, [offset.x, offset.y, offX, offY])
   const away = useSpring(centered ? 1 : 0, spring)
   useEffect(() => away.set(centered ? 1 : 0), [centered, away])
+  // docked, the island's top follows its height so the lower edge stays on the taskbar as it grows
+  const line = useMotionValue(dock ? dock.line : -1)
+  const dockScale = useMotionValue(dock?.scale ?? 1)
+  useLayoutEffect(() => {
+    line.set(dock ? dock.line : -1)
+    dockScale.set(dock?.scale ?? 1)
+  }, [dock, line, dockScale])
   // whole pixels only: the glass filters redraw jagged on fractional offsets while the island is moving
   const enterT = useTransform(
-    [enterY, offX, offY, away],
-    ([ey, ox, oy, aw]: number[]) => `${Math.round(ox * (1 - aw))}px ${Math.round(ey + oy * (1 - aw))}px`,
+    [enterY, offX, offY, away, h, line, dockScale],
+    ([ey, ox, oy, aw, hv, ln, sc]: number[]) => {
+      const y = ln >= 0 ? ln - hv * sc : oy
+      return `${Math.round(ox * (1 - aw))}px ${Math.round(ey + y * (1 - aw))}px`
+    },
   )
 
   return (
@@ -155,11 +190,11 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
             <motion.div
               className="blob"
               initial={false}
-              style={{ marginTop: floating ? 0 : -HIDDEN_TOP }}
+              style={{ marginTop: floating || docked ? 0 : -HIDDEN_TOP }}
               animate={{
                 width: shape.w - 4,
-                height: shape.h - 2 + (floating ? 0 : HIDDEN_TOP),
-                ...radii(Math.max(0, shape.r - 2), floating),
+                height: shape.h - 2 + (floating || docked ? 0 : HIDDEN_TOP),
+                ...radii(Math.max(0, shape.r - 2), floating, docked),
               }}
               transition={SPRING}
             />
@@ -214,7 +249,7 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
         <motion.div
           className="content-clip"
           initial={false}
-          animate={{ width: shape.w, height: shape.h, ...radii(shape.r, floating) }}
+          animate={{ width: shape.w, height: shape.h, ...radii(shape.r, floating, docked) }}
           transition={SPRING}
           onClick={onClick}
           onHoverStart={() => onHover(true)}

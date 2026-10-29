@@ -1,7 +1,11 @@
+import { CAMPUS } from './campus'
+
 export interface Release {
   version: string
   title: string
   items: string[]
+  /** only for the Universitas Indonesia build */
+  campus?: boolean
 }
 
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
@@ -11,15 +15,132 @@ export const CHANGELOG: Release[] = [
     title: 'Meet Astra',
     items: [
       'Meet Astra (beta), a little voice assistant. Say what you need and she opens apps, controls music and volume, starts timers, searches the web and answers questions. She is off until you choose to use her.',
+      'Start a focus session from any deadline, and see your streak and week in Study.',
+      'Astra and Home have new icons on the rail.',
+    ],
+  },
+  {
+    version: '0.7.11',
+    campus: true,
+    title: 'Know what\'s left to hand in',
+    items: [
+      'Due shows where each assignment stands: Not submitted, Draft, not submitted, Submitted or Graded. A draft isn\'t handed in until you press Submit on SCELE, so it stays marked.',
+      'Once you hand something in, the island says well done, moves it to Submitted and stops reminding you about it.',
+      'Reminders now come 3 days, 2 days, 24 hours, 12 hours, 6 hours, 3 hours and 1 hour before a deadline.',
+      'Recent grades are on Due, hidden until you press Show. The alert for a new grade never shows the score.',
+      'Syncing is lighter: a course page is only read again when SCELE says something on it changed, so new materials show up within about 10 minutes.',
+      'Drag the island to the bottom of the screen and it sits on the taskbar, opening upwards. Double-click it to send it back to the top.',
+    ],
+  },
+  {
+    version: '0.7.10',
+    campus: true,
+    title: 'Every week shows what\'s next',
+    items: [
+      'Every week now shows each class\'s next topic and its room, instead of where its time came from. Hover a class to see the date, and whether its time came from SLCM or the course page.',
+      'An exam or a week without class shows up there too.',
+      'Topics are also found in a course\'s first week, like an "Intro to OS" deck in Week 00 that lists the term\'s topics, or a plan typed straight onto the course page.',
+      'Syncing is faster, since several courses are read at once. Classes shows how far it has got.',
+      'Classes catches up as soon as your computer wakes up or is back online, instead of showing what it had before. It still syncs every 10 minutes, day and night.',
+      'If SLCM has no class for one of your courses, Classes asks whether you\'ve changed classes and offers to read SLCM again.',
+    ],
+  },
+  {
+    version: '0.7.9',
+    title: 'Profiles and Apple Music lyrics',
+    items: [
+      "Click someone's picture in Friends, requests, chats and groups to open their profile, then click their photo to see it full size.",
+      'New profile photos are saved sharper, so they look good when opened full size.',
       'Lyrics now show for songs playing in Apple Music on Windows.',
-      "Click someone's picture to open their profile, and click it again to see it full size. New profile photos are saved sharper.",
+      'New group and Join a group are now clear buttons at the top of Groups.',
+      'Settings shows which version you have installed, next to Version.',
+    ],
+  },
+  {
+    version: '0.7.8',
+    campus: true,
+    title: 'SLCM signs you in',
+    items: [
+      'Get times from SLCM now asks for your SSO UI password (the same one as SCELE) and signs in to SLCM for you, in the background. The password isn\'t saved.',
+      'Classes shows how far it got. SLCM\'s site can be slow, and the island reloads it if it stops halfway.',
+      'If SLCM needs you, for example after a wrong password, its window opens so you can finish there. You can also open it yourself, or stop.',
+      'Topics are found week by week in lesson plans and RPS, in English or Indonesian: dated rows (26-Aug-2026 too, even with last year\'s year), "Week 07", "Minggu ke-3", "Pertemuan 5" or a numbered column.',
+      'A lesson plan with one date per week gives that week\'s topic to every class that week, and weeks are counted from when the term really started.',
+      'Section names like "Topic 15" are no longer shown as a topic. Classes shows what the section holds instead, or nothing.',
+    ],
+  },
+  {
+    version: '0.7.7',
+    campus: true,
+    title: 'Classes, rebuilt around your next class',
+    items: [
+      'Connect SLCM in Classes to get every class\'s official time and room from your study plan. You sign in on SLCM\'s own page, and only the schedule comes back.',
+      'Each class shows the topic exactly as the lesson plan words it, a link to that page of the document, and the SCELE section and slides for that topic. If nothing matches, Classes says so instead of showing unrelated slides.',
+      'Today and Tomorrow are one list. Your next class opens first, and you can tap any other class to see what it covers.',
+      'Questions that need you, like a missing class time or a course you\'re enrolled in twice, come first, and the sources sit folded at the bottom.',
+    ],
+  },
+  {
+    version: '0.7.6',
+    title: 'Prompter, deadlines and your week',
+    items: [
+      'Prompter (Tools): paste a script and read it as it scrolls at your pace, with speed, text size, mirror and fullscreen.',
+      'Deadlines (Plan): add things with a date and time. In Settings, choose Deadline for what the pill shows, then hover the pill to see them all.',
+      'Schedule (Plan): plan Monday to Sunday, and open fullscreen to see the whole week at once.',
     ],
   },
   {
     version: '0.7.5',
-    title: 'Back to the general build',
+    title: 'Campus has its own build',
     items: [
-      'The Campus tools for Fasilkom UI students (Verify Student, Due, Classes and Inbox) moved to their own build, so this version is the same for everyone.',
+      'The Campus tools for Fasilkom UI students (Verify Student, Due, Classes and Inbox) now come in their own build, Dynamic Island UI, so this version is the same for everyone.',
+    ],
+  },
+  {
+    version: '0.7.4',
+    campus: true,
+    title: 'Classes from your course timelines',
+    items: [
+      'Classes now reads each course\'s timeline, from PDFs, slides, Word, Excel or a linked Google Sheet, and finds your class days from it.',
+      'Today and Tomorrow list your classes with their time, room and what each one covers, plus the matching course materials.',
+      'Holidays on the timeline skip the reminder, and you get a heads-up on days when a class has no time listed.',
+      'If a course\'s timeline needs a Google sign-in, Classes tells you which one so you can open it.',
+    ],
+  },
+  {
+    version: '0.7.3',
+    campus: true,
+    title: 'Your classes, from the syllabus',
+    items: [
+      'Classes now reads your class days from each course\'s syllabus when the course page doesn\'t list them.',
+      'Only this term\'s courses are used, so old courses SCELE still shows are left out.',
+      'Courses you TA are marked TA. Tap TA or Hide on any course in Classes to change it.',
+    ],
+  },
+  {
+    version: '0.7.2',
+    campus: true,
+    title: 'Verify Student for assistants',
+    items: ['Fasilkom UI students whom SSO UI also lists as staff, such as teaching assistants, can now verify and use Campus.'],
+  },
+  {
+    version: '0.7.1',
+    campus: true,
+    title: 'Verify Student fixed',
+    items: [
+      'Verify Student now works for Fasilkom UI students even when SSO UI leaves out which faculty you are in.',
+      'If it does, the Profile card asks you to confirm with your SCELE sign-in, which also connects SCELE.',
+    ],
+  },
+  {
+    version: '0.7.0',
+    campus: true,
+    title: 'Campus for Fasilkom UI',
+    items: [
+      'Fasilkom UI students: tap Verify Student on the Profile page and sign in with SSO UI to unlock Campus.',
+      'Due lists your SCELE deadlines, and the island warns you 24 hours, 3 hours and 1 hour before each one.',
+      'Classes builds your weekly schedule from your SCELE courses and reminds you before class, with that week\'s topic.',
+      'Inbox collects SCELE announcements and new course materials, and the pill shows how much is due today.',
     ],
   },
   {
@@ -137,5 +258,6 @@ export function releaseToShow(current: string): Release | null {
   } catch {
     return null
   }
-  return CHANGELOG.find((r) => r.version === current) ?? null
+  const r = CHANGELOG.find((x) => x.version === current)
+  return r && (CAMPUS || !r.campus) ? r : null
 }

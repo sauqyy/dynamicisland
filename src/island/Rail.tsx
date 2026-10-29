@@ -71,7 +71,7 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
 
   return (
     <nav
-      className="rail"
+      className={`rail ${groups.length > 6 ? 'tight' : ''}`}
       ref={rail}
       aria-label="Pages"
       style={{ ['--astra' as string]: astraColor, ['--astra-ink' as string]: inkOn(astraColor) }}

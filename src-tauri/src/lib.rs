@@ -8,6 +8,12 @@ mod auth;
 mod claude;
 mod llm;
 mod llm_core;
+#[cfg(feature = "campus")]
+mod scele;
+#[cfg(feature = "campus")]
+mod slcm;
+#[cfg(feature = "campus")]
+mod sso;
 #[cfg(windows)]
 mod files;
 #[cfg(windows)]
@@ -66,6 +72,9 @@ static DRAGGING: AtomicBool = AtomicBool::new(false);
 static FULLSCREEN: AtomicBool = AtomicBool::new(false);
 /// How far the user moved the island from its default spot (centre top), in logical px.
 static OFFSET: Mutex<(f64, f64)> = Mutex::new((0.0, 0.0));
+/// True while the island is docked to the bottom of the screen, on top of the taskbar: it then
+/// grows upwards from the work area's bottom edge, and the vertical offset is ignored.
+static BOTTOM: AtomicBool = AtomicBool::new(false);
 
 /// Seconds since the last keyboard or mouse input anywhere on the computer (drives the automatic Idle status).
 #[tauri::command]
@@ -129,6 +138,15 @@ fn set_fullscreen(window: WebviewWindow, on: bool) -> (f64, f64) {
 fn set_offset(window: WebviewWindow, x: f64, y: f64) {
     *OFFSET.lock().unwrap() = (x, y);
     place_window(&window);
+}
+
+/// Docks the island to the bottom of the work area (or back to its offset). Returns that bottom edge
+/// in logical px from the monitor's top, so the frontend can draw the island resting on the taskbar.
+#[tauri::command]
+fn set_dock_bottom(window: WebviewWindow, on: bool) -> f64 {
+    BOTTOM.store(on, Ordering::Relaxed);
+    place_window(&window);
+    target_monitor(&window).map(|m| work_bottom(&m) / m.scale_factor()).unwrap_or(0.0)
 }
 
 #[tauri::command]
@@ -278,6 +296,12 @@ fn island_offset(monitor: &Monitor) -> (f64, f64) {
     )
 }
 
+/// The bottom of the monitor's work area (where the taskbar starts), in physical px from the monitor's top.
+fn work_bottom(monitor: &Monitor) -> f64 {
+    let area = monitor.work_area();
+    (area.position.y - monitor.position().y) as f64 + area.size.height as f64
+}
+
 /// Put the window at the monitor's top-left corner, as wide as the monitor. It never moves: dragging the
 /// island only moves it inside the page (and makes the window taller), so going fullscreen is just a height
 /// change and the island can't jump. The window is click-through outside the pill.
@@ -287,6 +311,9 @@ fn place_window(window: &WebviewWindow) {
     let scale = monitor.scale_factor();
     let height = if FULLSCREEN.load(Ordering::Relaxed) {
         monitor.size().height
+    } else if BOTTOM.load(Ordering::Relaxed) {
+        // down to the taskbar and no further, so the island can sit on it and grow upwards
+        work_bottom(&monitor).max(120.0 * scale) as u32
     } else {
         let (_, win_h) = *WIN_SIZE.lock().unwrap();
         // rounded up to steps so dragging the island down doesn't resize the window on every frame
@@ -339,13 +366,19 @@ fn spawn_watcher(window: WebviewWindow, app: AppHandle) {
             let scale = window.scale_factor().unwrap_or(1.0);
             let (w, h) = *app.state::<HitArea>().0.lock().unwrap();
             let (w, h) = ((w + MARGIN * 2.0) * scale, (h + MARGIN * 2.0) * scale);
-            let (off_x, off_y) = if FULLSCREEN.load(Ordering::Relaxed) {
+            let fullscreen = FULLSCREEN.load(Ordering::Relaxed);
+            let monitor = target_monitor(&window);
+            let (off_x, off_y) = if fullscreen {
                 (0.0, 0.0)
             } else {
-                target_monitor(&window).map(|m| island_offset(&m)).unwrap_or((0.0, 0.0))
+                monitor.as_ref().map(island_offset).unwrap_or((0.0, 0.0))
             };
             let left = pos.x as f64 + (size.width as f64 - w) / 2.0 + off_x;
-            let top = pos.y as f64 + off_y + (TOP - MARGIN) * scale;
+            // docked to the bottom, the island's lower edge rests on the taskbar and it grows upwards
+            let top = match monitor.as_ref() {
+                Some(m) if !fullscreen && BOTTOM.load(Ordering::Relaxed) => pos.y as f64 + work_bottom(m) - h + MARGIN * scale,
+                _ => pos.y as f64 + off_y + (TOP - MARGIN) * scale,
+            };
             let now_inside = !hidden
                 && (DRAGGING.load(Ordering::Relaxed)
                     || (cursor.x >= left
@@ -377,10 +410,39 @@ pub fn run() {
             set_window_size,
             set_monitor,
             set_offset,
+            set_dock_bottom,
             set_fullscreen,
             set_dragging,
             auth::oauth_wait,
             auth::open_url,
+            #[cfg(feature = "campus")]
+            scele::scele_login,
+            #[cfg(feature = "campus")]
+            scele::scele_account,
+            #[cfg(feature = "campus")]
+            scele::scele_logout,
+            #[cfg(feature = "campus")]
+            scele::scele_call,
+            #[cfg(feature = "campus")]
+            scele::scele_file,
+            #[cfg(feature = "campus")]
+            scele::web_doc,
+            #[cfg(feature = "campus")]
+            slcm::slcm_open,
+            #[cfg(feature = "campus")]
+            slcm::slcm_saved,
+            #[cfg(feature = "campus")]
+            slcm::slcm_show,
+            #[cfg(feature = "campus")]
+            slcm::slcm_cancel,
+            #[cfg(feature = "campus")]
+            slcm::slcm_forget,
+            #[cfg(feature = "campus")]
+            sso::sso_verify,
+            #[cfg(feature = "campus")]
+            sso::sso_student,
+            #[cfg(feature = "campus")]
+            sso::sso_forget,
             set_hide_on_fullscreen,
             monitor_count,
             install_update,

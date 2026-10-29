@@ -401,11 +401,6 @@
   opacity: 0;
 }
 
-/* ---------- smart mode: tucked away until the cursor reaches the top middle ---------- */
-.root.tucked .stage {
-  opacity: 0;
-}
-
 /* ---------- settings ---------- */
 .settings {
   height: 100%;
@@ -2359,11 +2354,9 @@ button.ao-text:hover {
   flex: none;
 }
 
-/* keep the island on its own GPU layer so the glass filters aren't re-rasterised while it drops in.
-   Only hint `translate` (the drop-in): hinting `transform` makes Chromium rasterise the layer at 1x
-   and stretch the bitmap, so the Size setting's scale() came out blurry. */
+/* keep the island on its own GPU layer so the glass filters aren't re-rasterised while it drops in */
 .stage {
-  will-change: translate;
+  will-change: translate, transform;
   backface-visibility: hidden;
 }
 
@@ -2688,29 +2681,6 @@ button.ao-text:hover {
 .rail-lit.follow {
   transition: none;
 }
-/* Astra's page: the highlight wraps her icon too, in her colour, with a soft breathing glow */
-.rail-lit.is-astra {
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.28), rgb(255 255 255 / 0) 55%),
-    linear-gradient(135deg, var(--astra), color-mix(in srgb, var(--astra) 70%, #8fa8ff));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.4),
-    0 0 14px color-mix(in srgb, var(--astra) 55%, transparent),
-    0 2px 10px color-mix(in srgb, var(--astra) 35%, transparent);
-  animation: astra-glow 3.4s ease-in-out infinite;
-}
-@keyframes astra-glow {
-  50% {
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.4),
-      0 0 22px color-mix(in srgb, var(--astra) 75%, transparent),
-      0 2px 12px color-mix(in srgb, var(--astra) 45%, transparent);
-  }
-}
-.rail-g.is-astra.on .rail-ic,
-.rail-g.is-astra.on .rail-pg.on {
-  color: var(--astra-ink);
-}
 .rail-g {
   position: relative;
   display: flex;
@@ -2808,10 +2778,6 @@ button.ao-text:hover {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--pressed) transparent;
-}
-/* Astra's chat scrolls inside itself; while the card is still growing to it, the page must not flash a scrollbar */
-.xbody > .page:has(.astra-chat) {
-  overflow: hidden;
 }
 .page-fit {
   display: flex;
@@ -4160,13 +4126,6 @@ button.ao-text:hover {
 .msg-row .avatar {
   flex: none;
 }
-/* the row is sized by its bubble, so a % cap on the bubble would squeeze it below its own text */
-.expanded.fs .msg-row {
-  max-width: 72%;
-}
-.expanded.fs .msg-row .msg {
-  max-width: none;
-}
 .seen-by {
   align-self: flex-start;
   margin: -2px 0 2px 30px;
@@ -4227,140 +4186,698 @@ button.ao-text:hover {
   white-space: nowrap;
 }
 
-/* ---------- who is in the voice chat, under the group name ---------- */
-.chat-title {
-  min-width: 0;
+/* ---------- SCELE (Campus: Due, Classes, Inbox) ---------- */
+.scele {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100%;
+}
+.scele.center {
+  align-items: center;
+  justify-content: center;
+}
+.scele-login {
+  gap: 10px;
+  padding: 4px 24px;
+}
+.scele-login .pill-btn {
+  margin-top: 2px;
+}
+.sc-note {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+  text-align: center;
+  max-width: 300px;
+}
+.sc-error {
+  font-size: var(--fs-meta);
+  color: var(--danger);
+}
+.sc-sync {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-sync .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sc-spin svg {
+  animation: sc-spin 0.9s linear infinite;
+}
+@keyframes sc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sc-list section {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  line-height: 1.1;
 }
-.voice-live {
+.sc-list h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 2px;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.sc-list h4 .chip {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.sc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--r-tile);
+  text-align: left;
+  transition: background 0.15s;
+}
+button.sc-row:hover {
+  background: var(--raised);
+}
+.sc-row.read .sc-main b {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.sc-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sc-main b,
+.sc-main small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-main b {
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+.sc-main small,
+.sc-when small {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.sc-when {
   flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.sc-when b {
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sc-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.sc-dot.warm {
+  background: var(--warn);
+}
+.sc-dot.hot,
+.sc-dot.over {
+  background: var(--danger);
+}
+.sc-dot.hot {
+  box-shadow: 0 0 0 3px rgb(248 113 113 / 0.25);
+}
+.sc-dot.info {
+  background: var(--info);
+}
+/* handed in, or graded */
+.sc-dot.done {
+  background: var(--charge);
+}
+/* where the user's work on an assignment stands: amber while there's still something to press */
+.sc-state.draft,
+.sc-state.reopened {
+  color: var(--warn);
+}
+.sc-state.submitted {
+  color: var(--charge);
+}
+.sc-list h4 .sc-eye {
+  gap: 4px;
+}
+.sc-grade {
+  font-variant-numeric: tabular-nums;
+}
+.sc-grade small {
+  font-weight: 500;
+  color: var(--text-3);
+}
+.sc-grade.hidden {
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+}
+.sc-day {
+  flex: none;
+  width: 34px;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  color: var(--accent);
+}
+.sc-topic {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sc-topic > b {
+  font-size: var(--fs-body);
+}
+.sc-topic p {
+  margin: 0;
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sc-src {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-src.dated::before {
+  content: '✓ ';
+  color: var(--charge);
+}
+.sc-src.week::before {
+  content: '≈ ';
+  color: var(--warn);
+}
+.sc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sc-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.sc-add-row {
+  display: flex;
+  gap: 6px;
+}
+.sc-add .todo-input {
+  padding: 7px 10px;
+  font-size: var(--fs-meta);
+  color-scheme: dark;
+}
+.root.light .sc-add .todo-input {
+  color-scheme: light;
+}
+.sc-add select option {
+  background: #1c1c1e;
+  color: #fff;
+}
+.sc-lead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.sc-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.sc-account .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* how many SCELE deadlines are left today, on the pill */
+.sc-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--warn);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+/* Verify Student (SSO UI) on the Profile page */
+.student-card {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.student-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.student-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-tile);
+  background: var(--raised);
+}
+.student-id > .ui-logo {
+  flex: none;
+  color: var(--accent);
+}
+.student-id > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.student-id b {
+  font-size: var(--fs-body);
+}
+.student-id small {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Universitas Indonesia's makara, tinted through a mask (see UiLogo.tsx) */
+.ui-logo {
+  flex: none;
+  display: inline-block;
+  vertical-align: -0.15em;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+}
+.student-check {
+  vertical-align: -2px;
+  color: var(--accent);
+}
+.sc-ask {
+  gap: 8px !important;
+  padding: 10px 12px;
+  border-radius: var(--r-tile);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+.sc-ask > span {
+  display: flex;
+  flex-direction: column;
+}
+.sc-ask b {
+  font-size: var(--fs-body);
+}
+.sc-ask small {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.chip.ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+.sc-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sc-pick .sc-row {
+  background: var(--pressed);
+}
+.sc-pick .sc-main b {
+  white-space: normal;
+  font-weight: 500;
+}
+/* SSO UI verified the account but not the faculty: confirm it with SCELE */
+.student-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.student-confirm-row {
+  display: flex;
+  gap: 6px;
+}
+.student-confirm > small {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.student-confirm .student-detail {
+  color: var(--text-3);
+  word-break: break-word;
+}
+/* this term's courses on the Classes page */
+.sc-course .sc-main b {
+  font-weight: 500;
+}
+.sc-course.off .sc-main {
+  opacity: 0.5;
+}
+.sc-ta {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.sc-earlier {
+  padding: 2px 10px 0;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-time {
+  flex: none;
+  width: 42px;
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+}
+.sc-time b {
+  font-size: var(--fs-meta);
+  font-weight: 700;
+  color: var(--accent);
+}
+.sc-time small {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-topic-line {
+  display: block;
+  color: var(--text-1) !important;
+  font-size: var(--fs-meta) !important;
+}
+.sc-topic-line .sc-src::before {
+  margin-right: 2px;
+}
+.sc-meta {
+  color: var(--text-3) !important;
+}
+.sc-off {
+  color: var(--warn) !important;
+}
+.sc-exam {
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--danger);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+}
+.sc-none {
+  padding: 2px 10px;
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+/* Classes: the agenda. Every meeting is one row that opens to what it covers; the next class
+   starts open and is set apart as a card. */
+.sc-meeting {
+  border-radius: var(--r-tile);
+  transition: background 0.15s;
+}
+.sc-meeting.next {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+.sc-meeting.past .sc-meeting-head {
+  opacity: 0.45;
+}
+.sc-meeting-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--r-tile);
+  text-align: left;
+}
+.sc-meeting-head:hover {
+  background: rgb(var(--fg-rgb) / 0.05);
+}
+.sc-meeting-head:focus-visible,
+.sc-link:focus-visible,
+.sc-sources summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.sc-meeting .sc-main b,
+.sc-topic-line,
+.sc-meeting .sc-main small {
+  white-space: normal;
+}
+.sc-meeting .sc-main b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sc-meeting.off .sc-main b {
+  text-decoration: line-through;
+  color: var(--text-2);
+}
+.sc-meeting.next .sc-main > b {
+  font-size: var(--fs-title);
+}
+.sc-badge-line {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+.sc-chev {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-3);
+  transition: transform 0.2s;
+}
+.sc-meeting.open > .sc-meeting-head .sc-chev,
+.sc-sources[open] > summary .sc-chev {
+  transform: rotate(180deg);
+}
+.sc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 10px 62px;
+}
+.sc-fix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sc-fix > small {
+  font-size: var(--fs-label);
+  color: var(--warn);
+}
+.sc-topic p {
+  -webkit-line-clamp: 3;
+}
+.sc-detail .sc-meta {
+  font-size: var(--fs-label);
+}
+.sc-meeting:not(.open) .sc-topic-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sc-prov {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.sc-link {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  text-align: left;
+}
+.sc-link > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.sc-link:hover {
+  color: var(--text-1);
+}
+.sc-link:hover > span {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sc-link.sub {
+  padding-left: 14px;
+}
+.sc-link.small {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-link.warn {
+  color: var(--warn);
+}
+.sc-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sc-cover-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.sc-none-inline {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+/* the weekly schedule, by weekday */
+.sc-weekday {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.sc-weekday > .sc-day {
+  padding-top: 9px;
+}
+.sc-weekday > div {
+  flex: 1;
+  min-width: 0;
+}
+.sc-slot {
+  padding: 6px 8px;
+}
+.sc-slot-time {
+  flex: none;
+  width: 74px;
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.sc-slot .sc-main b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+/* the next meeting's topic, then the room: both shorten to fit, so the room stays in view */
+.sc-slot .sc-slot-line {
+  display: flex;
+  gap: 5px;
+}
+.sc-slot-topic,
+.sc-slot-room {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sc-slot-topic {
+  flex: 0 1 auto;
+}
+.sc-slot-topic.off {
+  color: var(--warn);
+}
+.sc-slot-topic.exam {
+  color: var(--danger);
+}
+.sc-slot-room {
+  flex: 0 1 auto;
+  min-width: 4.5em;
+  max-width: 48%;
+  color: var(--text-3);
+}
+.sc-slot-topic + .sc-slot-room::before {
+  content: '· ';
+}
+/* where the schedule comes from: folded away under the agenda */
+.sc-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.sc-sources > summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 6px 5px 8px;
-  border-radius: 12px;
-  background: rgb(74 222 128 / 0.12);
-  font-size: 12px;
-}
-.voice-live-count {
-  flex: 1;
-  min-width: 0;
+  padding: 4px 2px;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--fs-label);
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
 }
-.voice-join {
+.sc-sources > summary::-webkit-details-marker {
+  display: none;
+}
+.sc-sources > summary > span {
+  flex: 1;
+}
+.sc-sources > h4 {
+  margin-top: 8px;
+}
+.sc-warn-count {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--warn);
+}
+.sc-src-icon {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #4ade80;
-  color: #000;
+  color: var(--text-2);
 }
-.voice-faces {
-  display: flex;
-  align-items: center;
+.sc-main small.sc-missing {
+  color: var(--warn);
 }
-.voice-faces .avatar {
-  margin-left: -3px;
-  box-shadow: 0 0 0 1.5px var(--island-bg, #000), 0 0 0 2.5px #4ade80;
+.sc-course .sc-main b,
+.sc-course .sc-main small {
+  white-space: normal;
 }
-.voice-faces .avatar:first-child {
-  margin-left: 0;
-}
-
-/* ---------- opening and closing a chat: three looks (Settings > Motion > Chat animation) ---------- */
-@keyframes chat-rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-}
-/* slide: in from the right, out to the right */
-@keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateX(34px) scale(0.985);
-  }
-}
-@keyframes slide-out {
-  to {
-    opacity: 0;
-    transform: translateX(34px) scale(0.985);
-  }
-}
-/* pop: grows out of the middle with a little overshoot, shrinks back */
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.86);
-  }
-}
-@keyframes pop-out {
-  to {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-}
-/* rise: floats up out of a soft blur, sinks back down */
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(38px);
-    filter: blur(7px);
-  }
-}
-@keyframes rise-out {
-  to {
-    opacity: 0;
-    transform: translateY(30px);
-    filter: blur(5px);
-  }
-}
-.chat-slide .chat {
-  animation: slide-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.chat-slide .friends.leaving > .chat {
-  animation: slide-out 0.23s cubic-bezier(0.5, 0, 0.75, 0) both;
-}
-.chat-pop .chat {
-  transform-origin: 50% 40%;
-  animation: pop-in 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-.chat-pop .friends.leaving > .chat {
-  animation: pop-out 0.2s cubic-bezier(0.5, 0, 0.75, 0) both;
-}
-.chat-rise .chat {
-  animation: rise-in 0.46s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.chat-rise .friends.leaving > .chat {
-  animation: rise-out 0.23s cubic-bezier(0.5, 0, 0.75, 0) both;
-}
-/* inside the chat the header, messages and message box settle in one after another */
-.chat-slide .chat > .chat-head,
-.chat-rise .chat > .chat-head {
-  animation: chat-rise 0.34s 0.04s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.chat-slide .chat > .chat-list,
-.chat-rise .chat > .chat-list {
-  animation: chat-rise 0.42s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.chat-slide .chat > .chat-compose,
-.chat-rise .chat > .chat-compose {
-  animation: chat-rise 0.42s 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.friends.leaving > .chat > * {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .chat,
-  .chat > .chat-head,
-  .chat > .chat-list,
-  .chat > .chat-compose,
-  .friends.leaving > .chat {
-    animation: none !important;
-  }
+.sc-reset {
+  margin: 6px 2px 0;
 }
 
 /* ---------- deadlines ---------- */
@@ -4795,37 +5312,16 @@ button.ao-text:hover {
   pointer-events: none;
 }
 
-/* ---------- crop a freshly picked profile photo ---------- */
-.crop-stage {
-  position: relative;
-  align-self: center;
-  overflow: hidden;
-  border-radius: 14px;
-  background: rgb(var(--fg-rgb) / 0.08);
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
+/* seven groups (the campus build) would not fit the card: a slimmer rail */
+.rail.tight {
+  gap: 0;
 }
-.crop-stage:active {
-  cursor: grabbing;
+.rail.tight .rail-ic {
+  width: 24px;
 }
-.crop-stage img {
-  position: absolute;
-  max-width: none;
-  pointer-events: none;
-}
-/* dim the corners so the circle shows exactly what the avatar will look like */
-.crop-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  box-shadow: 0 0 0 999px rgb(0 0 0 / 0.5);
-  outline: 2px solid rgb(255 255 255 / 0.85);
-  outline-offset: -2px;
-  pointer-events: none;
-}
-.photo-crop .presets {
-  justify-content: flex-end;
+.rail.tight .rail-pg {
+  padding: 5px 7px;
+  font-size: 12px;
 }
 
 /* ---------- someone's profile, opened from their avatar ---------- */
@@ -4972,9 +5468,9 @@ button.ao-text:hover {
   flex: none;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   color: var(--accent, #4ade80);
   background: color-mix(in srgb, var(--accent, #4ade80) 18%, transparent);
   transition: transform 0.2s;
@@ -5021,7 +5517,272 @@ button.ao-text:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- assistant (the mascot you talk to) ---------- */
+/* connecting SLCM: the password once, then the hidden window's progress */
+.sc-slcm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.sc-slcm-row {
+  display: flex;
+  gap: 6px;
+}
+.sc-slcm-row .todo-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: var(--fs-meta);
+}
+.sc-slcm .sc-hint {
+  font-size: var(--fs-label);
+  color: var(--text-3);
+}
+.sc-slcm .sc-hint b {
+  color: var(--text-2);
+}
+.sc-slcm-cancel {
+  align-self: flex-start;
+}
+.sc-inline-link {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sc-progress {
+  font-size: var(--fs-label);
+  color: var(--text-2);
+}
+.sc-progress::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: sc-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sc-progress::before {
+    animation: none;
+  }
+}
+.sc-warn {
+  font-size: var(--fs-label);
+  color: var(--warn);
+}
+
+/* ---------- Astra, study room and plan widgets (merged from the general build) ---------- */
+.root.tucked .stage {
+  opacity: 0;
+}
+.stage {
+  will-change: translate;
+  backface-visibility: hidden;
+}
+.rail-lit.is-astra {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.28), rgb(255 255 255 / 0) 55%),
+    linear-gradient(135deg, var(--astra), color-mix(in srgb, var(--astra) 70%, #8fa8ff));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    0 0 14px color-mix(in srgb, var(--astra) 55%, transparent),
+    0 2px 10px color-mix(in srgb, var(--astra) 35%, transparent);
+  animation: astra-glow 3.4s ease-in-out infinite;
+}
+@keyframes astra-glow {
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.4),
+      0 0 22px color-mix(in srgb, var(--astra) 75%, transparent),
+      0 2px 12px color-mix(in srgb, var(--astra) 45%, transparent);
+  }
+}
+.rail-g.is-astra.on .rail-ic,
+.rail-g.is-astra.on .rail-pg.on {
+  color: var(--astra-ink);
+}
+.xbody > .page:has(.astra-chat) {
+  overflow: hidden;
+}
+.expanded.fs .msg-row {
+  max-width: 72%;
+}
+.expanded.fs .msg-row .msg {
+  max-width: none;
+}
+.chat-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.1;
+}
+.voice-live {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 8px;
+  border-radius: 12px;
+  background: rgb(74 222 128 / 0.12);
+  font-size: 12px;
+}
+.voice-live-count {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+.voice-join {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #4ade80;
+  color: #000;
+}
+.voice-faces {
+  display: flex;
+  align-items: center;
+}
+.voice-faces .avatar {
+  margin-left: -3px;
+  box-shadow: 0 0 0 1.5px var(--island-bg, #000), 0 0 0 2.5px #4ade80;
+}
+.voice-faces .avatar:first-child {
+  margin-left: 0;
+}
+@keyframes chat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(34px) scale(0.985);
+  }
+}
+@keyframes slide-out {
+  to {
+    opacity: 0;
+    transform: translateX(34px) scale(0.985);
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(38px);
+    filter: blur(7px);
+  }
+}
+@keyframes rise-out {
+  to {
+    opacity: 0;
+    transform: translateY(30px);
+    filter: blur(5px);
+  }
+}
+.chat-slide .chat {
+  animation: slide-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.chat-slide .friends.leaving > .chat {
+  animation: slide-out 0.23s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+.chat-pop .chat {
+  transform-origin: 50% 40%;
+  animation: pop-in 0.46s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.chat-pop .friends.leaving > .chat {
+  animation: pop-out 0.2s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+.chat-rise .chat {
+  animation: rise-in 0.46s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.chat-rise .friends.leaving > .chat {
+  animation: rise-out 0.23s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+.chat-slide .chat > .chat-head,
+.chat-rise .chat > .chat-head {
+  animation: chat-rise 0.34s 0.04s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.chat-slide .chat > .chat-list,
+.chat-rise .chat > .chat-list {
+  animation: chat-rise 0.42s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.chat-slide .chat > .chat-compose,
+.chat-rise .chat > .chat-compose {
+  animation: chat-rise 0.42s 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.friends.leaving > .chat > * {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat,
+  .chat > .chat-head,
+  .chat > .chat-list,
+  .chat > .chat-compose,
+  .friends.leaving > .chat {
+    animation: none !important;
+  }
+}
+.crop-stage {
+  position: relative;
+  align-self: center;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgb(var(--fg-rgb) / 0.08);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.crop-stage:active {
+  cursor: grabbing;
+}
+.crop-stage img {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+}
+.crop-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgb(0 0 0 / 0.5);
+  outline: 2px solid rgb(255 255 255 / 0.85);
+  outline-offset: -2px;
+  pointer-events: none;
+}
+.photo-crop .presets {
+  justify-content: flex-end;
+}
+.ga-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: var(--accent, #4ade80);
+  background: color-mix(in srgb, var(--accent, #4ade80) 18%, transparent);
+  transition: transform 0.2s;
+}
 .assistant {
   width: 100%;
   height: 100%;
@@ -5095,20 +5856,15 @@ button.ao-text:hover {
     opacity: 1;
   }
 }
-
-/* the resting pill's sleeping mascot */
 .pill-mascot {
   flex: none;
   display: grid;
   place-items: center;
   margin-right: 2px;
 }
-
-/* the outline glows while the assistant is awake; --level is the live loudness (0-1) */
 .stage.glow .outline-layer {
   --g: var(--accent, #4ade80);
 }
-/* a solid coloured rim plus stacked halos, so the glow still reads on a light wallpaper */
 .stage.glow .island-rim {
   stroke: var(--g);
   stroke-width: 2.5;
@@ -5148,8 +5904,6 @@ button.ao-text:hover {
     animation: none;
   }
 }
-
-/* Settings: Buddy */
 .set-input {
   width: 120px;
   padding: 5px 9px;
@@ -5181,7 +5935,6 @@ button.ao-text:hover {
   color: var(--accent, #4ade80);
   background: rgb(var(--fg-rgb) / 0.1);
 }
-
 .row.stack {
   flex-direction: column;
   align-items: stretch;
@@ -5234,7 +5987,6 @@ button.ao-text:hover {
   background: #fff;
   color: #1c1c1e;
 }
-
 .buddy-preview {
   display: flex;
   flex-direction: column;
@@ -5255,8 +6007,6 @@ button.ao-text:hover {
   background: var(--accent, #4ade80);
   color: var(--on-accent, #000);
 }
-
-/* what the assistant did on the computer, and the yes / no question before anything risky */
 .as-chips {
   display: flex;
   flex-wrap: wrap;
@@ -5294,7 +6044,6 @@ button.ao-text:hover {
   background: rgb(var(--fg-rgb) / 0.12);
   color: var(--text-1);
 }
-
 .alias-row {
   display: flex;
   gap: 6px;
@@ -5321,7 +6070,6 @@ button.ao-text:hover {
 .chip.add {
   align-self: flex-start;
 }
-
 .hk {
   display: flex;
   flex-direction: column;
@@ -5332,8 +6080,6 @@ button.ao-text:hover {
 .hk-preset {
   width: 92px;
 }
-
-/* ---------- Astra welcome (beta) ---------- */
 .astra {
   position: absolute;
   inset: 0;
@@ -5624,9 +6370,6 @@ button.ao-text:hover {
   width: 18px;
   background: var(--accent, #4ade80);
 }
-
-/* ---------- study ---------- */
-/* deadlines inside the next few hours */
 .dl-item.u-urgent .dl-left,
 .dl-peek li.u-urgent small {
   color: #f87171;
@@ -5657,8 +6400,6 @@ button.ao-text:hover {
 .dl-start.on {
   opacity: 0.4;
 }
-
-/* what the pill says while studying, in class or close to a deadline */
 .idle-lyric.st-study {
   font-variant-numeric: tabular-nums;
 }
@@ -5668,7 +6409,6 @@ button.ao-text:hover {
 .idle-lyric.st-urgent {
   color: #f87171;
 }
-
 .wk-room-in {
   flex: none;
   width: 64px;
@@ -5680,8 +6420,6 @@ button.ao-text:hover {
   font-weight: 500;
   opacity: 0.55;
 }
-
-/* focus task on the pomodoro tab */
 .pomo-setup {
   gap: 8px;
 }
@@ -5713,8 +6451,6 @@ button.ao-text:hover {
   white-space: nowrap;
   text-align: center;
 }
-
-/* the room field makes the schedule form too wide for one row: the title gets its own line */
 .wk-add {
   flex-wrap: wrap;
 }
@@ -5724,7 +6460,6 @@ button.ao-text:hover {
 .wk-add .wk-room-in {
   flex: 1 1 0;
 }
-/* ---------- the study page ---------- */
 .st {
   display: flex;
   flex-direction: column;
@@ -5771,8 +6506,6 @@ button.ao-text:hover {
 .st-btn.stop:hover:not(:disabled) {
   background: color-mix(in srgb, #f87171 32%, transparent);
 }
-
-/* the session that is running right now */
 .st-live {
   display: flex;
   align-items: center;
@@ -5813,7 +6546,6 @@ button.ao-text:hover {
     transform: scale(0.75);
   }
 }
-
 .st-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5848,7 +6580,6 @@ button.ao-text:hover {
 .st-stats .hot b {
   color: #fb923c;
 }
-
 .st-chart {
   display: flex;
   flex-direction: column;
@@ -5905,7 +6636,6 @@ button.ao-text:hover {
   margin-left: 4px;
   color: var(--accent);
 }
-
 .st-sec h4 {
   display: flex;
   align-items: center;
@@ -5931,8 +6661,6 @@ button.ao-text:hover {
   font-size: 12px;
   font-weight: 600;
 }
-
-/* session length: one segmented control for every room */
 .st-seg {
   display: flex;
   gap: 4px;
@@ -5990,7 +6718,6 @@ button.ao-text:hover {
   width: 3ch;
   flex: none;
 }
-
 .st-ask {
   position: fixed;
   inset: 0;
@@ -6115,7 +6842,6 @@ button.ao-text:hover {
   color: inherit;
   opacity: 0.7;
 }
-
 .st-rooms {
   display: flex;
   flex-direction: column;
@@ -6182,8 +6908,6 @@ button.ao-text:hover {
   font-weight: 650;
   opacity: 0.6;
 }
-
-/* leaderboard */
 .st-share {
   margin-left: auto;
   position: relative;
@@ -6281,8 +7005,6 @@ button.ao-text:hover {
   line-height: 1.4;
   opacity: 0.5;
 }
-
-/* ---------- chat with Astra ---------- */
 .astra-chat {
   gap: 10px;
 }
@@ -6337,7 +7059,6 @@ button.ao-text:hover {
   gap: 12px;
   padding: 2px 2px 4px;
 }
-/* Astra's replies sit on the page as plain text; only your own messages get a bubble */
 .astra-chat .msg {
   max-width: 88%;
   padding: 0;
@@ -6430,7 +7151,6 @@ button.ao-text:hover {
 .astra-hints .chip:hover {
   background: rgb(var(--fg-rgb) / 0.08);
 }
-/* one rounded field with the send button inside it */
 .astra-compose {
   align-items: flex-end;
   gap: 6px;
@@ -6479,8 +7199,6 @@ button.ao-text:hover {
   opacity: 0.25;
   cursor: default;
 }
-
-/* ---------- settings, as a window: a sidebar of entries and a pane, like the system settings of a Mac ---------- */
 .set-open {
   flex: none;
   align-self: flex-start;
@@ -6604,8 +7322,6 @@ button.ao-text:hover {
   padding: 2px 16px;
   border-radius: 14px;
 }
-
-/* Settings: the outfit picker, one row per slot with a live preview on every tile */
 .outfit {
   display: flex;
   flex-direction: column;
@@ -6658,7 +7374,6 @@ button.ao-text:hover {
   font-size: 12px;
   color: var(--text-2);
 }
-
 .rename-btn {
   display: inline-grid;
   place-items: center;
@@ -6673,7 +7388,6 @@ button.ao-text:hover {
   opacity: 1;
   background: rgba(255, 255, 255, 0.1);
 }
-
 .rename-pop {
   width: min(300px, 86%);
   display: flex;
@@ -6713,7 +7427,6 @@ button.ao-text:hover {
   backdrop-filter: blur(22px) saturate(170%);
   color: #fff;
 }
-
 .avatar-pop {
   width: min(340px, 92%);
 }
@@ -6772,8 +7485,6 @@ button.ao-text:hover {
 .root.light .ap-tile:hover {
   background: rgb(0 0 0 / 0.11);
 }
-
-/* the microphone meter: bars that follow the pitch of your voice, centred on the right of the card */
 .assistant {
   position: relative;
 }

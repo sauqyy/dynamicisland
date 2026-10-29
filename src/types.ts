@@ -8,10 +8,13 @@ export type Tab =
   | 'todo'
   | 'notes'
   | 'prompter'
-  | 'deadlines'
+  | 'deadlist'
   | 'schedule'
   | 'study'
   | 'clipboard'
+  | 'deadlines'
+  | 'classes'
+  | 'inbox'
   | 'shelf'
   | 'apps'
   | 'friends'
@@ -19,36 +22,43 @@ export type Tab =
   | 'profile'
   | 'settings'
 
-export const PAGES: { id: Tab; title: string }[] = [
-  { id: 'astra', title: 'Chat with Astra' },
-  { id: 'media', title: 'Now Playing' },
-  { id: 'weather', title: 'Weather' },
-  { id: 'timer', title: 'Timer' },
-  { id: 'todo', title: 'To-do' },
-  { id: 'notes', title: 'Notes' },
-  { id: 'prompter', title: 'Prompter' },
-  { id: 'deadlines', title: 'Deadlines' },
-  { id: 'schedule', title: 'Schedule' },
-  { id: 'study', title: 'Study' },
-  { id: 'clipboard', title: 'Clipboard' },
-  { id: 'shelf', title: 'Shelf' },
-  { id: 'apps', title: 'Apps' },
-  { id: 'friends', title: 'Friends' },
-  { id: 'groups', title: 'Groups' },
-  { id: 'profile', title: 'Profile' },
-  { id: 'settings', title: 'Settings' },
-]
-
 /** Pages are grouped so the card has 5 places to go instead of 11 pages in a row. */
 export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[] = [
   { id: 'astra', title: 'Astra', icon: '✨', pages: ['astra'] },
   { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
   { id: 'tools', title: 'Tools', icon: '🛠️', pages: ['todo', 'notes', 'prompter'] },
-  { id: 'plan', title: 'Plan', icon: '📅', pages: ['deadlines', 'schedule', 'study'] },
+  { id: 'plan', title: 'Plan', icon: '📅', pages: ['deadlist', 'schedule', 'study'] },
+  { id: 'campus', title: 'Campus', icon: '🎓', pages: ['deadlines', 'classes', 'inbox'] },
   { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps', 'clipboard'] },
   { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'groups', 'profile'] },
   { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
 ]
+
+const TITLES: Record<Tab, string> = {
+  astra: 'Chat with Astra',
+  media: 'Now Playing',
+  weather: 'Weather',
+  timer: 'Timer',
+  todo: 'To-do',
+  notes: 'Notes',
+  prompter: 'Prompter',
+  deadlist: 'Deadlines',
+  schedule: 'Schedule',
+  study: 'Study',
+  clipboard: 'Clipboard',
+  deadlines: 'SCELE Deadlines',
+  classes: 'SCELE Classes',
+  inbox: 'SCELE Inbox',
+  shelf: 'Shelf',
+  apps: 'Apps',
+  friends: 'Friends',
+  groups: 'Groups',
+  profile: 'Profile',
+  settings: 'Settings',
+}
+
+/** Every page, in the order the bar shows them, which is also the order the arrow keys step through. */
+export const PAGES: { id: Tab; title: string }[] = GROUPS.flatMap((g) => g.pages).map((id) => ({ id, title: TITLES[id] }))
 
 /** Short names for the tabs inside a group. */
 export const SHORT: Record<Tab, string> = {
@@ -59,10 +69,13 @@ export const SHORT: Record<Tab, string> = {
   todo: 'To-do',
   notes: 'Notes',
   prompter: 'Prompter',
-  deadlines: 'Deadlines',
+  deadlist: 'Deadlines',
   schedule: 'Schedule',
   study: 'Study',
   clipboard: 'Clipboard',
+  deadlines: 'Due',
+  classes: 'Classes',
+  inbox: 'Inbox',
   shelf: 'Shelf',
   apps: 'Apps',
   friends: 'Friends',
@@ -99,7 +112,7 @@ export interface IslandAlert {
   chatWith?: string
   /** a new song started: drawn with the current track's art, opens Playing when clicked */
   nowPlaying?: boolean
-  /** clicking the alert opens this page */
+  /** clicking the alert opens the card on this page */
   openTab?: Tab
 }
 
