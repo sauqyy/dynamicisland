@@ -11,6 +11,13 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.8.2',
+    title: 'Back in your Start menu',
+    items: [
+      'Astra Isle is findable from Windows Search and the Start menu again. Updating from an older version could drop its shortcut; the update now puts it back.',
+    ],
+  },
+  {
     version: '0.8.1',
     title: 'Meet Astra',
     items: [
