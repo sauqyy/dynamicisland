@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Dynamic Island",
-  "version": "0.7.5",
+  "productName": "Astra Isle",
+  "version": "0.8.1",
   "identifier": "com.dynamicisland.app",
   "build": {
     "frontendDist": "../dist",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Dynamic Island",
+        "title": "Astra Isle",
         "width": 520,
         "height": 340,
         "x": 0,
@@ -67,6 +67,6 @@
     "macOS": {
       "minimumSystemVersion": "11.0"
     },
-    "publisher": "Dynamic Island"
+    "publisher": "Astra Isle"
   }
 }

@@ -7,6 +7,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.8.1',
+    title: 'Meet Astra',
+    items: [
+      'Meet Astra (beta), a little voice assistant. Say what you need and she opens apps, controls music and volume, starts timers, searches the web and answers questions. She is off until you choose to use her.',
+      'Lyrics now show for songs playing in Apple Music on Windows.',
+      "Click someone's picture to open their profile, and click it again to see it full size. New profile photos are saved sharper.",
+    ],
+  },
+  {
     version: '0.7.5',
     title: 'Back to the general build',
     items: [
