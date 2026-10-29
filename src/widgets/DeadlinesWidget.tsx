@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { play } from 'cuelume'
 import { CalendarClock, Check, Play } from 'lucide-react'
-import { dueLabel, toInputValue, urgency, type Deadline } from '../lib/deadlines'
+import { dueLabel, urgency, type Deadline } from '../lib/deadlines'
+import { DuePicker } from './DuePicker'
 
 interface Props {
   deadlines: Deadline[]
@@ -14,31 +15,25 @@ interface Props {
   studyingId?: number
 }
 
-/** Things with a date on them. The nearest open one can be shown in the pill (Settings → Pill). */
-export function DeadlinesWidget({ deadlines, setDeadlines, now, onStart, studyingId }: Props) {
+/** The form for adding a deadline: what, and when (tomorrow night until you pick something else). */
+export function AddDeadline({ onAdd }: { onAdd: (title: string, due: number) => void }) {
   const [title, setTitle] = useState('')
-  // tomorrow at 09:00 until you pick something else
-  const [when, setWhen] = useState(() => {
+  const [due, setDue] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 1)
-    d.setHours(9, 0, 0, 0)
-    return toInputValue(d.getTime())
+    return d.setHours(23, 59, 0, 0)
   })
 
   const add = () => {
     const text = title.trim()
-    const due = new Date(when).getTime()
-    if (!text || Number.isNaN(due)) return
+    if (!text) return
     play('tap')
-    setDeadlines([...deadlines, { id: Date.now(), title: text, due, done: false }])
+    onAdd(text, due)
     setTitle('')
   }
 
-  // open ones by date, finished ones sink to the bottom
-  const sorted = [...deadlines].sort((a, b) => Number(a.done) - Number(b.done) || a.due - b.due)
-
   return (
-    <div className="dl" onClick={(e) => e.stopPropagation()}>
+    <div className="dl-add-form">
       <div className="dl-add">
         <input
           className="todo-input"
@@ -51,21 +46,25 @@ export function DeadlinesWidget({ deadlines, setDeadlines, now, onStart, studyin
             if (e.key === 'Enter') add()
           }}
         />
-        <input
-          className="todo-input dl-when"
-          type="datetime-local"
-          value={when}
-          aria-label="Due date and time"
-          onChange={(e) => setWhen(e.target.value)}
-          onKeyDown={(e) => {
-            e.stopPropagation()
-            if (e.key === 'Enter') add()
-          }}
-        />
         <button className="pill-btn dl-go" data-cuelume-tap onClick={add} disabled={!title.trim()}>
           Add
         </button>
       </div>
+      {/* a deadline always has a date: the picker can change it but not take it off */}
+      <DuePicker value={due} onChange={(d) => d !== undefined && setDue(d)} optional={false} />
+    </div>
+  )
+}
+
+/** Things with a date on them. The nearest open one can be shown in the pill (Settings → Pill). */
+export function DeadlinesWidget({ deadlines, setDeadlines, now, onStart, studyingId }: Props) {
+
+  // open ones by date, finished ones sink to the bottom
+  const sorted = [...deadlines].sort((a, b) => Number(a.done) - Number(b.done) || a.due - b.due)
+
+  return (
+    <div className="dl" onClick={(e) => e.stopPropagation()}>
+      <AddDeadline onAdd={(title, due) => setDeadlines([...deadlines, { id: Date.now(), title, due, done: false }])} />
       <ul className="dl-list">
         <AnimatePresence initial={false}>
           {sorted.map((d) => (
