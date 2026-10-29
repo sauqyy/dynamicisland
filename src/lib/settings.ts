@@ -67,6 +67,8 @@ export interface Settings {
   /** island offset from its default spot (centre top), in px */
   posX: number
   posY: number
+  /** docked on the taskbar at the bottom of the screen, growing upwards (posY is then unused) */
+  posBottom: boolean
   /** city for the weather page */
   city: string
   /** exact spot picked from the search suggestions */
@@ -133,6 +135,7 @@ const DEFAULTS: Settings = {
   clipSkipSecrets: true,
   posX: 0,
   posY: 0,
+  posBottom: false,
   city: '',
   cityLat: null,
   cityLon: null,
