@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Maximize2, Palette, Mic, ShieldCheck, SlidersHorizontal, LayoutGrid, Volume2, type LucideIcon } from 'lucide-react'
+import { type ComponentType, createContext, useContext, useEffect, useRef, useState } from 'react'
+import { ChevronLeft, Maximize2, Palette, ShieldCheck, SlidersHorizontal, LayoutGrid, Volume2 } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { AstraStar } from './AstraStar'
 import { AnimatePresence, motion } from 'motion/react'
 import { PAGE_VARIANTS } from '../lib/pageAnim'
 import { ColorPicker } from './ColorPicker'
@@ -36,11 +37,11 @@ interface Props {
 }
 
 /** The sidebar of the full-screen settings, and which titled card belongs to which entry. */
-const SYS_CATS: { id: string; label: string; color: string; Icon: LucideIcon; titles: string[] }[] = [
+const SYS_CATS: { id: string; label: string; color: string; Icon: ComponentType<{ size?: number | string; strokeWidth?: number | string }>; titles: string[] }[] = [
   { id: 'general', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Updates'] },
   { id: 'appearance', label: 'Appearance', color: '#0a84ff', Icon: Palette, titles: ['Appearance', 'Pill', 'Motion'] },
   { id: 'sound', label: 'Sound', color: '#ff453a', Icon: Volume2, titles: ['Sound'] },
-  { id: 'astra', label: 'Astra', color: '#bf5af2', Icon: Mic, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
+  { id: 'astra', label: 'Astra', color: '#bf5af2', Icon: AstraStar, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
   { id: 'pages', label: 'Pages', color: '#ff9f0a', Icon: LayoutGrid, titles: ['Pages'] },
   { id: 'privacy', label: 'Study & privacy', color: '#30d158', Icon: ShieldCheck, titles: ['Study', 'Clipboard privacy'] },
 ]

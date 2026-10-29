@@ -1,7 +1,9 @@
-import { House, CalendarClock, Mic, FolderOpen, ListChecks, Settings2, Users, type LucideIcon } from 'lucide-react'
+import type { ComponentType } from 'react'
+import { House, CalendarClock, FolderOpen, ListChecks, Settings2, Users } from 'lucide-react'
+import { AstraStar } from './AstraStar'
 
-const ICONS: Record<string, LucideIcon> = {
-  astra: Mic,
+const ICONS: Record<string, ComponentType<{ size?: number | string; strokeWidth?: number | string }>> = {
+  astra: AstraStar,
   home: House,
   tools: ListChecks,
   plan: CalendarClock,
