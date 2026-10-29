@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Maximize2, Palette, Sparkles, ShieldCheck, SlidersHorizontal, LayoutGrid, Volume2, type LucideIcon } from 'lucide-react'
+import { ChevronLeft, Maximize2, Palette, Mic, ShieldCheck, SlidersHorizontal, LayoutGrid, Volume2, type LucideIcon } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { PAGE_VARIANTS } from '../lib/pageAnim'
@@ -40,7 +40,7 @@ const SYS_CATS: { id: string; label: string; color: string; Icon: LucideIcon; ti
   { id: 'general', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Updates'] },
   { id: 'appearance', label: 'Appearance', color: '#0a84ff', Icon: Palette, titles: ['Appearance', 'Pill', 'Motion'] },
   { id: 'sound', label: 'Sound', color: '#ff453a', Icon: Volume2, titles: ['Sound'] },
-  { id: 'astra', label: 'Astra', color: '#bf5af2', Icon: Sparkles, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
+  { id: 'astra', label: 'Astra', color: '#bf5af2', Icon: Mic, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
   { id: 'pages', label: 'Pages', color: '#ff9f0a', Icon: LayoutGrid, titles: ['Pages'] },
   { id: 'privacy', label: 'Study & privacy', color: '#30d158', Icon: ShieldCheck, titles: ['Study', 'Clipboard privacy'] },
 ]
