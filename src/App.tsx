@@ -314,7 +314,7 @@ export default function App() {
   // what is still due before midnight, for the badge on the pill
   const dueToday = useMemo(() => {
     const midnight = new Date(now).setHours(24, 0, 0, 0)
-    return scele.deadlines.filter((d) => d.due > now && d.due < midnight).length
+    return scele.deadlines.filter((d) => d.due > now && d.due < midnight && d.submission !== 'submitted').length
   }, [scele.deadlines, now])
   const sceleUnread = scele.notices.some((n) => !n.read)
 

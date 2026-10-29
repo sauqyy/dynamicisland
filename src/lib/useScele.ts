@@ -12,16 +12,21 @@ import {
   docCandidates,
   fetchContents,
   fetchCourses,
+  fetchAssignments,
   fetchDeadlines,
+  fetchGrades,
   fetchMyGroups,
   fetchMyRoles,
   fetchNotices,
+  fetchSubmission,
+  fetchUpdates,
   introText,
   isTeachingRole,
   materials,
   meetingOn,
   readDoc,
   relTime,
+  SCELE_URL,
   sceleAccount,
   sceleLogin,
   sceleLogout,
@@ -30,15 +35,18 @@ import {
   termStartEstimate,
   termWindow,
   topicFor,
+  type Assign,
   type ClassSlot,
   type Course,
   type Deadline,
   type Detected,
   type DocRef,
+  type Grade,
   type Notice,
   type SceleAccount,
   type SceleModule,
   type Section,
+  type Submission,
   WEEK_SECTION,
 } from './scele'
 import { coverage } from './coverage'
@@ -99,6 +107,17 @@ interface Cache {
   docs: Record<string, DocResult>
   fresh: Fresh[]
   syncedAt: number
+  /** per course: when SCELE was last asked what changed on its page (or the page read), and when the page was last read whole */
+  checked: Record<number, number>
+  readAt: Record<number, number>
+  /** this term's assignments, and when they were listed */
+  assigns: Assign[]
+  assignsAt: number
+  /** the user's submission per assignment id, with when it was looked up */
+  subs: Record<number, { state: Submission; graded: boolean; at: number }>
+  /** the user's graded items per course, and when each course's were read */
+  grades: Record<number, Grade[]>
+  gradesAt: Record<number, number>
 }
 
 /** The user's say over the class times found on course pages. */
@@ -155,7 +174,24 @@ export interface Meeting {
   materials: SceleModule[]
 }
 
-const EMPTY: Cache = { courses: [], deadlines: [], notices: [], contents: {}, groups: {}, roles: {}, docs: {}, fresh: [], syncedAt: 0 }
+const EMPTY: Cache = {
+  courses: [],
+  deadlines: [],
+  notices: [],
+  contents: {},
+  groups: {},
+  roles: {},
+  docs: {},
+  fresh: [],
+  syncedAt: 0,
+  checked: {},
+  readAt: {},
+  assigns: [],
+  assignsAt: 0,
+  subs: {},
+  grades: {},
+  gradesAt: {},
+}
 const NO_PREFS: Prefs = { choice: {}, primary: {}, dismissed: [], teaching: {}, hidden: [] }
 // the cache's shape changed with timelines (0.7.4); the old one is dropped and read afresh
 const CACHE_KEY = 'di.scele.2'
@@ -167,9 +203,21 @@ const LEAD_KEY = 'di.scele.lead'
 /** what has been seen or alerted already, so a restart does not repeat it */
 const SEEN_KEY = 'di.scele.seen'
 
-/** Deadlines and notifications are checked this often, day and night; course pages every PAGES_MS. */
+/**
+ * Deadlines, notifications and what changed on this term's course pages are checked this often,
+ * day and night; past terms' pages every PAGES_MS. A page is read only when SCELE reports a change
+ * on it, or whole every FULL_MS for what that report leaves out (section text, removed activities).
+ */
 const SYNC_MS = 10 * 60_000
 const PAGES_MS = 30 * 60_000
+const FULL_MS = 6 * 3600_000
+/** A submission or grade report SCELE hasn't reported a change to is looked up again after this long anyway. */
+const STATUS_MS = 30 * 60_000
+const GRADES_MS = 6 * 3600_000
+/** What changed on a page counts from a little before the last check, so nothing falls between two. */
+const OVERLAP_MS = 60_000
+/** Changes SCELE reports that leave the page as it was: someone's grade, a submission, forum posts. Anything else is read. */
+const NOT_ON_PAGE = new Set(['gradeitems', 'grades', 'submissions', 'outcomes', 'completion', 'comments', 'ratings', 'tags', 'discussions', 'attempts', 'entries', 'responses'])
 /** Back from sleep, back online or opened again: data older than this is read again at once. */
 const STALE_MS = 2 * 60_000
 /** After a failed sync (offline, SCELE down), the next try. */
@@ -177,7 +225,10 @@ const RETRY_MS = 2 * 60_000
 /** Course pages read at once: enough to overlap SCELE's slow answers, few enough to go easy on it. */
 const PARALLEL = 4
 /** Deadline heads-ups, tightest last. */
-const DUE_STEPS = [24, 3, 1].map((h) => h * 3600_000)
+const DUE_HOURS = [72, 48, 24, 12, 6, 3, 1]
+const DUE_STEPS = DUE_HOURS.map((h) => h * 3600_000)
+/** From this step on (6 h and closer) a heads-up sounds urgent. */
+const DUE_URGENT = DUE_HOURS.indexOf(6)
 const DAY_MS = 86_400_000
 /** A linked Google document is read again after this long; files only when they change. */
 const LINK_TTL = 6 * 3600_000
@@ -465,12 +516,13 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   }, [enabled, signedOut])
 
   const sync = useCallback(
-    async (acc: SceleAccount, withContents: boolean) => {
+    /** `withContents`: past terms' pages too, with progress shown; `force`: read every page whole (Sync pressed) */
+    async (acc: SceleAccount, withContents: boolean, force = false) => {
       if (busy.current) return
       busy.current = true
       setSyncing(true)
       try {
-        const [courses, deadlines, notices] = await Promise.all([fetchCourses(acc.userid), fetchDeadlines(), fetchNotices(acc.userid)])
+        const [courses, actions, notices] = await Promise.all([fetchCourses(acc.userid), fetchDeadlines(), fetchNotices(acc.userid)])
         const s = seen.current
 
         // notifications newer than the last one shown; the very first sync only takes note of them
@@ -482,33 +534,59 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
         }
         s.notice = Math.max(s.notice, newest)
 
-        let contents: Record<number, Section[]> | null = null
+        const prev = dataRef.current
+        const started = Date.now()
+        const contents: Record<number, Section[]> = {}
+        const checked: Record<number, number> = {}
+        const readAt: Record<number, number> = {}
+        /** what SCELE reported changed, per course: activity id → what about it */
+        const changes: Record<number, Record<number, string[]>> = {}
         const groups: Record<number, string[]> = {}
         const roles: Record<number, string[]> = {}
         const docs: Record<string, DocResult> = {}
         const added: Fresh[] = []
-        if (withContents) {
-          const pages: Record<number, Section[]> = (contents = {})
-          const thisTerm = new Set(currentTerm(courses).current.map((c) => c.id))
+        const thisTerm = new Set(currentTerm(courses).current.map((c) => c.id))
+        {
           let spent = 0
           let done = 0
-          setProgress({ done, total: thisTerm.size })
-          // this term's courses first, a few at a time: SCELE answers each slowly, so overlapping
-          // them is what makes a sync quick
-          const order = [...courses].sort((a, b) => Number(thisTerm.has(b.id)) - Number(thisTerm.has(a.id)))
+          if (withContents) setProgress({ done, total: thisTerm.size })
+          const step = () => withContents && setProgress({ done: ++done, total: thisTerm.size })
+          // this term's courses every sync, past terms' with the pages round; this term's first,
+          // a few at a time: SCELE answers each slowly, so overlapping them is what makes a sync quick
+          const order = courses.filter((c) => thisTerm.has(c.id) || withContents).sort((a, b) => Number(thisTerm.has(b.id)) - Number(thisTerm.has(a.id)))
           await inParallel(order, PARALLEL, async (c) => {
-            const secs = await fetchContents(c.id).catch((e) => {
-              if (e === 'signed-out') throw e
-              return null
-            })
+            const page = prev.contents[c.id]
+            // a page read a while ago is only read again when SCELE says something on it changed
+            let whole = force || !page || started - (prev.readAt[c.id] ?? 0) >= FULL_MS
+            if (!whole) {
+              const upd = await fetchUpdates(c.id, (prev.checked[c.id] ?? 0) - OVERLAP_MS).catch((e) => {
+                if (e === 'signed-out') throw e
+                return null
+              })
+              if (upd) {
+                changes[c.id] = upd
+                checked[c.id] = started
+              }
+              whole = !upd || Object.values(upd).some((u) => u.some((name) => !NOT_ON_PAGE.has(name)))
+            }
+            let secs = page
+            if (whole) {
+              const got = await fetchContents(c.id).catch((e) => {
+                if (e === 'signed-out') throw e
+                return null
+              })
+              if (got) {
+                secs = contents[c.id] = got
+                checked[c.id] = readAt[c.id] = started
+              } else delete checked[c.id]
+            }
             if (!secs) {
-              if (thisTerm.has(c.id)) setProgress({ done: ++done, total: thisTerm.size })
+              if (thisTerm.has(c.id)) step()
               return
             }
-            pages[c.id] = secs
             // labels are page text, not materials: they are neither counted nor announced
             const known = s.modules[c.id]
-            if (known) {
+            if (contents[c.id] && known) {
               const had = new Set(known)
               for (const m of materials(secs)) {
                 if (!had.has(m.id)) added.push({ key: `${c.id}:${m.id}`, courseId: c.id, course: c.short, name: m.name, url: m.url, at: Date.now() })
@@ -548,27 +626,126 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
             }
             // several parallel classes listed and none chosen: the user's SCELE group may say which
             const listed = onPage.length > 1 || mine.some((d) => d.slots.length > 1)
-            if (haveTimes && listed && prefsRef.current.choice[c.id] === undefined) {
+            if (haveTimes && listed && prefsRef.current.choice[c.id] === undefined && (contents[c.id] || prev.groups[c.id] === undefined)) {
               groups[c.id] = await fetchMyGroups(c.id, acc.userid).catch(() => [])
             }
             if (role) roles[c.id] = await role
-            setProgress({ done: ++done, total: thisTerm.size })
+            step()
           })
           if (added.length === 1) alertRef.current({ icon: '📄', text: `New in ${added[0].course}`, sub: added[0].name.slice(0, 48), openTab: 'inbox' }, 'ready')
           else if (added.length > 1) alertRef.current({ icon: '📄', text: `${added.length} new materials`, sub: [...new Set(added.map((a) => a.course))].join(', '), openTab: 'inbox' }, 'ready')
         }
+
+        // what SCELE reported about an activity, and whether any of it is about grades
+        const touched = (cmid: number) => Object.values(changes).some((u) => u[cmid])
+        const gradedIn = (courseId: number) => Object.values(changes[courseId] ?? {}).some((u) => u.includes('gradeitems') || u.includes('grades'))
+        const term = courses.filter((c) => thisTerm.has(c.id))
+
+        // this term's assignments, listed again when anything on a page changed: the action events
+        // drop an assignment once it's handed in, so this is what still knows about it
+        const anyChange = Object.values(changes).some((u) => Object.keys(u).length > 0) || Object.keys(contents).length > 0
+        const relist = force || withContents || !prev.assignsAt || anyChange
+        const assigns = relist ? await fetchAssignments(term.map((c) => c.id)).catch((e) => (e === 'signed-out' ? Promise.reject(e) : prev.assigns)) : prev.assigns
+        const assignsAt = relist ? started : prev.assignsAt
+
+        // the user's submission to each assignment due in the next two weeks: looked up when SCELE
+        // reports a change to it, when it leaves or joins the action events (handed in, reopened),
+        // and otherwise every STATUS_MS
+        const actionable = new Set(actions.filter((d) => d.module === 'assign' && d.instance).map((d) => d.instance!))
+        const due = assigns.filter((a) => actionable.has(a.id) || (a.due >= started - 3600_000 && a.due <= started + 14 * DAY_MS))
+        const subs: Cache['subs'] = {}
+        await inParallel(due, PARALLEL, async (a) => {
+          const old = prev.subs[a.id]
+          const moved = old && old.state !== 'offline' && (old.state === 'submitted') === actionable.has(a.id)
+          if (old && !force && !moved && !touched(a.cmid) && started - old.at < STATUS_MS) {
+            subs[a.id] = old
+            return
+          }
+          const got = await fetchSubmission(a.id).catch((e) => {
+            if (e === 'signed-out') throw e
+            return null
+          })
+          if (got) subs[a.id] = { ...got, at: started }
+          else if (old) subs[a.id] = old
+        })
+        // handed in since the last look (not just found handed in the first time it's looked up): well done
+        const handedIn = due.filter((a) => subs[a.id]?.state === 'submitted' && prev.subs[a.id] && prev.subs[a.id].state !== 'submitted')
+        if (handedIn.length === 1) {
+          const a = handedIn[0]
+          const left = a.due - started
+          const ahead = relTime(a.due, started).replace(/^in /, '')
+          const sub = left <= 0 ? 'Submitted. Reminders for it are off.' : left >= DAY_MS ? `Submitted ${ahead} early. Well done.` : `Submitted with ${ahead} to spare. Well done.`
+          alertRef.current({ icon: '✅', text: a.name.slice(0, 40), sub, openTab: 'deadlines' }, 'success')
+        } else if (handedIn.length > 1) {
+          alertRef.current({ icon: '✅', text: `${handedIn.length} assignments submitted`, sub: 'Well done. Reminders for them are off.', openTab: 'deadlines' }, 'success')
+        }
+
+        const short = new Map(courses.map((c) => [c.id, c.short]))
+        const deadlines: Deadline[] = actions.map((d) => {
+          const sub = d.instance && d.module === 'assign' ? subs[d.instance] : undefined
+          return sub ? { ...d, submission: sub.state, graded: sub.graded } : d
+        })
+        // handed in, so no longer an action event, but still due: kept on the list as done
+        for (const a of due) {
+          const sub = subs[a.id]
+          if (actionable.has(a.id) || sub?.state !== 'submitted' || a.due < started) continue
+          deadlines.push({
+            id: -a.cmid,
+            name: a.name,
+            courseId: a.courseId,
+            course: short.get(a.courseId) ?? '',
+            due: a.due,
+            url: `${SCELE_URL}/mod/assign/view.php?id=${a.cmid}`,
+            module: 'assign',
+            overdue: false,
+            instance: a.id,
+            submission: 'submitted',
+            graded: sub.graded,
+          })
+        }
+
+        // grades: read for a course when SCELE reports a grade changed in it, else every GRADES_MS
+        const grades: Cache['grades'] = {}
+        const gradesAt: Cache['gradesAt'] = {}
+        await inParallel(term, PARALLEL, async (c) => {
+          if (prev.grades[c.id] && !force && !gradedIn(c.id) && started - (prev.gradesAt[c.id] ?? 0) < GRADES_MS) return
+          const got = await fetchGrades(c.id, acc.userid).catch((e) => {
+            if (e === 'signed-out') throw e
+            return null
+          })
+          if (!got) return
+          grades[c.id] = got
+          gradesAt[c.id] = started
+        })
+        // a grade new since the last read of that course; the first read only takes note. The
+        // alert never says the grade itself: the island can be on a shared or projected screen
+        const newGrades = Object.entries(grades).flatMap(([id, list]) => {
+          const was = prev.grades[Number(id)]
+          if (!was) return []
+          return list.filter((g) => !was.some((w) => w.id === g.id && w.value === g.value && w.at === g.at)).map((g) => ({ g, course: short.get(g.courseId) ?? '' }))
+        })
+        if (newGrades.length === 1) alertRef.current({ icon: '🏅', text: `New grade in ${newGrades[0].course}`, sub: `${newGrades[0].g.name} · open Due to see it`.slice(0, 48), openTab: 'deadlines' }, 'ready')
+        else if (newGrades.length > 1) alertRef.current({ icon: '🏅', text: `${newGrades.length} new grades`, sub: [...new Set(newGrades.map((n) => n.course))].join(', '), openTab: 'deadlines' }, 'ready')
+
         write(SEEN_KEY, s)
         setData((d) => ({
           courses,
           deadlines,
           notices,
-          contents: contents ? { ...d.contents, ...contents } : d.contents,
+          contents: { ...d.contents, ...contents },
           groups: { ...d.groups, ...groups },
           roles: { ...d.roles, ...roles },
-          // only the documents still on the course pages are kept
-          docs: contents ? docs : d.docs,
+          // only the documents still on this term's course pages are kept
+          docs,
           fresh: [...added, ...d.fresh].slice(0, 20),
           syncedAt: Date.now(),
+          checked: { ...d.checked, ...checked },
+          readAt: { ...d.readAt, ...readAt },
+          assigns,
+          assignsAt,
+          subs,
+          grades: { ...d.grades, ...grades },
+          gradesAt: { ...d.gradesAt, ...gradesAt },
         }))
         setError(null)
         syncAt.current = Date.now()
@@ -726,14 +903,16 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
 
       for (const d of data.deadlines) {
         const left = d.due - now
-        if (left <= 0) continue
+        // handed in: nothing left to remind about
+        if (left <= 0 || d.submission === 'submitted') continue
         // only the tightest step reached: opening the laptop 2h before is one alert, not three
         const i = DUE_STEPS.findLastIndex((t) => left <= t)
         if (i < 0) continue
-        const key = `due:${d.id}:${i}`
+        const key = `due:${d.id}:${DUE_HOURS[i]}h`
         if (!s.fired[key]) {
-          DUE_STEPS.slice(0, i + 1).forEach((_, j) => fire(`due:${d.id}:${j}`))
-          alertRef.current({ icon: '📅', text: `${d.course}: ${d.name}`.slice(0, 40), sub: `Due ${relTime(d.due, now)}`, openTab: 'deadlines' }, i >= 1 ? 'attention' : 'ready')
+          DUE_HOURS.slice(0, i + 1).forEach((h) => fire(`due:${d.id}:${h}h`))
+          const state = d.submission === 'draft' ? ' · still a draft' : d.submission === 'reopened' ? ' · reopened' : ''
+          alertRef.current({ icon: '📅', text: `${d.course}: ${d.name}`.slice(0, 40), sub: `Due ${relTime(d.due, now)}${state}`, openTab: 'deadlines' }, i >= DUE_URGENT ? 'attention' : 'ready')
         }
       }
 
@@ -783,7 +962,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   }, [signedOut])
 
   const refresh = useCallback(() => {
-    if (account) sync(account, true)
+    if (account) sync(account, true, true)
   }, [account, sync])
 
   const addSlot = useCallback((s: Omit<ClassSlot, 'id'>) => {
