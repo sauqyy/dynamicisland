@@ -34,6 +34,41 @@ fn agent() -> &'static ureq::Agent {
     AGENT.get_or_init(|| ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(15)).build())
 }
 
+/// The agent for every request that carries the SCELE token or the password. It follows no
+/// redirects, so neither can be carried along to another address than scele.cs.ui.ac.id.
+fn private_agent() -> &'static ureq::Agent {
+    static AGENT: std::sync::OnceLock<ureq::Agent> = std::sync::OnceLock::new();
+    AGENT.get_or_init(|| ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(15)).redirects(0).build())
+}
+
+/// Where the SCELE token is kept: the system's credential store (Windows Credential Manager, the
+/// macOS Keychain), which other programs and a copied folder can't read, rather than a file.
+const VAULT_SERVICE: &str = "com.dynamicisland.ui.scele";
+const VAULT_USER: &str = "token";
+
+fn vault() -> Option<keyring::Entry> {
+    keyring::Entry::new(VAULT_SERVICE, VAULT_USER).ok()
+}
+
+/// The saved token. One still in scele.json from before it moved to the credential store is moved
+/// there, and taken out of the file, the first time it's needed.
+fn token(app: &AppHandle) -> Option<String> {
+    if let Some(mut saved) = load(app) {
+        if let Some(t) = saved.get("token").and_then(Value::as_str).map(str::to_string) {
+            if vault().is_some_and(|v| v.set_password(&t).is_ok()) {
+                if let Some(o) = saved.as_object_mut() {
+                    o.remove("token");
+                }
+                if let Ok(p) = token_path(app) {
+                    let _ = std::fs::write(p, saved.to_string());
+                }
+            }
+            return Some(t);
+        }
+    }
+    vault()?.get_password().ok().filter(|t| !t.is_empty())
+}
+
 /// Largest course file read for the class schedule (a syllabus is far smaller).
 const FILE_LIMIT: u64 = 20 * 1024 * 1024;
 
@@ -52,17 +87,20 @@ pub async fn scele_file(app: AppHandle, url: String) -> Result<String, String> {
         if !crate::sso::saved(&app).is_some_and(|s| s.fasilkom) {
             return Err("signed-out".to_string());
         }
-        let saved = load(&app).ok_or_else(|| "signed-out".to_string())?;
-        let token = saved.get("token").and_then(Value::as_str).ok_or_else(|| "signed-out".to_string())?;
+        let token = token(&app).ok_or_else(|| "signed-out".to_string())?;
         // the web-service file endpoint takes the token instead of a browser session
         let (path, query) = path.split_once('?').unwrap_or((path.as_str(), ""));
-        let mut req = agent().get(&format!("{BASE}/webservice/pluginfile.php/{path}")).timeout(std::time::Duration::from_secs(30));
+        let mut req = private_agent().get(&format!("{BASE}/webservice/pluginfile.php/{path}")).timeout(std::time::Duration::from_secs(30));
         for (k, v) in query.split('&').filter_map(|kv| kv.split_once('=')) {
             if k != "token" {
                 req = req.query(k, v);
             }
         }
-        let resp = req.query("token", token).call().map_err(|_| "SCELE file unavailable".to_string())?;
+        let resp = req.query("token", &token).call().map_err(|_| "SCELE file unavailable".to_string())?;
+        // a redirect isn't followed (it could carry the token elsewhere): it's no file
+        if resp.status() != 200 {
+            return Err("SCELE file unavailable".to_string());
+        }
         let mut bytes = Vec::new();
         resp.into_reader().take(FILE_LIMIT).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
         Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
@@ -194,7 +232,7 @@ fn flatten(prefix: &str, v: &Value, out: &mut Vec<(String, String)>) {
 
 fn post_form(url: &str, fields: &[(String, String)]) -> Result<Value, String> {
     let pairs: Vec<(&str, &str)> = fields.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    let resp = agent()
+    let resp = private_agent()
         .post(url)
         .timeout(std::time::Duration::from_secs(20))
         .send_form(&pairs)
@@ -229,6 +267,9 @@ pub fn forget_token(app: &AppHandle) {
     if let Ok(p) = token_path(app) {
         let _ = std::fs::remove_file(p);
     }
+    if let Some(v) = vault() {
+        let _ = v.delete_credential();
+    }
 }
 
 /// Connects the SSO-verified student's SCELE account; only the resulting token is saved.
@@ -238,16 +279,24 @@ pub fn forget_token(app: &AppHandle) {
 /// e-learning, so the same account having courses there is the proof.
 #[tauri::command]
 pub async fn scele_login(app: AppHandle, password: String) -> Result<SceleAccount, String> {
+    use zeroize::Zeroize;
     tauri::async_runtime::spawn_blocking(move || {
-        let mut student = crate::sso::saved(&app)
-            .filter(|s| s.fasilkom || s.needs_scele)
-            .ok_or_else(|| "Verify your student status first".to_string())?;
-        let fields = vec![
+        let mut password = password;
+        let Some(mut student) = crate::sso::saved(&app).filter(|s| s.fasilkom || s.needs_scele) else {
+            password.zeroize();
+            return Err("Verify your student status first".to_string());
+        };
+        let mut fields = vec![
             ("username".to_string(), student.username.clone()),
-            ("password".to_string(), password),
+            ("password".to_string(), std::mem::take(&mut password)),
             ("service".to_string(), SERVICE.to_string()),
         ];
-        let v = post_form(&format!("{BASE}/login/token.php"), &fields)?;
+        let sent = post_form(&format!("{BASE}/login/token.php"), &fields);
+        // the password is only needed for this one request: wiped from memory straight after
+        for (_, value) in fields.iter_mut() {
+            value.zeroize();
+        }
+        let v = sent?;
         let Some(token) = v.get("token").and_then(Value::as_str) else {
             return Err(v.get("error").and_then(Value::as_str).unwrap_or("Sign-in failed").to_string());
         };
@@ -263,8 +312,14 @@ pub async fn scele_login(app: AppHandle, password: String) -> Result<SceleAccoun
             student.detail = format!("{} · Fasilkom confirmed by SCELE", student.detail);
             crate::sso::save(&app, &student)?;
         }
+        // the token goes to the credential store only; if that can't be written, nothing is kept
+        // (it isn't put in a file instead)
+        vault()
+            .ok_or_else(|| "The system's credential store isn't available".to_string())?
+            .set_password(token)
+            .map_err(|_| "Couldn't keep the SCELE connection in the system's credential store".to_string())?;
+        // the file holds only who is connected, nothing secret
         let saved = json!({
-            "token": token,
             "userid": userid,
             "fullname": info.get("fullname").and_then(Value::as_str).unwrap_or(""),
             "username": info.get("username").and_then(Value::as_str).unwrap_or(""),
@@ -279,6 +334,7 @@ pub async fn scele_login(app: AppHandle, password: String) -> Result<SceleAccoun
 /// The signed-in account, if there is a saved token.
 #[tauri::command]
 pub fn scele_account(app: AppHandle) -> Option<SceleAccount> {
+    token(&app)?;
     load(&app).as_ref().and_then(account_of)
 }
 
@@ -297,9 +353,8 @@ pub async fn scele_call(app: AppHandle, function: String, params: Option<Map<Str
         if !crate::sso::saved(&app).is_some_and(|s| s.fasilkom) {
             return Err("signed-out".to_string());
         }
-        let saved = load(&app).ok_or_else(|| "signed-out".to_string())?;
-        let token = saved.get("token").and_then(Value::as_str).ok_or_else(|| "signed-out".to_string())?;
-        let result = ws(token, &function, &Value::Object(params.unwrap_or_default()));
+        let token = token(&app).ok_or_else(|| "signed-out".to_string())?;
+        let result = ws(&token, &function, &Value::Object(params.unwrap_or_default()));
         if matches!(&result, Err(e) if e == "signed-out") {
             // the token was revoked or expired: forget it so the island asks to sign in again
             forget_token(&app);

@@ -6,7 +6,12 @@
 //! password, an extra step). A script in the window keeps the schedule the page loads for itself
 //! (/course-plan/me/schedule and /classes) and hands it back by navigating to a made-up address,
 //! which is caught and cancelled here. The password is kept only until it has been typed into the
-//! login page, and SLCM's tokens stay in the page; only the schedule comes out.
+//! login page (and wiped from memory then), and SLCM's tokens stay in the page; only the schedule
+//! comes out. The window can only go to UI's own sites, over HTTPS.
+//!
+//! UI's login keeps its own session in the island's window storage, so a later reading usually
+//! needs no password at all: `quiet` tries that first and, if the login page wants a password
+//! after all, says so ("needs-password") instead of showing the window.
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -14,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use zeroize::Zeroize;
 
 const PAGE: &str = "https://slcm.ui.ac.id/akademik/course-plan/view-schedule";
 const LABEL: &str = "slcm";
@@ -89,6 +95,8 @@ const SCRIPT: &str = r##"(() => {
 struct Signin {
     username: String,
     password: Option<String>,
+    /// trying UI's saved session: a login page that wants a password is reported, not shown
+    quiet: bool,
     /// login pages loaded since the window opened
     logins: u32,
     /// pages loaded, to tell whether a submitted login went anywhere
@@ -154,14 +162,31 @@ fn loaded(app: &AppHandle, window: &WebviewWindow, url: &Url) {
         return;
     }
     s.logins += 1;
+    // no password to fill in while trying the saved session: ask for one (the window goes)
+    if s.quiet && s.password.is_none() {
+        drop(guard);
+        status(app, "needs-password");
+        if let Some(w) = app.get_webview_window(LABEL) {
+            let _ = w.close();
+        }
+        return;
+    }
     // the login page again after submitting it (a wrong password, an extra step), or no password
     // to fill in: the user takes it from here
-    let Some(password) = s.password.take().filter(|_| s.logins == 1) else {
+    if s.logins != 1 || s.password.is_none() {
+        // a password not used now isn't used later either: wiped
+        if let Some(p) = s.password.as_mut() {
+            p.zeroize();
+        }
+        s.password = None;
         drop(guard);
         reveal(app);
         return;
-    };
+    }
+    let mut password = s.password.take().unwrap_or_default();
     fill(window, &s.username, &password);
+    // typed into the page: no longer needed here
+    password.zeroize();
     status(app, "signing-in");
     // a login form that wasn't what we expected leaves the page where it is: show it
     let at = s.loads;
@@ -173,6 +198,11 @@ fn loaded(app: &AppHandle, window: &WebviewWindow, url: &Url) {
             reveal(&app);
         }
     });
+}
+
+/// The addresses the SLCM window may open: UI's own sites (slcm.ui.ac.id, login.ui.ac.id, …), over HTTPS.
+fn allowed(url: &Url) -> bool {
+    url.scheme() == "https" && url.host_str().is_some_and(|h| h == "ui.ac.id" || h.ends_with(".ui.ac.id"))
 }
 
 fn handback(app: &AppHandle, data: &str) {
@@ -208,21 +238,26 @@ fn handback(app: &AppHandle, data: &str) {
 /// login with the verified SSO UI username. Progress arrives as "slcm-status", the schedule as
 /// "slcm"; the window closing first sends "slcm-closed".
 #[tauri::command]
-pub async fn slcm_open(app: AppHandle, password: Option<String>) -> Result<(), String> {
+pub async fn slcm_open(app: AppHandle, password: Option<String>, quiet: Option<bool>) -> Result<(), String> {
     let username = crate::sso::saved(&app).map(|s| s.username).unwrap_or_default();
     let password = password.filter(|p| !p.is_empty() && !username.is_empty());
+    let quiet = quiet.unwrap_or(false) && password.is_none();
     if let Some(w) = app.get_webview_window(LABEL) {
         // already open: a password typed now is used on the login page it comes to next
         if let Some(s) = SIGNIN.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
             if password.is_some() {
+                if let Some(old) = s.password.as_mut() {
+                    old.zeroize();
+                }
                 s.password = password;
                 s.logins = 0;
+                s.quiet = false;
             }
         }
         let _ = w.set_focus();
         return Ok(());
     }
-    *SIGNIN.lock().unwrap_or_else(|e| e.into_inner()) = Some(Signin { username, password, logins: 0, loads: 0 });
+    *SIGNIN.lock().unwrap_or_else(|e| e.into_inner()) = Some(Signin { username, password, quiet, logins: 0, loads: 0 });
 
     let url = Url::parse(PAGE).map_err(|e| e.to_string())?;
     let nav = app.clone();
@@ -234,13 +269,14 @@ pub async fn slcm_open(app: AppHandle, password: Option<String>) -> Result<(), S
         .visible(false)
         .initialization_script(SCRIPT)
         .on_navigation(move |url| {
-            if url.host_str() != Some(HANDBACK) {
-                return true;
+            if url.host_str() == Some(HANDBACK) {
+                if let Some((_, d)) = url.query_pairs().find(|(k, _)| k == "d") {
+                    handback(&nav, &d);
+                }
+                return false;
             }
-            if let Some((_, d)) = url.query_pairs().find(|(k, _)| k == "d") {
-                handback(&nav, &d);
-            }
-            false
+            // only UI's own sites, over HTTPS: the window never follows a link or redirect elsewhere
+            allowed(url)
         })
         .on_page_load(move |window, payload| {
             if matches!(payload.event(), PageLoadEvent::Finished) {
@@ -253,8 +289,12 @@ pub async fn slcm_open(app: AppHandle, password: Option<String>) -> Result<(), S
     let handle = app.clone();
     window.on_window_event(move |e| {
         if let WindowEvent::Destroyed = e {
-            // the password, if it was never used, goes with the window
-            *SIGNIN.lock().unwrap_or_else(|e| e.into_inner()) = None;
+            // the password, if it was never used, goes with the window, wiped
+            if let Some(mut s) = SIGNIN.lock().unwrap_or_else(|e| e.into_inner()).take() {
+                if let Some(p) = s.password.as_mut() {
+                    p.zeroize();
+                }
+            }
             let _ = handle.emit("slcm-closed", ());
         }
     });

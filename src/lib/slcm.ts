@@ -156,36 +156,55 @@ export async function slcmSaved(): Promise<SlcmSchedule | null> {
   return raw ? parseSlcm(raw) : null
 }
 
-/** How far reading SLCM has got: its slow site loading, signing in to UI's login, or the window waiting for the user. */
-export type SlcmStage = 'loading' | 'signing-in' | 'needs-you'
+/**
+ * How far reading SLCM has got: its slow site loading, signing in to UI's login, the window waiting
+ * for the user, or (trying the saved session) UI's login wanting a password after all.
+ */
+export type SlcmStage = 'loading' | 'signing-in' | 'needs-you' | 'needs-password'
+
+/** The browser demo: whether UI's login still has a session (it does until "Disconnect everything"). */
+let demoSession = true
+export const demoForgetSlcmSession = () => {
+  demoSession = false
+}
 
 /**
  * Opens SLCM in a hidden window and, with the SSO UI password, signs in for the user (the password
- * is used once, on UI's login page, and not kept). Resolves with the schedule once SLCM's page has
- * loaded it, or null if the window is closed first. `onStage` follows the progress.
+ * is used once, on UI's login page, and not kept). Without one, `quiet` tries UI's saved login
+ * session and resolves 'needs-password' if it has run out. Otherwise resolves with the schedule
+ * once SLCM's page has loaded it, or null if the window is closed first. `onStage` follows it.
  */
-export function slcmConnect(password: string | null, onStage: (s: SlcmStage) => void = () => {}): Promise<SlcmSchedule | null> {
+export function slcmConnect(password: string | null, onStage: (s: SlcmStage) => void = () => {}, quiet = false): Promise<SlcmSchedule | null | 'needs-password'> {
   if (!IS_TAURI) {
     onStage('loading')
     return new Promise((done) => {
+      if (quiet && !password && !demoSession) {
+        setTimeout(() => (onStage('needs-password'), done('needs-password')), 700)
+        return
+      }
+      if (password) demoSession = true
       setTimeout(() => onStage('signing-in'), 500)
       setTimeout(() => done(parseSlcm(DEMO_SLCM)), 1200)
     })
   }
   return new Promise((done, fail) => {
     const off: (() => void)[] = []
-    const finish = (v: SlcmSchedule | null) => {
+    let wanted = false
+    const finish = (v: SlcmSchedule | null | 'needs-password') => {
       off.forEach((f) => f())
       done(v)
     }
     Promise.all([
       listen<Raw>('slcm', (e) => finish(parseSlcm(e.payload))),
-      listen('slcm-closed', () => finish(null)),
-      listen<SlcmStage>('slcm-status', (e) => onStage(e.payload)),
+      listen('slcm-closed', () => finish(wanted ? 'needs-password' : null)),
+      listen<SlcmStage>('slcm-status', (e) => {
+        if (e.payload === 'needs-password') wanted = true
+        onStage(e.payload)
+      }),
     ])
       .then((fns) => {
         off.push(...fns)
-        return invoke('slcm_open', { password })
+        return invoke('slcm_open', { password, quiet })
       })
       .catch((e) => {
         off.forEach((f) => f())
