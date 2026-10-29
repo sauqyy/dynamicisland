@@ -45,14 +45,14 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
   const isNow = (s: Slot) => s.day === today() && minutes(s.start) <= nowMin && nowMin < minutes(s.end)
 
   const renderSlot = (s: Slot) => (
-    <li key={s.id} className={`sc-slot ${isNow(s) ? 'now' : ''}`}>
-      <span className="sc-time">
+    <li key={s.id} className={`wk-slot ${isNow(s) ? 'now' : ''}`}>
+      <span className="wk-time">
         {s.start}
         <small>{s.end}</small>
       </span>
-      <span className="sc-title">
+      <span className="wk-title">
         {s.title}
-        {s.room && <small className="sc-room">{s.room}</small>}
+        {s.room && <small className="wk-room">{s.room}</small>}
       </span>
       <button className="x" aria-label="Delete" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => remove(s.id)}>
         ×
@@ -61,7 +61,7 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
   )
 
   const form = (
-    <div className="sc-add">
+    <div className="wk-add">
       <input
         className="todo-input"
         placeholder={`Add to ${DAYS[sel]}`}
@@ -74,7 +74,7 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
         }}
       />
       <input
-        className="todo-input sc-room-in"
+        className="todo-input wk-room-in"
         placeholder="Room"
         value={room}
         data-cuelume-type
@@ -84,8 +84,8 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
           if (e.key === 'Enter') add()
         }}
       />
-      <input className="todo-input sc-clock" type="time" value={start} aria-label="Start" onChange={(e) => setStart(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
-      <input className="todo-input sc-clock" type="time" value={end} aria-label="End" onChange={(e) => setEnd(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+      <input className="todo-input wk-clock" type="time" value={start} aria-label="Start" onChange={(e) => setStart(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+      <input className="todo-input wk-clock" type="time" value={end} aria-label="End" onChange={(e) => setEnd(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
       <button className="pill-btn dl-go" data-cuelume-tap onClick={add} disabled={!title.trim()}>
         Add
       </button>
@@ -94,7 +94,7 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
 
   const fullBtn = (
     <button
-      className="chip sc-full"
+      className="chip wk-full"
       aria-pressed={fullscreen}
       data-cuelume-toggle
       title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -108,15 +108,15 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
   )
 
   return (
-    <div className={`sc ${fullscreen ? 'sc-fs' : ''}`} onClick={(e) => e.stopPropagation()}>
-      <div className="sc-top">
-        <div className="sc-days" role="tablist" aria-label="Day">
+    <div className={`wk ${fullscreen ? 'wk-fs' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className="wk-top">
+        <div className="wk-days" role="tablist" aria-label="Day">
           {DAYS.map((d, i) => (
             <button
               key={d}
               role="tab"
               aria-selected={sel === i}
-              className={`sc-day ${sel === i ? 'on' : ''} ${today() === i ? 'today' : ''}`}
+              className={`wk-day ${sel === i ? 'on' : ''} ${today() === i ? 'today' : ''}`}
               data-cuelume-tap
               onClick={() => setSel(i)}
             >
@@ -129,17 +129,17 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
       </div>
       {form}
       {fullscreen ? (
-        <div className="sc-week">
+        <div className="wk-week">
           {DAYS.map((d, i) => (
-            <section key={d} className={`sc-col ${sel === i ? 'sel' : ''} ${today() === i ? 'today' : ''}`} onClick={() => setSel(i)}>
+            <section key={d} className={`wk-col ${sel === i ? 'sel' : ''} ${today() === i ? 'today' : ''}`} onClick={() => setSel(i)}>
               <h4>{d}</h4>
               <ul>{daySlots(i).map(renderSlot)}</ul>
-              {!daySlots(i).length && <span className="sc-free">Free</span>}
+              {!daySlots(i).length && <span className="wk-free">Free</span>}
             </section>
           ))}
         </div>
       ) : (
-        <ul className="sc-list">
+        <ul className="wk-list">
           {daySlots(sel).map(renderSlot)}
           {!daySlots(sel).length && (
             <div className="empty">

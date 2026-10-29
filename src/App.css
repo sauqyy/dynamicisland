@@ -4371,13 +4371,13 @@ button.ao-text:hover {
   gap: 10px;
 }
 .dl-add,
-.sc-add {
+.wk-add {
   display: flex;
   gap: 6px;
   align-items: center;
 }
 .dl-add .todo-input,
-.sc-add .todo-input {
+.wk-add .todo-input {
   min-width: 0;
 }
 .dl-when {
@@ -4385,14 +4385,14 @@ button.ao-text:hover {
   width: auto;
   color-scheme: dark;
 }
-.sc-clock {
+.wk-clock {
   flex: none;
   width: auto;
   padding: 9px 8px;
   color-scheme: dark;
 }
 .light .dl-when,
-.light .sc-clock {
+.light .wk-clock {
   color-scheme: light;
 }
 .dl-go {
@@ -4506,23 +4506,23 @@ button.ao-text:hover {
 }
 
 /* ---------- schedule ---------- */
-.sc {
+.wk {
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.sc-top {
+.wk-top {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.sc-days {
+.wk-days {
   flex: 1;
   display: flex;
   gap: 4px;
 }
-.sc-day {
+.wk-day {
   position: relative;
   flex: 1;
   height: 28px;
@@ -4533,18 +4533,18 @@ button.ao-text:hover {
   opacity: 0.7;
   transition: background 0.15s, opacity 0.15s;
 }
-.sc-day:hover {
+.wk-day:hover {
   opacity: 1;
 }
-.sc-day.on {
+.wk-day.on {
   opacity: 1;
   background: var(--accent);
   color: var(--on-accent, #000);
 }
-.sc-day.today:not(.on) {
+.wk-day.today:not(.on) {
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
-.sc-day i {
+.wk-day i {
   position: absolute;
   bottom: 3px;
   left: 50%;
@@ -4555,7 +4555,7 @@ button.ao-text:hover {
   background: currentColor;
   opacity: 0.6;
 }
-.sc-full {
+.wk-full {
   flex: none;
   display: grid;
   place-items: center;
@@ -4563,18 +4563,18 @@ button.ao-text:hover {
   height: 28px;
   padding: 0;
 }
-.sc-list,
-.sc-col ul {
+.wk-list,
+.wk-col ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.sc-list {
+.wk-list {
   flex: 1;
   overflow-y: auto;
   scrollbar-width: none;
 }
-.sc-slot {
+.wk-slot {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4584,11 +4584,11 @@ button.ao-text:hover {
   background: rgb(var(--fg-rgb) / 0.07);
   font-size: 13px;
 }
-.sc-slot.now {
+.wk-slot.now {
   background: color-mix(in srgb, var(--accent) 24%, transparent);
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
-.sc-time {
+.wk-time {
   flex: none;
   display: flex;
   flex-direction: column;
@@ -4597,12 +4597,12 @@ button.ao-text:hover {
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
 }
-.sc-time small {
+.wk-time small {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.5;
 }
-.sc-title {
+.wk-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -4611,26 +4611,26 @@ button.ao-text:hover {
   font-weight: 600;
 }
 /* fullscreen: the whole week at once */
-.sc-fs {
+.wk-fs {
   gap: 14px;
 }
-.sc-fs .sc-days {
+.wk-fs .wk-days {
   display: none;
 }
-.sc-fs .sc-top {
+.wk-fs .wk-top {
   justify-content: flex-end;
 }
-.sc-fs .sc-add {
+.wk-fs .wk-add {
   max-width: 640px;
 }
-.sc-week {
+.wk-week {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 8px;
 }
-.sc-col {
+.wk-col {
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -4642,43 +4642,43 @@ button.ao-text:hover {
   scrollbar-width: none;
   cursor: pointer;
 }
-.sc-col.sel {
+.wk-col.sel {
   box-shadow: inset 0 0 0 1.5px rgb(var(--fg-rgb) / 0.3);
 }
-.sc-col h4 {
+.wk-col h4 {
   margin: 0 0 2px;
   font-size: 13px;
   font-weight: 700;
   text-align: center;
   opacity: 0.6;
 }
-.sc-col.today h4 {
+.wk-col.today h4 {
   color: var(--accent);
   opacity: 1;
 }
-.sc-col .sc-slot {
+.wk-col .wk-slot {
   flex-wrap: wrap;
   gap: 2px 6px;
   margin-bottom: 0;
 }
-.sc-col .sc-time {
+.wk-col .wk-time {
   flex-direction: row;
   gap: 4px;
   align-items: baseline;
 }
-.sc-col .sc-time small::before {
+.wk-col .wk-time small::before {
   content: '–';
   margin-right: 4px;
 }
-.sc-col .sc-title {
+.wk-col .wk-title {
   flex-basis: 100%;
   white-space: normal;
   order: 3;
 }
-.sc-col .sc-slot .x {
+.wk-col .wk-slot .x {
   margin-left: auto;
 }
-.sc-free {
+.wk-free {
   text-align: center;
   font-size: 12px;
   opacity: 0.3;
@@ -4686,7 +4686,7 @@ button.ao-text:hover {
 }
 
 /* ---------- prompter ---------- */
-.pr {
+.tp {
   height: 100%;
   position: relative;
   display: flex;
@@ -4694,20 +4694,20 @@ button.ao-text:hover {
   gap: 8px;
   outline: 0;
 }
-.pr-script {
+.tp-script {
   flex: 1;
 }
-.pr-fs .pr-script {
+.tp-fs .tp-script {
   font-size: 18px;
 }
-.pr-bar {
+.tp-bar {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
 }
-.pr-bar .chip {
+.tp-bar .chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4715,27 +4715,27 @@ button.ao-text:hover {
   height: 28px;
   gap: 4px;
 }
-.pr-bar .chip.on,
-.pr-bar .chip[aria-pressed='true']:not(.sc-full) {
+.tp-bar .chip.on,
+.tp-bar .chip[aria-pressed='true']:not(.wk-full) {
   background: var(--accent);
   color: var(--on-accent, #000);
 }
-.pr-count {
+.tp-count {
   margin-right: auto;
   font-size: 11px;
   opacity: 0.45;
 }
-.pr-bar .pill-btn {
+.tp-bar .pill-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
-.pr-group {
+.tp-group {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.pr-group small {
+.tp-group small {
   min-width: 22px;
   text-align: center;
   font-size: 11px;
@@ -4743,21 +4743,21 @@ button.ao-text:hover {
   font-variant-numeric: tabular-nums;
   opacity: 0.6;
 }
-.pr.reading .pr-bar {
+.tp.reading .tp-bar {
   justify-content: center;
 }
-.pr-stage {
+.tp-stage {
   position: relative;
   /* the card page has no height of its own, so the view needs one to scroll inside */
   flex: none;
   height: 176px;
 }
-.pr-fs .pr-stage {
+.tp-fs .tp-stage {
   flex: 1;
   min-height: 0;
   height: auto;
 }
-.pr-view {
+.tp-view {
   position: absolute;
   inset: 0;
   overflow-y: auto;
@@ -4770,7 +4770,7 @@ button.ao-text:hover {
   mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
   -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent);
 }
-.pr-text {
+.tp-text {
   /* room above and below so the first and last line can reach the reading line */
   padding: 42% 0;
   line-height: 1.45;
@@ -4780,10 +4780,10 @@ button.ao-text:hover {
   overflow-wrap: anywhere;
   user-select: none;
 }
-.pr-text.mirror {
+.tp-text.mirror {
   transform: scaleX(-1);
 }
-.pr-line {
+.tp-line {
   position: absolute;
   left: 0;
   right: 0;
@@ -5669,12 +5669,12 @@ button.ao-text:hover {
   color: #f87171;
 }
 
-.sc-room-in {
+.wk-room-in {
   flex: none;
   width: 64px;
   min-width: 0;
 }
-.sc-room {
+.wk-room {
   display: block;
   font-size: 11px;
   font-weight: 500;
@@ -5715,13 +5715,13 @@ button.ao-text:hover {
 }
 
 /* the room field makes the schedule form too wide for one row: the title gets its own line */
-.sc-add {
+.wk-add {
   flex-wrap: wrap;
 }
-.sc-add > .todo-input:first-child {
+.wk-add > .todo-input:first-child {
   flex: 1 1 100%;
 }
-.sc-add .sc-room-in {
+.wk-add .wk-room-in {
   flex: 1 1 0;
 }
 /* ---------- the study page ---------- */

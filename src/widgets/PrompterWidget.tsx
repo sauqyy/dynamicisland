@@ -89,7 +89,7 @@ export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boole
 
   const fullBtn = (
     <button
-      className="chip sc-full"
+      className="chip wk-full"
       aria-pressed={fullscreen}
       data-cuelume-toggle
       title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
@@ -104,17 +104,17 @@ export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boole
 
   if (!reading) {
     return (
-      <div className={`pr ${fullscreen ? 'pr-fs' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`tp ${fullscreen ? 'tp-fs' : ''}`} onClick={(e) => e.stopPropagation()}>
         <textarea
-          className="notes-input pr-script"
+          className="notes-input tp-script"
           placeholder="Paste or write your script…"
           value={saved.text}
           data-cuelume-type
           onChange={(e) => patch({ text: e.target.value })}
           onKeyDown={(e) => e.stopPropagation()}
         />
-        <div className="pr-bar">
-          <span className="pr-count">{saved.text.trim() ? `${saved.text.trim().split(/\s+/).length} words` : ''}</span>
+        <div className="tp-bar">
+          <span className="tp-count">{saved.text.trim() ? `${saved.text.trim().split(/\s+/).length} words` : ''}</span>
           {fullBtn}
           <button className="pill-btn" data-cuelume-tap onClick={start} disabled={!saved.text.trim()}>
             <Play size={12} aria-hidden /> Start
@@ -126,7 +126,7 @@ export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boole
 
   return (
     <div
-      className={`pr reading ${fullscreen ? 'pr-fs' : ''}`}
+      className={`tp reading ${fullscreen ? 'tp-fs' : ''}`}
       tabIndex={-1}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
@@ -142,20 +142,20 @@ export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boole
       }}
       ref={(el) => el?.focus({ preventScroll: true })}
     >
-      <div className="pr-stage">
-        <div className="pr-view" ref={view} onClick={togglePlay} style={{ fontSize: saved.size * (fullscreen ? 1.7 : 1) }}>
-          <div className={`pr-text ${saved.mirror ? 'mirror' : ''}`}>{saved.text}</div>
+      <div className="tp-stage">
+        <div className="tp-view" ref={view} onClick={togglePlay} style={{ fontSize: saved.size * (fullscreen ? 1.7 : 1) }}>
+          <div className={`tp-text ${saved.mirror ? 'mirror' : ''}`}>{saved.text}</div>
         </div>
-        <i className="pr-line" aria-hidden />
+        <i className="tp-line" aria-hidden />
       </div>
-      <div className="pr-bar">
+      <div className="tp-bar">
         <button className="chip" data-cuelume-tap onClick={edit} aria-label="Edit script" title="Edit script">
           <SquarePen size={12} aria-hidden />
         </button>
         <button className="chip" data-cuelume-toggle aria-pressed={running} onClick={togglePlay} aria-label={running ? 'Pause' : 'Play'}>
           {running ? <Pause size={12} aria-hidden /> : <Play size={12} aria-hidden />}
         </button>
-        <span className="pr-group" title="Speed">
+        <span className="tp-group" title="Speed">
           <button className="chip" data-cuelume-tap onClick={() => patch({ speed: clamp(saved.speed - 5, 10, 200) })} aria-label="Slower">
             <Minus size={12} aria-hidden />
           </button>
@@ -164,7 +164,7 @@ export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boole
             <Plus size={12} aria-hidden />
           </button>
         </span>
-        <span className="pr-group" title="Text size">
+        <span className="tp-group" title="Text size">
           <button className="chip" data-cuelume-tap onClick={() => patch({ size: clamp(saved.size - 2, 14, 60) })} aria-label="Smaller text">
             A−
           </button>
