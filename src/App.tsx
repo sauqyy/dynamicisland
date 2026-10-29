@@ -191,6 +191,9 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(loadTab)
   const [pos, setPos] = useState({ x: settings.posX, y: settings.posY })
   const [moving, setMoving] = useState(false)
+  // docked on the taskbar, growing upwards; and where the taskbar starts, in px from the top of the window
+  const [docked, setDocked] = useState(settings.posBottom)
+  const [taskbarTop, setTaskbarTop] = useState(0)
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; active: boolean } | null>(null)
   const motionRef = useRef({
     pos: { x: 0, y: 0 },
@@ -201,6 +204,7 @@ export default function App() {
     held: false,
     magX: false,
     magY: false,
+    magBottom: settings.posBottom,
   })
   const justDragged = useRef(false)
   const [clockMode, setClockMode] = useState<ClockMode>('timer')
@@ -284,8 +288,24 @@ export default function App() {
 
   // keep the live position in step with the stored one (e.g. after Reset)
   useEffect(() => {
-    if (!dragRef.current?.active && !motionRef.current.raf) setPos({ x: settings.posX, y: settings.posY })
-  }, [settings.posX, settings.posY])
+    if (dragRef.current?.active || motionRef.current.raf) return
+    setPos({ x: settings.posX, y: settings.posY })
+    setDocked(settings.posBottom)
+    motionRef.current.magBottom = settings.posBottom
+  }, [settings.posX, settings.posY, settings.posBottom])
+
+  // tell the window it's docked (it then reaches down to the taskbar and no further), and learn where
+  // the taskbar starts; looked at again now and then, as the taskbar can move or change size
+  useEffect(() => {
+    if (!IS_TAURI) return
+    const look = () =>
+      invoke<number>('set_dock_bottom', { on: docked })
+        .then((line) => line > 0 && setTaskbarTop(line))
+        .catch(() => {})
+    look()
+    const id = setInterval(look, 10_000)
+    return () => clearInterval(id)
+  }, [docked, settings.monitor])
   const addShelf = shelf.add
   const addApps = apps.add
 
@@ -881,7 +901,7 @@ export default function App() {
       m.raf = requestAnimationFrame(stepSpring)
     } else {
       m.raf = 0
-      update({ posX: next.x, posY: next.y })
+      update({ posX: next.x, posY: next.y, posBottom: m.magBottom })
     }
   }, [update])
 
@@ -899,6 +919,19 @@ export default function App() {
     [stepSpring],
   )
 
+  // where the island's top goes when it rests on the taskbar, at its current height and size
+  const dockTop = () => taskbarTop - shape.h * settings.scale
+  // saved lower than resting on the taskbar (behind it, from before the taskbar dock): put it on the taskbar
+  useEffect(() => {
+    if (!taskbarTop || docked || dragRef.current?.active) return
+    if (posRef.current.y <= taskbarTop - shape.h * settings.scale) return
+    motionRef.current.magBottom = true
+    setDocked(true)
+    update({ posBottom: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskbarTop])
+  const dockAt = useMemo(() => (docked && taskbarTop > 0 ? { line: taskbarTop, scale: settings.scale } : null), [docked, taskbarTop, settings.scale])
+
   const dragHandlers = IS_TAURI
     ? {
         onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
@@ -907,7 +940,11 @@ export default function App() {
           if (el.closest('button, input, textarea, a, .scrub, [draggable="true"]')) return
           // inside the open card only the header strip is a handle
           if (mode === 'expanded' && !el.closest('.xtop')) return
-          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy: posRef.current.y, active: false }
+          // docked, the island's top is wherever its height puts it above the taskbar
+          const oy = motionRef.current.magBottom ? Math.round(dockTop()) : posRef.current.y
+          if (oy !== posRef.current.y) setPos((p) => ({ ...p, y: oy }))
+          posRef.current = { ...posRef.current, y: oy }
+          dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
         onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
@@ -924,12 +961,17 @@ export default function App() {
           }
           const maxX = window.screen.width / 2 - 80
           const rawX = Math.max(-maxX, Math.min(maxX, g.ox + dx))
-          const rawY = Math.max(0, Math.min(window.screen.height - 56, g.oy + dy))
+          // never lower than resting on the taskbar, so it can't slip behind it
+          const dockY = Math.max(0, Math.round(dockTop()))
+          const rawY = Math.max(0, Math.min(dockY, g.oy + dy))
           const m = motionRef.current
-          // magnets grab at 24px and let go at 44px, so they feel sticky
+          // magnets grab at 24px and let go at 44px, so they feel sticky: the centre line, the top
+          // edge, and the taskbar at the bottom
           m.magX = Math.abs(rawX) < (m.magX ? 44 : 24)
           m.magY = rawY < (m.magY ? 30 : 14)
-          glideTo(m.magX ? 0 : Math.round(rawX), m.magY ? 0 : Math.round(rawY), true)
+          m.magBottom = taskbarTop > 0 && !m.magY && rawY > dockY - (m.magBottom ? 30 : 14)
+          setDocked(m.magBottom)
+          glideTo(m.magX ? 0 : Math.round(rawX), m.magY ? 0 : m.magBottom ? dockY : Math.round(rawY), true)
         },
         onPointerUp: () => {
           const g = dragRef.current
@@ -945,11 +987,13 @@ export default function App() {
         },
         // double-click the pill to send it back to the centre top
         onDoubleClick: () => {
-          if (mode === 'expanded' || (!posRef.current.x && !posRef.current.y)) return
+          if (mode === 'expanded' || (!posRef.current.x && !posRef.current.y && !motionRef.current.magBottom)) return
           play('navigate', { emphasis: 'subtle', direction: 'back' })
           setExpanded(false)
           const m = motionRef.current
           m.magX = m.magY = true
+          m.magBottom = false
+          setDocked(false)
           glideTo(0, 0, false)
         },
       }
@@ -1366,8 +1410,9 @@ export default function App() {
         shape={shape}
         contentKey={contentKey}
         bubble={bubble}
-        floating={pos.y > 2}
+        floating={!docked && pos.y > 2}
         offset={pos}
+        dock={dockAt}
         centered={Boolean(fs)}
         dragHandlers={dragHandlers}
         onClick={(e) => {

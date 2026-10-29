@@ -315,10 +315,10 @@ export function SettingsWidget({ settings, update, updater, unavailable }: Props
           <span>Position (drag the pill)</span>
           <button
             className="chip"
-            disabled={!settings.posX && !settings.posY}
+            disabled={!settings.posX && !settings.posY && !settings.posBottom}
             data-cuelume-tap
             data-cuelume-emphasis="subtle"
-            onClick={() => update({ posX: 0, posY: 0 })}
+            onClick={() => update({ posX: 0, posY: 0, posBottom: false })}
           >
             Reset
           </button>
