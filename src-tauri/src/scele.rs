@@ -26,6 +26,13 @@ const ALLOWED: &[&str] = &[
     "core_user_get_course_user_profiles",
 ];
 
+/// One HTTP agent for every request here, so a sync's many calls reuse their connections (and
+/// TLS handshakes) instead of opening one each.
+fn agent() -> &'static ureq::Agent {
+    static AGENT: std::sync::OnceLock<ureq::Agent> = std::sync::OnceLock::new();
+    AGENT.get_or_init(|| ureq::AgentBuilder::new().timeout_connect(std::time::Duration::from_secs(15)).build())
+}
+
 /// Largest course file read for the class schedule (a syllabus is far smaller).
 const FILE_LIMIT: u64 = 20 * 1024 * 1024;
 
@@ -48,7 +55,7 @@ pub async fn scele_file(app: AppHandle, url: String) -> Result<String, String> {
         let token = saved.get("token").and_then(Value::as_str).ok_or_else(|| "signed-out".to_string())?;
         // the web-service file endpoint takes the token instead of a browser session
         let (path, query) = path.split_once('?').unwrap_or((path.as_str(), ""));
-        let mut req = ureq::get(&format!("{BASE}/webservice/pluginfile.php/{path}")).timeout(std::time::Duration::from_secs(30));
+        let mut req = agent().get(&format!("{BASE}/webservice/pluginfile.php/{path}")).timeout(std::time::Duration::from_secs(30));
         for (k, v) in query.split('&').filter_map(|kv| kv.split_once('=')) {
             if k != "token" {
                 req = req.query(k, v);
@@ -108,7 +115,8 @@ pub async fn web_doc(url: String) -> Result<WebDoc, String> {
         return Err("unsupported link".into());
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let resp = ureq::get(&export)
+        let resp = agent()
+            .get(&export)
             .timeout(std::time::Duration::from_secs(30))
             .call()
             .map_err(|e| match e {
@@ -185,7 +193,8 @@ fn flatten(prefix: &str, v: &Value, out: &mut Vec<(String, String)>) {
 
 fn post_form(url: &str, fields: &[(String, String)]) -> Result<Value, String> {
     let pairs: Vec<(&str, &str)> = fields.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
-    let resp = ureq::post(url)
+    let resp = agent()
+        .post(url)
         .timeout(std::time::Duration::from_secs(20))
         .send_form(&pairs)
         .map_err(|e| match e {

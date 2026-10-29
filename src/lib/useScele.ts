@@ -16,6 +16,7 @@ import {
   fetchMyGroups,
   fetchMyRoles,
   fetchNotices,
+  introText,
   isTeachingRole,
   materials,
   meetingOn,
@@ -123,7 +124,7 @@ export interface CourseStatus {
   teaching: boolean
   hidden: boolean
   /** the timeline it reads topics from */
-  timeline?: { sessions: number; name: string; url: string }
+  timeline?: { /** its entries: dated sessions, else numbered weeks */ sessions: number; name: string; url: string }
   /** documents it links to that need a sign-in to read */
   blocked: { name: string; url: string }[]
   /** its subject is enrolled twice and the user hasn't said which is theirs yet */
@@ -166,8 +167,15 @@ const LEAD_KEY = 'di.scele.lead'
 /** what has been seen or alerted already, so a restart does not repeat it */
 const SEEN_KEY = 'di.scele.seen'
 
-/** Deadlines and notifications are checked this often; course pages every third time. */
+/** Deadlines and notifications are checked this often, day and night; course pages every PAGES_MS. */
 const SYNC_MS = 10 * 60_000
+const PAGES_MS = 30 * 60_000
+/** Back from sleep, back online or opened again: data older than this is read again at once. */
+const STALE_MS = 2 * 60_000
+/** After a failed sync (offline, SCELE down), the next try. */
+const RETRY_MS = 2 * 60_000
+/** Course pages read at once: enough to overlap SCELE's slow answers, few enough to go easy on it. */
+const PARALLEL = 4
 /** Deadline heads-ups, tightest last. */
 const DUE_STEPS = [24, 3, 1].map((h) => h * 3600_000)
 const DAY_MS = 86_400_000
@@ -231,6 +239,16 @@ const startOfDay = (t: number) => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 }
 
+/** Runs `run` over `items`, at most `n` at a time. */
+async function inParallel<T>(items: T[], n: number, run: (item: T) => Promise<void>) {
+  let next = 0
+  await Promise.all(
+    Array.from({ length: Math.min(n, items.length) }, async () => {
+      while (next < items.length) await run(items[next++])
+    }),
+  )
+}
+
 /** Reads one course document into what the schedule needs; failures are kept too, so they aren't retried every sync. */
 async function readOne(ref: DocRef, course: Course): Promise<DocResult> {
   const base = { name: ref.name, url: ref.url, kind: ref.kind, readAt: Date.now(), v: READER }
@@ -268,9 +286,13 @@ function detect(data: Cache, prefs: Prefs, slcm: SlcmSchedule | null) {
   // matches, so the one kept of a subject enrolled twice gets it), or stays a class of its own
   const planned = new Map<number, Omit<ClassSlot, 'id'>[]>()
   const unmatched: Omit<ClassSlot, 'id'>[] = []
-  if (slcm && Date.now() - slcm.at < SLCM_MAX_AGE) {
+  /** courses the study plan has no class for, and nothing else gives a time: the plan may be from before the user changed classes */
+  const unplanned: Course[] = []
+  const planOn = Boolean(slcm && Date.now() - slcm.at < SLCM_MAX_AGE)
+  if (slcm && planOn) {
     for (const k of slcm.classes) {
-      const slot = { courseId: 0, day: k.day, start: k.start, end: k.end, room: k.room }
+      // "Lab A3.02 (Gd. Baru) --- PC 45" reads as "Lab A3.02 (Gd. Baru) · PC 45"
+      const slot = { courseId: 0, day: k.day, start: k.start, end: k.end, room: k.room.replace(/\s*(?:-{2,}|—|\|)\s*/g, ' · ').trim() }
       const to = matchCourses(k, taking)
       if (!to.length) unmatched.push({ ...slot, name: k.course })
       for (const c of to) planned.set(c.id, [...(planned.get(c.id) ?? []), { ...slot, courseId: c.id }])
@@ -299,15 +321,20 @@ function detect(data: Cache, prefs: Prefs, slcm: SlcmSchedule | null) {
     const results = docCandidates(sections)
       .map((r) => data.docs[r.key])
       .filter((r): r is DocResult => Boolean(r))
-    const best = results.filter((r) => r.timeline).sort((a, b) => timelineScore(b.timeline!) - timelineScore(a.timeline!))[0]
-    if (best) timelines[c.id] = { timeline: best.timeline!, name: best.name, url: best.url }
+    // the documents' timelines, and one typed onto the course page itself (often in its first week)
+    const onPage = parseTimeline(introText(sections), termWindow(c))
+    const best = [
+      ...results.flatMap((r) => (r.timeline ? [{ timeline: r.timeline, name: r.name, url: r.url }] : [])),
+      ...(onPage ? [{ timeline: onPage, name: 'Course page', url: c.url }] : []),
+    ].sort((a, b) => timelineScore(b.timeline) - timelineScore(a.timeline))[0]
+    if (best) timelines[c.id] = best
     const row: CourseStatus = {
       course: c,
       found: 0,
       source: null,
       teaching: teach,
       hidden,
-      timeline: best ? { sessions: best.timeline!.sessions.length, name: best.name, url: best.url } : undefined,
+      timeline: best ? { sessions: best.timeline.sessions.length || Object.keys(best.timeline.weeks).length, name: best.name, url: best.url } : undefined,
       blocked: results.filter((r) => r.blocked === 'signin').map((r) => ({ name: r.name, url: r.url })),
       waiting: duplicates.some((q) => q.courses.some((x) => x.id === c.id)),
     }
@@ -337,9 +364,10 @@ function detect(data: Cache, prefs: Prefs, slcm: SlcmSchedule | null) {
     }
     // the timeline's class days, only for a course whose times are written nowhere: a written
     // schedule (or the study plan) is complete as it is, and its dates may only date the weeks
-    const days = best && !found.length ? classDays(best.timeline!) : []
+    const days = best && !found.length ? classDays(best.timeline) : []
     if (days.length) source = 'timeline'
     for (const d of days) picked.push({ courseId: c.id, day: d.day, start: d.start ?? '', end: d.end ?? '', room: '', from: 'timeline' })
+    if (planOn && !teach && !planned.has(c.id) && !picked.some((p) => p.start)) unplanned.push(c)
 
     for (const { from, ...sl } of picked) {
       const key = slotKey(sl)
@@ -368,7 +396,7 @@ function detect(data: Cache, prefs: Prefs, slcm: SlcmSchedule | null) {
     if (same) same.room ||= u.room
     else if (!prefs.dismissed.includes(slotKey(u))) auto.push({ ...u, id: `auto-${slotKey(u)}`, auto: true, source: 'slcm' })
   }
-  return { auto, duplicates, unsure, status, earlier, timelines, termStart }
+  return { auto, duplicates, unsure, status, earlier, timelines, termStart, unplanned }
 }
 
 /** A section numbered for a week: "Week 3", "Minggu ke-3", "Pertemuan 3". */
@@ -388,6 +416,8 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   const [prefs, setPrefs] = useState<Prefs>(() => read(PREFS_KEY, NO_PREFS))
   const [lead, setLeadState] = useState<number>(() => Number(localStorage.getItem(LEAD_KEY)) || 30)
   const [syncing, setSyncing] = useState(false)
+  /** reading the course pages: how many of this term's courses are done */
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   /** the study plan read from SLCM; undefined while it is looked up */
   const [slcm, setSlcm] = useState<SlcmSchedule | null | undefined>(undefined)
@@ -400,7 +430,10 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   prefsRef.current = prefs
   const dataRef = useRef(data)
   dataRef.current = data
-  const round = useRef(0)
+  /** when the last sync, and the last one with course pages, went through; one sync at a time */
+  const syncAt = useRef(0)
+  const pagesAt = useRef(0)
+  const busy = useRef(false)
 
   useEffect(() => write(CACHE_KEY, data), [data])
   useEffect(() => write(SLOTS_KEY, manual), [manual])
@@ -433,6 +466,8 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
 
   const sync = useCallback(
     async (acc: SceleAccount, withContents: boolean) => {
+      if (busy.current) return
+      busy.current = true
       setSyncing(true)
       try {
         const [courses, deadlines, notices] = await Promise.all([fetchCourses(acc.userid), fetchDeadlines(), fetchNotices(acc.userid)])
@@ -453,18 +488,25 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
         const docs: Record<string, DocResult> = {}
         const added: Fresh[] = []
         if (withContents) {
-          contents = {}
+          const pages: Record<number, Section[]> = (contents = {})
           const thisTerm = new Set(currentTerm(courses).current.map((c) => c.id))
           let spent = 0
-          for (const c of courses) {
+          let done = 0
+          setProgress({ done, total: thisTerm.size })
+          // this term's courses first, a few at a time: SCELE answers each slowly, so overlapping
+          // them is what makes a sync quick
+          const order = [...courses].sort((a, b) => Number(thisTerm.has(b.id)) - Number(thisTerm.has(a.id)))
+          await inParallel(order, PARALLEL, async (c) => {
             const secs = await fetchContents(c.id).catch((e) => {
               if (e === 'signed-out') throw e
               return null
             })
-            if (!secs) continue
-            contents[c.id] = secs
+            if (!secs) {
+              if (thisTerm.has(c.id)) setProgress({ done: ++done, total: thisTerm.size })
+              return
+            }
+            pages[c.id] = secs
             // labels are page text, not materials: they are neither counted nor announced
-            const ids = materials(secs).map((m) => m.id)
             const known = s.modules[c.id]
             if (known) {
               const had = new Set(known)
@@ -472,15 +514,17 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
                 if (!had.has(m.id)) added.push({ key: `${c.id}:${m.id}`, courseId: c.id, course: c.short, name: m.name, url: m.url, at: Date.now() })
               }
             }
-            s.modules[c.id] = ids
-            if (!thisTerm.has(c.id)) continue
-            // teaching or taking it: SCELE's role in the course, looked up once
-            if (dataRef.current.roles[c.id] === undefined) roles[c.id] = await fetchMyRoles(c.id, acc.userid).catch(() => [])
+            s.modules[c.id] = materials(secs).map((m) => m.id)
+            if (!thisTerm.has(c.id)) return
+            // teaching or taking it: SCELE's role in the course, looked up once, while the documents are read
+            const role = dataRef.current.roles[c.id] === undefined ? fetchMyRoles(c.id, acc.userid).catch(() => []) : null
 
             // the course's documents, likeliest first: everything named like a timeline or
-            // syllabus, then (only while nothing is found) the general section's other documents
+            // syllabus, then (only while nothing is found) the other documents of the sections
+            // it introduces itself in
+            const onPage = detectSlots(c, secs)
             let haveTimeline = false
-            let haveTimes = detectSlots(c, secs).length > 0
+            let haveTimes = onPage.length > 0
             let courseSpent = 0
             let general = 0
             const mine: DocResult[] = []
@@ -491,22 +535,25 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
               const fresh = cached && cached.v === READER && (ref.kind === 'file' || Date.now() - cached.readAt < LINK_TTL)
               if (!fresh && (ref.size > (ref.tier === 1 ? 20 : 10) * 1024 * 1024 || courseSpent + cost > COURSE_BUDGET || spent + cost > SYNC_BUDGET)) continue
               if (ref.tier === 2) general++
-              const res = fresh ? cached : await readOne(ref, c)
+              // counted before the download, so courses read alongside this one see it
               if (!fresh) {
                 courseSpent += cost
                 spent += cost
               }
+              const res = fresh ? cached : await readOne(ref, c)
               docs[ref.key] = res
               mine.push(res)
               if (res.timeline) haveTimeline = true
               if (res.slots.length) haveTimes = true
             }
             // several parallel classes listed and none chosen: the user's SCELE group may say which
-            const listed = detectSlots(c, secs).length > 1 || mine.some((d) => d.slots.length > 1)
+            const listed = onPage.length > 1 || mine.some((d) => d.slots.length > 1)
             if (haveTimes && listed && prefsRef.current.choice[c.id] === undefined) {
               groups[c.id] = await fetchMyGroups(c.id, acc.userid).catch(() => [])
             }
-          }
+            if (role) roles[c.id] = await role
+            setProgress({ done: ++done, total: thisTerm.size })
+          })
           if (added.length === 1) alertRef.current({ icon: '📄', text: `New in ${added[0].course}`, sub: added[0].name.slice(0, 48), openTab: 'inbox' }, 'ready')
           else if (added.length > 1) alertRef.current({ icon: '📄', text: `${added.length} new materials`, sub: [...new Set(added.map((a) => a.course))].join(', '), openTab: 'inbox' }, 'ready')
         }
@@ -524,26 +571,48 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
           syncedAt: Date.now(),
         }))
         setError(null)
+        syncAt.current = Date.now()
+        if (withContents) pagesAt.current = Date.now()
       } catch (e) {
         if (e === 'signed-out') signedOut()
         else setError(typeof e === 'string' ? e : 'Could not reach SCELE')
+        // tried again in RETRY_MS, or as soon as the network is back
+        syncAt.current = Date.now() - SYNC_MS + RETRY_MS
       } finally {
+        busy.current = false
         setSyncing(false)
+        setProgress(null)
       }
     },
     [signedOut],
   )
 
-  // sync now, then every SYNC_MS; course pages on the first round and every third after
+  // a sync every SYNC_MS, with course pages every PAGES_MS, around the clock. Checked each minute
+  // rather than left to one long timer, which sleep pauses: a computer waking up, coming back
+  // online or the island being opened again reads anything older than STALE_MS at once
   useEffect(() => {
     if (!account) return
-    const run = () => sync(account, round.current++ % 3 === 0)
-    run()
-    const id = setInterval(run, SYNC_MS)
-    return () => clearInterval(id)
+    const due = (soon = false) => {
+      const now = Date.now()
+      const pages = now - pagesAt.current >= PAGES_MS
+      if (pages || now - syncAt.current >= (soon ? STALE_MS : SYNC_MS)) sync(account, pages)
+    }
+    const back = () => due(true)
+    const shown = () => document.visibilityState === 'visible' && due(true)
+    due()
+    const id = setInterval(due, 60_000)
+    window.addEventListener('online', back)
+    window.addEventListener('focus', back)
+    document.addEventListener('visibilitychange', shown)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('online', back)
+      window.removeEventListener('focus', back)
+      document.removeEventListener('visibilitychange', shown)
+    }
   }, [account, sync])
 
-  const { auto, duplicates, unsure, status, earlier, timelines, termStart } = useMemo(() => detect(data, prefs, slcm ?? null), [data, prefs, slcm])
+  const { auto, duplicates, unsure, status, earlier, timelines, termStart, unplanned } = useMemo(() => detect(data, prefs, slcm ?? null), [data, prefs, slcm])
   // the period's classes only: hand-added slots of a course that has ended drop out, and a class
   // added by hand stands in for a found one on the same day whose time wasn't listed
   const slots = useMemo(() => {
@@ -623,6 +692,13 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
       const sig = `${prefs.choice[c.id] ?? ''}/${prefs.primary[subjectOf(c)] ?? ''}|${mine.map((m) => `${slotKey(m)}@${m.end}@${m.room}`).join(',')}`
       const was = s.schedule[c.id]
       if (was === sig) continue
+      // only the room's separators changed (how it is written, not where): kept without an alert
+      const squash = (x: string) => x.replace(/\s*(?:-{2,}|—|\||·)\s*/g, ' ')
+      if (was !== undefined && squash(was) === squash(sig)) {
+        s.schedule[c.id] = sig
+        changed = true
+        continue
+      }
       // only a change the course made to classes it already had, not the user picking their class
       // or classes being found for the first time
       if (was !== undefined && was.split('|')[0] === sig.split('|')[0] && was.split('|')[1] && mine.length) {
@@ -695,7 +771,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
 
   const login = useCallback(async (password: string) => {
     const a = await sceleLogin(password)
-    round.current = 0
+    pagesAt.current = 0
     setAccount(a)
   }, [])
 
@@ -772,6 +848,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     status,
     earlier,
     timelines,
+    unplanned,
     upcoming,
     slcm: slcm ?? null,
     slcmStage,
@@ -783,6 +860,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     tuned,
     lead,
     syncing,
+    progress,
     error,
     login,
     logout,

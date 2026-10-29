@@ -11,6 +11,19 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.10',
+    campus: true,
+    title: 'Every week shows what\'s next',
+    items: [
+      'Every week now shows each class\'s next topic and its room, instead of where its time came from. Hover a class to see the date, and whether its time came from SLCM or the course page.',
+      'An exam or a week without class shows up there too.',
+      'Topics are also found in a course\'s first week, like an "Intro to OS" deck in Week 00 that lists the term\'s topics, or a plan typed straight onto the course page.',
+      'Syncing is faster, since several courses are read at once. Classes shows how far it has got.',
+      'Classes catches up as soon as your computer wakes up or is back online, instead of showing what it had before. It still syncs every 10 minutes, day and night.',
+      'If SLCM has no class for one of your courses, Classes asks whether you\'ve changed classes and offers to read SLCM again.',
+    ],
+  },
+  {
     version: '0.7.9',
     title: 'Profiles and Apple Music lyrics',
     items: [

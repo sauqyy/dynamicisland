@@ -296,7 +296,11 @@ const TIMELINE_RE = /\b(time\s?line|jadwal|schedule|rps|silabus|syllabus|sap|cou
 /** Google documents a course can link to as its timeline (see web_doc in scele.rs). */
 const GOOGLE_DOC = /^https:\/\/(docs\.google\.com\/(spreadsheets|document|presentation)\/|drive\.google\.com\/)/
 /** Sections that hold a course's general information. */
-const INFO_SECTION = /\b(general|umum|info|informasi|overview|course|pengantar|introduction|perkuliahan|silabus|syllabus)\b/i
+const INFO_SECTION = /\b(general|umum|info|informasi|overview|course|pengantar|pendahuluan|intro|introduction|orientasi|orientation|perkuliahan|silabus|syllabus)\b/i
+/** The first lecture, which often walks through the term's topics: "Intro to OS", "Pengantar", "Course Kick-off". */
+const INTRO_DOC = /\b(intro|introduction|pengantar|pendahuluan|orientasi|orientation|kick-?off|perkenalan|welcome)\b/i
+/** A section for the term's first week, numbered from 0 or 1: "Week 00", "Minggu ke-1", "Pertemuan 1", "Topic 1". */
+const FIRST_WEEK = /^\s*(?:week|minggu|pekan|pertemuan|sesi|session|topic|topik)\s*(?:ke\s*-?\s*)?0*[01]\b/i
 
 /** A document to read for a course's timeline: a file on its SCELE page, or a link it points to. */
 export interface DocRef {
@@ -305,16 +309,27 @@ export interface DocRef {
   name: string
   url: string
   kind: 'file' | 'link'
-  /** 1: named like a timeline or syllabus; 2: one of the general section's other documents */
+  /** 1: named like a timeline or syllabus, or the first lecture's deck; 2: another document of the sections the course introduces itself in */
   tier: 1 | 2
   size: number
   mime: string
 }
 
 /**
+ * The sections a course introduces itself in: the general one, ones named for the course's
+ * information or introduction, and the term's first week ("Week 00", "Minggu 1", or Moodle's first
+ * section), where the first lecture often lays out the topics week by week.
+ */
+export function introSections(sections: Section[]): Section[] {
+  const firstTopic = sections.find((s) => s.num > 0)
+  return sections.filter((s) => s.num === 0 || s === firstTopic || INFO_SECTION.test(s.name) || FIRST_WEEK.test(s.name))
+}
+
+/**
  * The documents worth reading for a course's timeline, most likely first: anything named like a
  * timeline, schedule, syllabus or overview (its files, or the Google Sheet/Doc/Slides/Drive file it
- * links to), then the other readable documents of the course's general section.
+ * links to) and the first lecture's deck, then the other readable documents of the sections the
+ * course introduces itself in.
  */
 export function docCandidates(sections: Section[]): DocRef[] {
   const out: DocRef[] = []
@@ -325,13 +340,14 @@ export function docCandidates(sections: Section[]): DocRef[] {
       out.push(r)
     }
   }
-  const mods = sections.flatMap((s) => s.modules.map((m) => ({ m, info: s.num === 0 || INFO_SECTION.test(s.name) })))
-  for (const { m } of mods) {
+  const intro = new Set(introSections(sections))
+  const mods = sections.flatMap((s) => s.modules.map((m) => ({ m, info: intro.has(s) })))
+  for (const { m, info } of mods) {
     if (m.mod === 'label') continue
-    const named = TIMELINE_RE.test(m.name)
+    const named = TIMELINE_RE.test(m.name) || (info && INTRO_DOC.test(m.name))
     for (const f of m.files ?? []) {
       if (!READABLE.test(f.name)) continue
-      if (named || TIMELINE_RE.test(f.name)) {
+      if (named || TIMELINE_RE.test(f.name) || (info && INTRO_DOC.test(f.name))) {
         add({ key: `${f.url}@${f.modified}`, name: m.name === f.name ? f.name : `${m.name} · ${f.name}`, url: f.url, kind: 'file', tier: 1, size: f.size, mime: f.mime })
       }
     }
@@ -550,6 +566,14 @@ export function scheduleText(course: Course, sections: Section[]): string {
     .map((m) => m.text ?? '')
     .filter((t) => /\b(jadwal|schedule|kuliah|kelas|class|lecture|pertemuan)\b/i.test(t))
   return [course.summary, first?.summary ?? '', ...(first?.modules.map((m) => m.text ?? '') ?? []), ...labels].join(' \n ')
+}
+
+/** What the course page writes in the sections it introduces itself in (summaries, labels), for a timeline typed onto the page. */
+export function introText(sections: Section[]): string {
+  return introSections(sections)
+    .flatMap((s) => [s.summary, ...s.modules.map((m) => m.text ?? '')])
+    .filter(Boolean)
+    .join('\n')
 }
 
 /** The one class a course is for when its name says so: "[KI] Operating Systems (A) Odd 2026/2027" → "A". */
