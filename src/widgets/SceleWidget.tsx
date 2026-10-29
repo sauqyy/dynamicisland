@@ -70,11 +70,17 @@ function SceleLogin({ scele, username }: { scele: SceleState; username: string }
   )
 }
 
+/** A sync under way, as far as it has got: "Reading course pages · 3 of 8". */
+const readingText = (scele: SceleState) =>
+  scele.progress && scele.progress.total ? `Reading course pages · ${Math.min(scele.progress.done, scele.progress.total)} of ${scele.progress.total}` : 'Reading your courses’ timelines…'
+
 function SyncRow({ scele, now }: { scele: SceleState; now: number }) {
   return (
     <div className="sc-sync">
       <span>
-        {scele.error ? (
+        {scele.progress ? (
+          readingText(scele)
+        ) : scele.error ? (
           <span className="sc-error">{scele.error}</span>
         ) : scele.syncedAt ? (
           // the clock ticks every 15 s, so a sync can be a moment "ahead" of it
@@ -155,13 +161,21 @@ const CERTAINTY: Record<NonNullable<Meeting['from']>, { word: string; cls: 'date
   'outline-dated': { word: 'section dated this week', cls: 'dated' },
   'outline-week': { word: 'estimated from the week number', cls: 'week' },
 }
-/** Where a found class came from, as the rows say it. */
-const SOURCE_NAME: Record<NonNullable<ClassSlot['source']>, string> = { slcm: 'SLCM study plan', page: 'course page', syllabus: 'syllabus', timeline: 'timeline' }
+/** Where a found class's time came from, as the rows say it. */
+const SOURCE_PHRASE: Record<NonNullable<ClassSlot['source']>, string> = {
+  slcm: 'time from SLCM',
+  page: 'time from the course page',
+  syllabus: 'time from the syllabus',
+  timeline: 'day from the timeline',
+}
 
 const DAY = 86_400_000
 const dayStart = (t: number) => new Date(new Date(t).setHours(0, 0, 0, 0)).getTime()
 const meetingKey = (m: Meeting) => `${m.slot.id}@${m.start}`
 const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString()
+/** A room as said: "Room 2.2301", but "Lab A3.02 (Gd. Baru)" as it is. */
+const roomText = (room: string) => (/^(?:room|ruang|lab|laboratorium|aula|hall)\b/i.test(room) ? room : `Room ${room}`)
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 /** A document's own name: "Lesson Plan - Statistics" of "Lesson Plan - Statistics · LessonPlan-SP.pdf". */
 const docName = (name: string) => name.split(' · ')[0]
 
@@ -239,7 +253,7 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
         </h4>
         {adding && <AddSlot scele={scele} initial={adding} onAdded={() => setAdding(null)} />}
         {!scele.slots.length && !adding && (
-          <div className="empty">{scele.syncing ? 'Reading your courses’ timelines…' : 'No class days found in this term’s courses yet. Connect SLCM below, or add yours, to get a heads-up and the day’s topic before each class.'}</div>
+          <div className="empty">{scele.syncing ? readingText(scele) : 'No class days found in this term’s courses yet. Connect SLCM below, or add yours, to get a heads-up and the day’s topic before each class.'}</div>
         )}
         {[1, 2, 3, 4, 5, 6, 0].map((d) => {
           const slots = scele.slots.filter((s) => s.day === d).sort((a, b) => (a.start || '99').localeCompare(b.start || '99'))
@@ -249,7 +263,14 @@ function Classes({ scele, now }: { scele: SceleState; now: number }) {
               <span className="sc-day">{dayName(d)}</span>
               <div>
                 {slots.map((s) => (
-                  <SlotRow key={s.id} slot={s} name={titleOf(scele, s)} onRemove={() => scele.removeSlot(s)} onSetTime={() => setTime(s)} />
+                  <SlotRow
+                    key={s.id}
+                    slot={s}
+                    name={titleOf(scele, s)}
+                    next={ahead.find((m) => m.slot.id === s.id && m.end > now)}
+                    onRemove={() => scele.removeSlot(s)}
+                    onSetTime={() => setTime(s)}
+                  />
                 ))}
               </div>
             </div>
@@ -380,9 +401,30 @@ function SlcmConnect({ scele, label, primary, open = false }: { scele: SceleStat
 }
 
 /** What the schedule can't settle alone, asked once, at the top. */
+/** The study plan and courses the "SLCM has no class for" card was put away for. */
+const PLAN_SEEN_KEY = 'di.scele.planSeen'
+
 function NeedsYou({ scele, askSlcm }: { scele: SceleState; askSlcm: number }) {
   const card = useRef<HTMLElement>(null)
   const untimed = new Set(scele.slots.filter((s) => !s.start).map((s) => s.courseId)).size
+  // courses SLCM has no class for: asked once per study plan read and set of courses
+  const { unplanned } = scele
+  const planKey = `${scele.slcm?.at ?? 0}:${unplanned.map((c) => c.id).join(',')}`
+  const [seenPlan, setSeenPlan] = useState(() => {
+    try {
+      return localStorage.getItem(PLAN_SEEN_KEY)
+    } catch {
+      return null
+    }
+  })
+  const dismissPlan = (key: string) => {
+    setSeenPlan(key)
+    try {
+      localStorage.setItem(PLAN_SEEN_KEY, key)
+    } catch {
+      /* ignore */
+    }
+  }
   useEffect(() => {
     if (askSlcm) card.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [askSlcm])
@@ -398,6 +440,21 @@ function NeedsYou({ scele, askSlcm }: { scele: SceleState; askSlcm: number }) {
           </span>
           {/* a class's "Get times from SLCM" opens it here, already asking */}
           <SlcmConnect key={askSlcm} scele={scele} label="Get times from SLCM" primary open={askSlcm > 0} />
+        </section>
+      )}
+      {scele.slcm && unplanned.length > 0 && !scele.slcmBusy && seenPlan !== planKey && (
+        <section className="sc-ask">
+          <span>
+            <b>{unplanned.length === 1 ? `SLCM has no class for ${courseTitle(unplanned[0])}` : `SLCM has no classes for ${unplanned.length} of your courses`}</b>
+            <small>
+              {unplanned.length > 1 && `${unplanned.map((c) => courseTitle(c)).join(', ')}. `}
+              The island last read your study plan {relTime(scele.slcm.at, Date.now())}. If you've changed classes since, read it again for their times and rooms.{' '}
+              <button className="sc-inline-link" data-cuelume-close onClick={() => dismissPlan(planKey)}>
+                Not now
+              </button>
+            </small>
+          </span>
+          <SlcmConnect scele={scele} label="Read SLCM again" primary />
         </section>
       )}
       {scele.duplicates.map((q) => (
@@ -482,7 +539,7 @@ function MeetingRow(props: {
 function MeetingDetail({ m, now, scele, onSetTime, onAskSlcm }: { m: Meeting; now: number; scele: SceleState; onSetTime: (s: ClassSlot) => void; onAskSlcm: () => void }) {
   const due = m.course ? scele.deadlines.filter((d) => d.courseId === m.course!.id && d.due > now).slice(0, 2) : []
   const syllabus = !m.topic && m.course ? syllabusLinks(scele.contents[m.course.id] ?? []) : []
-  const where = [m.slot.room && `Room ${m.slot.room}`, m.slot.source && `times from the ${SOURCE_NAME[m.slot.source]}`].filter(Boolean).join(' · ')
+  const where = [m.slot.room && roomText(m.slot.room), m.slot.source && capital(SOURCE_PHRASE[m.slot.source])].filter(Boolean).join(' · ')
   return (
     <div className="sc-detail">
       {m.slot.start ? (
@@ -622,7 +679,7 @@ function Sources({ scele }: { scele: SceleState }) {
                 : waiting
                   ? 'Waiting for you to pick your class above'
                   : found
-                  ? `${found} class${found > 1 ? 'es' : ''} a week · from the ${SOURCE_NAME[source ?? 'page']}`
+                  ? `${found} class${found > 1 ? 'es' : ''} a week · ${SOURCE_PHRASE[source ?? 'page']}`
                   : scele.syncing
                     ? 'Reading its documents…'
                     : 'No class days found · add them under Every week'}
@@ -667,9 +724,27 @@ function Sources({ scele }: { scele: SceleState }) {
   )
 }
 
-function SlotRow({ slot, name, onRemove, onSetTime }: { slot: ClassSlot; name: string; onRemove: () => void; onSetTime: () => void }) {
+/** What the next meeting of a weekly class is about, said briefly: its topic, an exam, or no class that week. */
+function nextText(m: Meeting | undefined): string {
+  if (!m) return ''
+  const date = new Date(m.start).toLocaleDateString([], { day: 'numeric', month: 'short' })
+  if (m.kind === 'off') return `No class ${date}${m.topic && m.topic !== 'No class' ? ` · ${m.topic}` : ''}`
+  if (m.kind === 'exam') return `Exam ${date}${m.topic ? ` · ${m.topic}` : ''}`
+  return m.topic ? `Next: ${m.topic}` : ''
+}
+
+/**
+ * A class of the weekly schedule: when, what its next meeting covers, and where. Where its time
+ * came from is only said on hover, or when nothing else is known.
+ */
+function SlotRow({ slot, name, next, onRemove, onSetTime }: { slot: ClassSlot; name: string; next?: Meeting; onRemove: () => void; onSetTime: () => void }) {
+  const topic = nextText(next)
+  const origin = slot.auto ? capital(SOURCE_PHRASE[slot.source ?? 'page']) : 'Added by you'
+  const hover = [next && topic && `${new Date(next.start).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}: ${next.kind === 'class' ? next.topic : topic}`, slot.room && roomText(slot.room), origin]
+    .filter(Boolean)
+    .join('\n')
   return (
-    <div className="sc-row static sc-slot">
+    <div className="sc-row static sc-slot" title={hover}>
       <span className="sc-slot-time">{slot.start ? `${slot.start}–${slot.end}` : 'no time'}</span>
       <span className="sc-main">
         <b>
@@ -680,9 +755,14 @@ function SlotRow({ slot, name, onRemove, onSetTime }: { slot: ClassSlot; name: s
             </span>
           )}
         </b>
-        <small>
-          {[slot.room, slot.auto ? `from the ${SOURCE_NAME[slot.source ?? 'page']}` : 'added by you'].filter(Boolean).join(' · ')}
-        </small>
+        {topic || slot.room ? (
+          <small className="sc-slot-line">
+            {topic && <span className={`sc-slot-topic ${next?.kind ?? ''}`}>{topic}</span>}
+            {slot.room && <span className="sc-slot-room">{slot.room}</span>}
+          </small>
+        ) : (
+          <small>{origin}</small>
+        )}
       </span>
       {!slot.start && (
         <button className="chip" data-cuelume-open onClick={onSetTime}>

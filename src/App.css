@@ -4773,6 +4773,36 @@ button.sc-row:hover {
   gap: 6px;
   font-weight: 500;
 }
+/* the next meeting's topic, then the room: both shorten to fit, so the room stays in view */
+.sc-slot .sc-slot-line {
+  display: flex;
+  gap: 5px;
+}
+.sc-slot-topic,
+.sc-slot-room {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sc-slot-topic {
+  flex: 0 1 auto;
+}
+.sc-slot-topic.off {
+  color: var(--warn);
+}
+.sc-slot-topic.exam {
+  color: var(--danger);
+}
+.sc-slot-room {
+  flex: 0 1 auto;
+  min-width: 4.5em;
+  max-width: 48%;
+  color: var(--text-3);
+}
+.sc-slot-topic + .sc-slot-room::before {
+  content: '· ';
+}
 /* where the schedule comes from: folded away under the agenda */
 .sc-sources {
   display: flex;
