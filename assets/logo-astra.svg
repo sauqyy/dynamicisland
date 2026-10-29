@@ -22,13 +22,10 @@
     </filter>
     <clipPath id="tile"><rect width="1024" height="1024" rx="232" /></clipPath>
   </defs>
-  <g clip-path="url(#tile)">
-    <rect width="1024" height="1024" fill="url(#bg)" />
-    <rect width="1024" height="1024" fill="url(#glow)" />
-  </g>
-  <rect x="132" y="372" width="760" height="280" rx="140" fill="url(#pill)" stroke="#fff" stroke-opacity="0.35" stroke-width="4" filter="url(#shadow)" />
+  <rect width="1024" height="1024" rx="232" fill="#050509" />
+  <rect x="8" y="8" width="1008" height="1008" rx="226" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="4" />
   <!-- Astra's eyes: two four-point stars that blink -->
-  <g fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round" filter="url(#halo)">
+  <g transform="translate(512 512) scale(1.25) translate(-512 -512)" fill="#fff" stroke="#fff" stroke-width="8" stroke-linejoin="round" filter="url(#halo)">
     <path transform-origin="360 512" d="M360 402 L385 487 L470 512 L385 537 L360 622 L335 537 L250 512 L335 487 Z">
       <animateTransform attributeName="transform" type="scale" additive="sum" values="1 1;1 1;1 .08;1 1;1 1" keyTimes="0;.88;.92;.96;1" dur="4s" repeatCount="indefinite" />
     </path>
