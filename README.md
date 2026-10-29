@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/logo.png" width="96" alt="Dynamic Island logo" />
+<img src="assets/logo.png" width="96" alt="Astra Isle logo" />
 
-# Dynamic Island
+# Astra Isle
 
 **A liquid, always-on-top island for the top of your screen, for Windows and macOS.**
 
@@ -23,8 +23,8 @@ Grab the latest build from [**Releases**](https://github.com/sauqyy/dynamicislan
 
 | Platform | File |
 |---|---|
-| Windows 10 / 11 | `DynamicIsland_<version>_x64-setup.exe` |
-| macOS (Intel and Apple silicon) | `Dynamic.Island_<version>_universal.dmg` |
+| Windows 10 / 11 | `AstraIsle_<version>_x64-setup.exe` |
+| macOS (Intel and Apple silicon) | `Astra.Isle_<version>_universal.dmg` |
 
 The app checks GitHub for updates on its own and shows what's new after each update.
 
@@ -59,6 +59,31 @@ Volume, brightness, battery, charging and downloads appear for a moment and fold
 - Group chats with icons, colours, sender names and read receipts
 - One-to-one and group voice calls (up to 6 people). Calls ring in the island with Answer and Decline, then become a small pill with the timer, mute, deafen and hang up
 - Pick your microphone and speaker in Settings
+
+### Astra, your voice assistant (beta)
+
+Astra is a little assistant who lives in the island. She is off until you turn her on in Settings, and her listening model downloads once, after she tells you how big it is.
+
+- **Wake her** with a global shortcut (press or hold, your choice), then just say what you need
+- **Her eyes live in the pill.** In the resting pill Astra's eyes blink and look around, take on the colour and accessories you give her, and follow your voice while she listens. Turn on *Only the eyes* to hide the clock and leave just her
+- **Talks back** with a local neural voice, or a cloud voice if you prefer. You can also type to her on the Astra page
+- Runs on a local model or Claude, with a short or normal reply length and a persona you pick
+
+#### Voice commands
+
+| Say something like | Astra will |
+|---|---|
+| "Open Spotify", "open VS Code" | Launch an app, file or folder |
+| "Search the web for ..." | Search, or open an https link |
+| "Pause", "play", "next song", "previous song" | Control the music that's playing |
+| "Volume up", "volume down", "set volume to 40", "mute" | Change the system volume |
+| "Set a timer for 10 minutes" | Start a timer on the island |
+| "Add buy milk to my to-do" | Add a task |
+| Your own routine names | Run a routine (several actions in one phrase) |
+| "Lock the computer", "sleep", "restart", "shut down" | Power actions, off until you enable them |
+| Any question | Answer it |
+
+You choose what Astra may do in Settings, one tool at a time, and she asks before opening a file path she doesn't already trust. You can add your own aliases and routines too.
 
 ### And more
 
@@ -121,7 +146,8 @@ See [`supabase/README.md`](supabase/README.md) for details. Without it, everythi
 src/
   App.tsx        island state and which page is shown
   island/        the island shell, alert icons, page bar
-  widgets/       one component per page (media, timer, chat, ...)
+  widgets/       one component per page (media, timer, chat, Astra, ...)
+  mascot/        Astra's eyes and accessories
   lib/           hooks and helpers (media, lyrics, calls, settings, ...)
 src-tauri/       Rust side: windows, tray, media, system and file APIs
 supabase/        database schema for friends, groups and chats
