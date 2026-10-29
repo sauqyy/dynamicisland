@@ -8,10 +8,6 @@
 </head>
 <body>
   <main class="window" data-state="welcome">
-    <div class="blob b1"></div>
-    <div class="blob b2"></div>
-    <div class="blob b3"></div>
-
     <header class="titlebar" data-tauri-drag-region>
       <span class="titlebar-name" data-tauri-drag-region><span class="ui-mark sm ui-only" data-tauri-drag-region></span><span class="app-name" data-tauri-drag-region>Astra Isle</span></span>
       <div class="titlebar-buttons">
@@ -20,42 +16,48 @@
       </div>
     </header>
 
-    <section class="stage" data-tauri-drag-region>
-      <!-- the logo island -->
-      <div class="island" aria-hidden="true">
-        <div class="pill">
-          <div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        </div>
-        <div class="bubble"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="11" class="ring-bg" /><circle id="ring" cx="18" cy="18" r="11" class="ring-fg" /></svg></div>
+    <!-- left: the mascot -->
+    <aside class="side" data-tauri-drag-region>
+      <div class="face" aria-hidden="true">
+        <svg viewBox="0 0 64 28" class="eyes">
+          <g class="eye" id="eyeL"><path d="M17 3.5 L20.3 10.7 L27.5 14 L20.3 17.3 L17 24.5 L13.7 17.3 L6.5 14 L13.7 10.7 Z" /></g>
+          <g class="eye" id="eyeR"><path d="M47 3.5 L50.3 10.7 L57.5 14 L50.3 17.3 L47 24.5 L43.7 17.3 L36.5 14 L43.7 10.7 Z" /></g>
+        </svg>
       </div>
+      <div class="side-foot">
+        <span class="side-name">Astra Isle</span>
+        <span id="version" class="side-version"></span>
+      </div>
+    </aside>
 
-      <!-- welcome -->
+    <!-- right: the steps -->
+    <section class="stage">
       <div class="panel panel-welcome">
         <div class="ui-badge ui-only"><span class="ui-mark"></span><small>Universitas Indonesia</small></div>
+        <span class="eyebrow">Welcome</span>
         <h1 class="app-name">Astra Isle</h1>
-        <p>Your desktop, alive.<br />Music, timers, notes and friends, right at the top of your screen.</p>
+        <p>Your desktop, alive. Music, timers, notes and friends, right at the top of your screen.</p>
         <button id="install" class="cta">Install</button>
-        <small id="version"></small>
       </div>
 
-      <!-- installing -->
       <div class="panel panel-installing">
+        <span class="eyebrow">Installing</span>
         <h1>Setting things up</h1>
         <p id="status">Unpacking…</p>
         <div class="progress"><div id="fill"></div></div>
         <small id="percent">0%</small>
       </div>
 
-      <!-- done -->
       <div class="panel panel-done">
         <div class="ui-badge ui-only"><span class="ui-mark"></span><small>Universitas Indonesia</small></div>
+        <span class="eyebrow">Finished</span>
         <h1>You're all set</h1>
         <p><span class="app-name">Astra Isle</span> is installed. It lives at the top of your screen: hover it, click it, drag it.</p>
         <button id="launch" class="cta">Open <span class="app-name">Astra Isle</span></button>
       </div>
 
-      <!-- error -->
       <div class="panel panel-error">
+        <span class="eyebrow">Error</span>
         <h1>Something went wrong</h1>
         <p id="error">Setup could not finish.</p>
         <button id="retry" class="cta">Try again</button>

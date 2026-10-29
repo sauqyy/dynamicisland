@@ -17,7 +17,6 @@ function setProgress(p) {
   shown = p
   $('fill').style.width = `${p}%`
   $('percent').textContent = `${Math.round(p)}%`
-  $('ring').style.strokeDashoffset = String(69.1 * (1 - p / 100))
   const step = [...STEPS].reverse().find(([from]) => p >= from)
   if (step) $('status').textContent = step[1]
 }
@@ -69,3 +68,19 @@ tauri?.core
   .catch(() => {})
 
 tauri?.core.invoke('version').then((v) => ($('version').textContent = `Version ${v}`)).catch(() => {})
+
+// The mascot blinks now and then and glances around while it waits.
+const eyes = [$('eyeL'), $('eyeR')]
+const look = (x, y) => eyes.forEach((e) => (e.style.translate = `${x}px ${y}px`))
+function blink() {
+  if (root.dataset.state === 'error') return
+  eyes.forEach((e) => (e.style.transform = 'scaleY(0.1)'))
+  setTimeout(() => eyes.forEach((e) => (e.style.transform = '')), 130)
+}
+function glance() {
+  if (root.dataset.state === 'done' || root.dataset.state === 'error') return look(0, 0)
+  look((Math.random() - 0.5) * 22, (Math.random() - 0.5) * 8)
+  setTimeout(() => look(0, 0), 1100)
+}
+setInterval(blink, 3200)
+setInterval(glance, 4800)
