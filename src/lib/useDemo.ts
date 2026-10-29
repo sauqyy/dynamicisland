@@ -66,6 +66,7 @@ const seed = (): Record<string, Message[]> => ({
 /** In-memory stand-ins for useAuth and useSocial. Messages get a canned reply after a moment. */
 export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: Call; voice: GroupVoice; ping: () => { friend: Friend; body: string }; ringCall: () => void; groupRing: string | null; ringGroupCall: () => void; answerGroupRing: () => void; declineGroupRing: () => void } {
   const [profile, setProfile] = useState<Profile>(ME)
+  const [signedIn, setSignedIn] = useState(true)
   const [messages, setMessages] = useState<Record<string, Message[]>>(seed)
   const [unread, setUnread] = useState<Record<string, number>>({ a: 1, b: 1 })
   const [incoming, setIncoming] = useState<Request[]>([{ friendshipId: 900, profile: requester }])
@@ -138,14 +139,15 @@ export function useDemo(): { auth: Auth; social: Social; groups: Groups; call: C
     return { friend, body }
   }
 
+  // signing out shows the sign-in form; any of its buttons signs back in to the same demo account
   const auth: Auth = {
-    user: { id: 'me', email: 'you@example.com' } as User,
-    profile,
+    user: signedIn ? ({ id: 'me', email: 'you@example.com' } as User) : null,
+    profile: signedIn ? profile : null,
     loading: false,
-    signIn: async () => null,
-    signUp: async () => null,
-    signInWithGoogle: async () => null,
-    signOut: async () => {},
+    signIn: async () => (setSignedIn(true), null),
+    signUp: async () => (setSignedIn(true), null),
+    signInWithGoogle: async () => (setSignedIn(true), null),
+    signOut: async () => (setSignedIn(false), null),
     saveProfile: async (patch) => {
       setProfile((p) => ({ ...p, ...patch }))
       return null

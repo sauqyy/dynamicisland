@@ -173,7 +173,7 @@ interface Props {
   setMode: (m: ClockMode) => void
   timer: TimerState | null
   now: number
-  onStart: (minutes: number) => void
+  onStart: (minutes: number, goal?: string) => void
   onCancel: () => void
   sw: StopwatchState
   setSw: (s: StopwatchState) => void
