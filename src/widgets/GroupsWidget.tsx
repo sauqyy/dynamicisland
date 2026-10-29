@@ -6,7 +6,9 @@ import { disclosureCue } from '../lib/sound'
 import { ACCENTS } from '../lib/settings'
 import type { GroupVoice } from '../lib/useGroupVoice'
 import { MAX_VOICE } from '../lib/useGroupVoice'
+import { useVoiceRoster } from '../lib/useVoiceRoster'
 import { Avatar } from './Avatar'
+import { ProfileAvatar } from './ProfileView'
 import { ChatInput } from './ChatInput'
 import { HeadphonesIcon } from './CallBar'
 import { VoiceBar } from './VoiceBar'
@@ -69,7 +71,7 @@ function GroupBubble({ m, mine, group, readers, seenHere, everyoneRead }: { m: G
         bubble
       ) : (
         <div className="msg-row">
-          {from ? <Avatar profile={from} size={24} /> : <span className="avatar ghost" style={{ width: 24, height: 24 }} />}
+          {from ? <ProfileAvatar profile={from} size={24} /> : <span className="avatar ghost" style={{ width: 24, height: 24 }} />}
           {bubble}
         </div>
       )}
@@ -193,7 +195,7 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
 
       {group.members.map((p) => (
         <div key={p.id} className="friend-row" style={{ cursor: 'default' }}>
-          <Avatar profile={p} size={26} />
+          <ProfileAvatar profile={p} size={26} presence />
           <div className="friend-meta">
             <b>{p.display_name || `@${p.username}`}</b>
             <small>
@@ -233,6 +235,11 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
   const end = useRef<HTMLDivElement>(null)
   const list = groups.messages[group.id]
   const { open } = groups
+  // who is in this group's voice chat: you and the others when you are in it, otherwise whoever is listed in the room
+  const inThisVoice = voice?.state.groupId === group.id
+  const roster = useVoiceRoster(group.id, !inThisVoice)
+  const inVoiceIds = inThisVoice ? voice.state.members : roster
+  const inVoice = group.members.filter((p) => inVoiceIds.includes(p.id))
 
   useEffect(() => {
     open(group.id)
@@ -272,8 +279,10 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
           ‹ Back
         </button>
         <GroupIcon group={group} size={22} />
-        <b>{group.name}</b>
-        <small className="handle">{group.members.length} {group.members.length === 1 ? 'member' : 'members'}</small>
+        <span className="chat-title">
+          <b>{group.name}</b>
+          <small className="handle">{group.members.length} {group.members.length === 1 ? 'member' : 'members'}</small>
+        </span>
         <button className={`chip group-info-btn ${info ? 'on' : ''}`} {...disclosureCue(info)} aria-pressed={info} title="Members and invites" onClick={() => setInfo((v) => !v)}>
           Info
         </button>
@@ -297,6 +306,31 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
       ) : (
         <>
           {voice && <VoiceBar voice={voice} group={group} me={me} />}
+          {/* a voice chat is going on without you: who is in it, how many, and a way in */}
+          {!inThisVoice && inVoice.length > 0 && (
+            <div className="voice-live" role="status">
+              <span className="voice-faces" title={`In the voice chat: ${inVoice.map(nameOf).join(', ')}`} aria-hidden>
+                {inVoice.map((p) => (
+                  <Avatar key={p.id} profile={p} size={20} />
+                ))}
+              </span>
+              <span className="voice-live-count">
+                {inVoice.length}/{group.members.length} in call
+              </span>
+              {voice && (
+                <button
+                  className="chip voice-join"
+                  disabled={Boolean(voice.state.groupId) || voiceBlocked || inVoice.length >= MAX_VOICE}
+                  data-cuelume-tap
+                  title={voice.state.groupId ? 'Already in a voice chat' : voiceBlocked ? 'You are on a call' : inVoice.length >= MAX_VOICE ? `Voice chat is full (max ${MAX_VOICE})` : 'Join the voice chat'}
+                  onClick={() => voice.join(group.id)}
+                >
+                  <HeadphonesIcon off={false} />
+                  Join
+                </button>
+              )}
+            </div>
+          )}
           <div className="chat-list">
             {!list ? (
               <div className="empty">Loading…</div>
@@ -422,12 +456,29 @@ export function GroupsPanel({ me, groups, onOpen }: Props) {
         </div>
       ))}
 
-      <div className="chat-share">
-        <button className={`chip ${mode === 'create' ? 'on' : ''}`} {...disclosureCue(mode === 'create')} onClick={() => setMode(mode === 'create' ? null : 'create')}>
-          New group
+      <div className="group-actions">
+        <button className={`group-action ${mode === 'create' ? 'on' : ''}`} aria-pressed={mode === 'create'} {...disclosureCue(mode === 'create')} onClick={() => setMode(mode === 'create' ? null : 'create')}>
+          <span className="ga-icon" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </span>
+          <span className="ga-text">
+            <b>New group</b>
+            <small>Chat with friends</small>
+          </span>
         </button>
-        <button className={`chip ${mode === 'join' ? 'on' : ''}`} {...disclosureCue(mode === 'join')} onClick={() => setMode(mode === 'join' ? null : 'join')}>
-          Join with code
+        <button className={`group-action ${mode === 'join' ? 'on' : ''}`} aria-pressed={mode === 'join'} {...disclosureCue(mode === 'join')} onClick={() => setMode(mode === 'join' ? null : 'join')}>
+          <span className="ga-icon" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
+              <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
+            </svg>
+          </span>
+          <span className="ga-text">
+            <b>Join a group</b>
+            <small>Use an invite code</small>
+          </span>
         </button>
       </div>
 

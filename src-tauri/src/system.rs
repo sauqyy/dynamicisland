@@ -51,7 +51,7 @@ pub fn spawn_battery(app: AppHandle) {
     });
 }
 
-fn endpoint() -> Option<IAudioEndpointVolume> {
+pub(crate) fn endpoint() -> Option<IAudioEndpointVolume> {
     unsafe {
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).ok()?;

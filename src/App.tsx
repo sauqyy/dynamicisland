@@ -14,8 +14,19 @@ import { useUpdater } from './lib/useUpdater'
 import { getVersion } from '@tauri-apps/api/app'
 import { CHANGELOG, releaseToShow, type Release } from './lib/changelog'
 import { SettingsWidget } from './widgets/SettingsWidget'
+import { AstraWelcome } from './widgets/AstraWelcome'
+import { astraIntroSeen, markAstraIntro } from './lib/astraIntro'
+import { markUpdateSeen, updateSeen } from './lib/updateSeen'
 import { ShelfWidget } from './widgets/ShelfWidget'
 import { NotesWidget } from './widgets/NotesWidget'
+import { PrompterWidget } from './widgets/PrompterWidget'
+import { DeadlinesWidget } from './widgets/DeadlinesWidget'
+import { ScheduleWidget } from './widgets/ScheduleWidget'
+import { StudyWidget } from './widgets/StudyWidget'
+import { dueLabel, upcoming, urgency, URGENT_HOURS, useDeadlines, type Deadline } from './lib/deadlines'
+import { classState, nextClassLabel, useSchedule } from './lib/schedule'
+import { DEFAULT_LABEL, studyActivity, useStudyBoard, useStudyLog, type StudySession } from './lib/study'
+import { useStudyRoom, type StudyRoom } from './lib/useStudyRoom'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
@@ -29,9 +40,18 @@ import { useSocial } from './lib/useSocial'
 import { useGroups } from './lib/useGroups'
 import { useCall } from './lib/useCall'
 import { useGroupVoice } from './lib/useGroupVoice'
+import { useGroupRing } from './lib/useGroupRing'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
+import { playJoin, playLeave } from './lib/callSounds'
 import { useClipboard } from './lib/useClipboard'
 import { Rail } from './island/Rail'
+import { MascotEyes } from './mascot/MascotEyes'
+import { AstraChatWidget } from './widgets/AstraChatWidget'
+import { AssistantCard, assistantShape } from './widgets/AssistantCard'
+import { useAssistant } from './lib/useAssistant'
+import { loadNeural } from './lib/neuralVoice'
+import { demoStt, loadStt, setSttModel, sttDeferred, useSttStatus } from './lib/speechToText'
+import { llmInstalled, loadLlm } from './lib/localBrain'
 import { AlertIcon, alertTone } from './island/AlertIcon'
 import {
   DEFAULT_APPS,
@@ -41,7 +61,7 @@ import {
   useStoredList,
   type FileItem,
 } from './lib/files'
-import { SPRINGS, STAGE, useSettings } from './lib/settings'
+import { CLOUD_MODEL, clampPos, SPRINGS, STAGE, useSettings, useSettingsSync } from './lib/settings'
 import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
@@ -145,7 +165,75 @@ function clockText(d: Date, clock24: boolean) {
 
 export default function App() {
   const { track, playing, position, toggle, seek, skip } = useMedia()
-  const { settings, update } = useSettings()
+  const { settings, update, adopt } = useSettings()
+  const assistant = useAssistant({
+    enabled: settings.assistant,
+    hotkey: settings.assistantKey,
+    talk: settings.assistantTalk,
+    brain: settings,
+    voice: {
+      enabled: settings.assistantSpeak,
+      voice: settings.assistantVoice,
+      rate: settings.assistantRate,
+      cloud: settings.assistantVoiceEngine === 'openai' ? { voice: settings.assistantCloudVoice, model: CLOUD_MODEL } : null,
+    },
+    // the parts of the island the assistant can operate
+    controls: {
+      startTimer: (m) => startTimer(m),
+      addTodo: (text) => setTodos((t) => [...t, { id: Date.now(), text, done: false }]),
+      isPlaying: () => playingRef.current,
+    },
+    // what Claude is told about the moment: the time, and what is playing
+    getContext: () => {
+      const d = new Date()
+      const when = d.toLocaleString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      const music = track ? `${playing ? 'Playing now' : 'Paused'}: "${track.title}"${track.artist ? ` by ${track.artist}` : ''}.` : ''
+      return `It is ${when}. ${music}`.trim()
+    },
+    // an answer typed for in the Chat tab lands in the pill when the island is not open to show it
+    onChatReply: (text) => {
+      if (expandedRef.current) return
+      pushAlertRef.current({ icon: '✨', text: settingsRef.current.mascotName || 'Astra', sub: text.replace(/\s+/g, ' ').slice(0, 60), openTab: 'astra' }, 'ready')
+    },
+  })
+  const expandedRef = useRef(false)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const pushAlertRef = useRef<(a: Omit<IslandAlert, 'id'>, cue?: SoundName) => void>(() => {})
+  // the mic light is expected while you talk to the island, so it should not warn about itself
+  const playingRef = useRef(false)
+  playingRef.current = playing
+  const [astraIntro, setAstraIntro] = useState(false) // the Astra (beta) welcome, shown once
+  // get listening and talking ready in the background (the first time they download), so nobody waits for them
+  useEffect(() => {
+    if (!IS_TAURI || !settings.assistant || astraIntro) return
+    // the size is chosen before anything loads, and a change of size reloads it
+    setSttModel(settings.assistantListenModel)
+    // someone who put the download off is not surprised by it later
+    if (sttDeferred()) return
+    const t = setTimeout(() => void loadStt().catch(() => {}), 2000)
+    return () => clearTimeout(t)
+  }, [settings.assistant, settings.assistantListenModel, astraIntro])
+  useEffect(() => {
+    if (!IS_TAURI || !settings.assistant || settings.assistantEngine !== 'local') return
+    // started in the background so the first question does not wait for it, but only when it is already downloaded:
+    // a multi-gigabyte download should start when it is asked for, not by itself
+    let alive = true
+    const t = setTimeout(async () => {
+      if (alive && (await llmInstalled(settings.assistantLocalModel))) void loadLlm(settings.assistantLocalModel).catch(() => {})
+    }, 6000)
+    return () => {
+      alive = false
+      clearTimeout(t)
+    }
+  }, [settings.assistant, settings.assistantEngine, settings.assistantLocalModel])
+  useEffect(() => {
+    if (!IS_TAURI || !settings.assistant || !settings.assistantSpeak || settings.assistantVoiceEngine === 'openai') return
+    const t = setTimeout(() => void loadNeural().catch(() => {}), 8000)
+    return () => clearTimeout(t)
+  }, [settings.assistant, settings.assistantSpeak, settings.assistantVoiceEngine])
+  const assistantAwake = useRef(false)
+  assistantAwake.current = assistant.state.phase !== 'idle'
   useSoundSetup(settings.uiSounds, settings.soundPack, settings.soundVolume, settings.typingSounds)
   const [hidden, setHidden] = useState(false)
   const updater = useUpdater()
@@ -165,6 +253,7 @@ export default function App() {
   const [fsWin, setFsWin] = useState(false) // the window is covering the monitor
   const fsTimer = useRef(0)
   const [notes, setNotes] = useState<Release | null>(null) // "What's new" card after an update
+  const afterIntro = useRef<Release | null>(null) // the update notes that wait behind it
   // the browser demo's button panel can be dragged out of the way by its title
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 })
   const panelDrag = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
@@ -172,6 +261,7 @@ export default function App() {
   const demo = useDemo()
   const auth = DEMO_SOCIAL ? demo.auth : realAuth
   const meId = !DEMO_SOCIAL && auth.user && auth.profile ? auth.user.id : null
+  useSettingsSync(DEMO_SOCIAL ? null : (realAuth.user?.id ?? null), settings, adopt)
   const [hovered, setHovered] = useState(false)
   const [intro, setIntro] = useState(0) // bumped by the demo's Replay intro button
   const [tab, setTab] = useState<Tab>(loadTab)
@@ -199,6 +289,18 @@ export default function App() {
   const [sw, setSw] = useState<StopwatchState>({ running: false, startedAt: 0, base: 0, laps: [] })
   const [now, setNow] = useState(() => Date.now())
   const [todos, setTodos] = useState<Todo[]>(loadTodos)
+  const { deadlines, setDeadlines } = useDeadlines()
+  const openDeadlines = useMemo(() => upcoming(deadlines), [deadlines])
+  const { slots, setSlots } = useSchedule()
+  const { log: studyLog, history: studyHistory, add: logStudy, clearHistory: clearStudyHistory } = useStudyLog()
+  // what the current focus session is for, and the study session that is counting minutes (the ref lets timers read it without waiting for a render)
+  const [task, setTask] = useState('')
+  const taskRef = useRef(task)
+  taskRef.current = task
+  const taskDeadline = useRef<number | undefined>(undefined)
+  const [study, setStudyState] = useState<StudySession | null>(null)
+  const studyRef = useRef<StudySession | null>(null)
+  const leaveRoomRef = useRef<(gid: string) => void>(() => {})
   const [battery, setBattery] = useState<number | null>(null)
   // natural height of the page on show, measured as it renders
   const [pageH, setPageH] = useState(240)
@@ -268,6 +370,12 @@ export default function App() {
   useEffect(() => {
     if (!dragRef.current?.active && !motionRef.current.raf) setPos({ x: settings.posX, y: settings.posY })
   }, [settings.posX, settings.posY])
+  // tray menu → "Reset island position": the way back when the pill ends up somewhere it can't be clicked
+  useEffect(() => {
+    if (!IS_TAURI) return
+    const off = listen('reset-position', () => update({ posX: 0, posY: 0 }))
+    return () => void off.then((f) => f())
+  }, [update])
   const addShelf = shelf.add
   const addApps = apps.add
 
@@ -289,6 +397,23 @@ export default function App() {
     setAlert({ ...a, id: ++alertId.current })
     if (cue) play(cue, opts)
   }, [])
+  pushAlertRef.current = pushAlert
+  expandedRef.current = expanded
+
+  // study sessions: a focus phase or a shared room counts its minutes into the log when it ends
+  const beginStudy = useCallback((label: string, opts: { maxMin: number; deadlineId?: number; gid?: string }) => {
+    const s: StudySession = { label: label.trim() || DEFAULT_LABEL, startedAt: Date.now(), ...opts }
+    studyRef.current = s
+    setStudyState(s)
+  }, [])
+  const endStudy = useCallback(() => {
+    const s = studyRef.current
+    if (!s) return
+    studyRef.current = null
+    setStudyState(null)
+    logStudy(s.label, Math.min((Date.now() - s.startedAt) / 60_000, s.maxMin), s.startedAt, Boolean(s.gid))
+    if (s.gid) leaveRoomRef.current(s.gid)
+  }, [logStudy])
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
@@ -301,13 +426,32 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.id, pushAlert])
 
-  // tell the user once per version when the automatic check finds an update; the cog keeps a dot until it is installed
-  const alertedUpdate = useRef('')
+  // an available update stays in the pill until it is hovered; after that it stays away, even across restarts,
+  // until a newer version comes along. The cog keeps its dot until the update is installed.
+  const [fakeUpdate, setFakeUpdate] = useState('') // the browser demo's pretend update
+  const [seenUpdate, setSeenUpdate] = useState(updateSeen)
+  const updateVersion = updater.state.s === 'available' ? updater.state.version : fakeUpdate
+  const cuedUpdate = useRef('')
   useEffect(() => {
-    if (updater.state.s !== 'available' || alertedUpdate.current === updater.state.version) return
-    alertedUpdate.current = updater.state.version
-    pushAlert({ icon: '⬆️', text: 'Update available', sub: `v${updater.state.version} · open Settings to install` }, 'ready')
-  }, [updater.state, pushAlert])
+    if (!updateVersion || updateVersion === seenUpdate || cuedUpdate.current === updateVersion) return
+    cuedUpdate.current = updateVersion
+    play('ready')
+  }, [updateVersion, seenUpdate])
+
+  // alerts and rings are held back during class and focus sessions, on top of the Focus status; what arrives is counted
+  const cls = useMemo(() => classState(slots, now), [slots, now])
+  const inClass = settings.classMode && Boolean(cls.current)
+  const focusing = settings.focusMute && Boolean(study)
+  const silent = inClass || focusing
+  const quiet = auth.profile?.presence === 'dnd' || silent
+  const missed = useRef(0)
+  /** true when an incoming alert should be dropped */
+  const hush = () => {
+    if (auth.profile?.presence === 'dnd') return true
+    if (!silent) return false
+    missed.current++
+    return true
+  }
 
   const playMessageSound = () => {
     if (settings.messageSound) {
@@ -317,7 +461,7 @@ export default function App() {
   }
 
   const realSocial = useSocial(meId, (m, from) => {
-    if (auth.profile?.presence === 'dnd') return
+    if (hush()) return
     playMessageSound()
     pushAlert({
       icon: '💬',
@@ -329,7 +473,7 @@ export default function App() {
   })
 
   const call = useCall(meId, realSocial.friends, (from) => {
-    if (auth.profile?.presence === 'dnd') return
+    if (hush()) return
     pushAlert(
       { icon: '📞', text: from.profile.display_name || from.profile.username, sub: 'Incoming voice call', avatar: from.profile, chatWith: from.profile.id },
       'attention',
@@ -337,10 +481,48 @@ export default function App() {
   })
 
   const activeCall = DEMO_SOCIAL ? demo.call : call
-  // the demo can also ring a group's voice chat (the id of the group that is calling)
-  const groupRing = DEMO_SOCIAL ? demo.groupRing : null
+
+  const groupChats = useGroups(meId, (m, group, from) => {
+    if (hush()) return
+    playMessageSound()
+    pushAlert({
+      icon: group?.emoji ?? '👥',
+      text: group?.name ?? 'Group chat',
+      sub: `${from?.display_name || from?.username || 'Someone'}: ${m.kind === 'activity' ? '🎵 shared an activity' : m.kind === 'note' ? '📝 shared a note' : m.body}`.slice(0, 42),
+    })
+  })
+
+  // someone starting a group's voice chat rings the rest of the group
+  const groupRinger = useGroupRing(meId, groupChats.groups, (group, from) => {
+    if (activeCall.state.phase !== 'idle' || voice.state.groupId || hush()) return
+    pushAlert(
+      { icon: '📞', text: group.name, sub: `${from?.display_name || from?.username || 'Someone'} started a voice chat`, avatar: from },
+      'attention',
+    )
+  })
+  const voice = useGroupVoice(meId, groupChats.groups, groupRinger)
+
+  // the id of the group whose voice chat is ringing, unless you are already in a call
+  const groupRing = DEMO_SOCIAL
+    ? demo.groupRing
+    : groupRinger.ring && activeCall.state.phase === 'idle' && !voice.state.groupId
+      ? groupRinger.ring.gid
+      : null
   const incomingCall = activeCall.state.phase === 'incoming' || Boolean(groupRing)
-  const ringing = incomingCall && auth.profile?.presence !== 'dnd'
+  const ringing = incomingCall && !quiet
+
+  // friends studying in a group's room, and the room you sit in
+  const studyRoom = useStudyRoom(DEMO_SOCIAL ? null : meId, groupChats.groups, (room, group, host) => {
+    if (quiet) return
+    pushAlert(
+      { icon: '📚', text: group.name, sub: `${host?.display_name || host?.username || 'Someone'} is studying · ${room.task || 'join them'}`.slice(0, 42), openTab: 'study' },
+      'attention',
+    )
+  })
+  leaveRoomRef.current = studyRoom.leave
+  // the browser demo has no backend, so it keeps its own pretend study rooms
+  const [demoRooms, setDemoRooms] = useState<Record<string, StudyRoom>>({})
+  const rooms = DEMO_SOCIAL ? demoRooms : studyRoom.rooms
   // the ringtone follows the sound volume slider in Settings
   useEffect(() => {
     ringAudio.volume = Math.min(1, Math.max(0, settings.soundVolume))
@@ -352,18 +534,13 @@ export default function App() {
     } else ringAudio.pause()
     return () => ringAudio.pause()
   }, [ringing])
-
-  const groupChats = useGroups(meId, (m, group, from) => {
-    if (auth.profile?.presence === 'dnd') return
-    playMessageSound()
-    pushAlert({
-      icon: group?.emoji ?? '👥',
-      text: group?.name ?? 'Group chat',
-      sub: `${from?.display_name || from?.username || 'Someone'}: ${m.kind === 'activity' ? '🎵 shared an activity' : m.kind === 'note' ? '📝 shared a note' : m.body}`.slice(0, 42),
-    })
-  })
-
-  const voice = useGroupVoice(meId, groupChats.groups)
+  const answerGroupRing = () => {
+    if (DEMO_SOCIAL) return demo.answerGroupRing()
+    const gid = groupRing
+    groupRinger.dismiss()
+    if (gid) void voice.join(gid)
+  }
+  const declineGroupRing = DEMO_SOCIAL ? demo.declineGroupRing : groupRinger.dismiss
 
   useEffect(() => {
     if (!alert) return
@@ -373,20 +550,22 @@ export default function App() {
 
   const advancePomo = useCallback(
     (p: PomodoroState) => {
+      endStudy() // a finished (or skipped) focus phase is logged; a break has nothing to log
       const next = nextPomo(p)
       const total = POMO_MIN[next.phase] * 60_000
       const start = Date.now()
       setPomo(next)
       setTimer({ endsAt: start + total, total })
       setNow(start) // so the ring shows the new phase full straight away instead of waiting for the next tick
+      if (next.phase === 'focus') beginStudy(taskRef.current, { maxMin: POMO_MIN.focus, deadlineId: taskDeadline.current })
       pushAlert(
         next.phase === 'focus'
-          ? { icon: '🎯', text: 'Focus time', sub: `Session ${next.done + 1}` }
-          : { icon: '☕', text: next.phase === 'long' ? 'Long break' : 'Break time', sub: `${next.done} done` },
+          ? { icon: '🎯', text: 'Focus time', sub: taskRef.current ? `${taskRef.current} · session ${next.done + 1}` : `Session ${next.done + 1}` }
+          : { icon: '☕', text: next.phase === 'long' ? 'Long break' : 'Break time', sub: next.phase === 'long' ? `${next.done} done · stretch your legs` : `${next.done} done` },
         'attention',
       )
     },
-    [pushAlert],
+    [pushAlert, endStudy, beginStudy],
   )
 
   useEffect(() => {
@@ -394,10 +573,79 @@ export default function App() {
     if (pomo) {
       advancePomo(pomo)
     } else {
+      const wasRoom = Boolean(studyRef.current?.gid)
+      endStudy()
       setTimer(null)
-      pushAlert({ icon: '⏰', text: 'Timer done' }, 'attention')
+      pushAlert(wasRoom ? { icon: '📚', text: 'Study session done' } : { icon: '⏰', text: 'Timer done' }, 'attention')
     }
-  }, [now, timer, pomo, pushAlert, advancePomo])
+  }, [now, timer, pomo, pushAlert, advancePomo, endStudy])
+
+  // when class or a focus session ends, say what came in while the island was quiet
+  const wasSilent = useRef(false)
+  useEffect(() => {
+    if (wasSilent.current && !silent && missed.current > 0) {
+      const n = missed.current
+      // after the "break time" / "class over" alert has had its moment
+      setTimeout(() => pushAlert({ icon: '💬', text: `${n} while you were away`, sub: n === 1 ? '1 message or call' : `${n} messages and calls` }), 2800)
+    }
+    if (!silent) missed.current = 0
+    wasSilent.current = silent
+  }, [silent, pushAlert])
+
+  // reminders that only fire once: due-soon deadlines, the class that is about to start, class mode switching on
+  const notified = useRef(new Set<string>())
+  const lastClass = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    const fire = (key: string, a: Omit<IslandAlert, 'id'>, cue: SoundName = 'attention') => {
+      if (notified.current.has(key)) return
+      notified.current.add(key)
+      pushAlert(a, cue)
+    }
+    if (settings.deadlineAlert) {
+      for (const x of openDeadlines) {
+        const left = x.due - now
+        if (left <= 0 || left > URGENT_HOURS * 3600_000) continue
+        const hour = left <= 3600_000
+        if (hour) notified.current.add(`dl-${x.id}-3h`)
+        fire(`dl-${x.id}-${hour ? '1h' : '3h'}`, { icon: '⚠️', text: x.title, sub: `Due ${dueLabel(x.due, now)}`, openTab: 'deadlines' })
+      }
+    }
+    const today = new Date(now).toDateString()
+    if (settings.classPill && cls.next && cls.startsIn !== undefined && cls.startsIn <= 10) {
+      fire(`${today}-${cls.next.id}-soon`, { icon: '🎓', text: nextClassLabel(cls.next, cls.startsIn) })
+    }
+    if (settings.classMode && cls.current) {
+      fire(`${today}-${cls.current.id}-on`, { icon: '🎓', text: 'Class mode on', sub: `${cls.current.title}${cls.current.room ? ` · ${cls.current.room}` : ''} · alerts held` })
+    }
+    if (lastClass.current !== undefined && !cls.current && settings.classMode) pushAlert({ icon: '🎓', text: 'Class over' }, 'ready')
+    lastClass.current = cls.current?.id
+  }, [now, cls, openDeadlines, settings.deadlineAlert, settings.classPill, settings.classMode, pushAlert])
+
+  // eye-rest and stretch reminders while studying without a real break
+  const strain = useRef({ last: Date.now(), studied: 0, away: 0, eyes: 20, stretch: 45 })
+  useEffect(() => {
+    const s = strain.current
+    const dt = Math.min(now - s.last, 60_000)
+    s.last = now
+    if (!study) {
+      s.away += dt
+      // four minutes off counts as a break
+      if (s.away >= 4 * 60_000) Object.assign(s, { studied: 0, eyes: 20, stretch: 45 })
+      return
+    }
+    s.away = 0
+    s.studied += dt
+    if (!settings.wellbeing) return
+    const min = s.studied / 60_000
+    if (min >= s.stretch) {
+      s.stretch += 45
+      s.eyes = Math.ceil((min + 1) / 20) * 20
+      pushAlert({ icon: '🧘', text: 'Stretch break', sub: `${Math.floor(min)} min in · stand up, roll your shoulders` }, 'attention')
+    } else if (min >= s.eyes) {
+      s.eyes += 20
+      pushAlert({ icon: '👀', text: 'Rest your eyes', sub: 'Look at something 6 m away for 20 seconds' }, 'attention')
+    }
+  }, [now, study, settings.wellbeing, pushAlert])
 
   // Windows battery + volume events from Rust
   useEffect(() => {
@@ -441,7 +689,7 @@ export default function App() {
         setPrivacy(p)
         if (p.camera && p.camera !== lastPrivacy.camera) {
           pushAlert({ icon: '📷', text: 'Camera in use', sub: p.camera }, 'warning', { emphasis: 'subtle' })
-        } else if (p.mic && p.mic !== lastPrivacy.mic) {
+        } else if (p.mic && p.mic !== lastPrivacy.mic && !assistantAwake.current) {
           pushAlert({ icon: '🎙️', text: 'Microphone in use', sub: p.mic }, 'warning', { emphasis: 'subtle' })
         }
         lastPrivacy = p
@@ -552,10 +800,10 @@ export default function App() {
 
   // Clicking outside can't be detected when click-through, so collapse when the cursor leaves.
   useEffect(() => {
-    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes) return
+    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes || astraIntro) return
     const id = setTimeout(() => setExpanded(false), 700)
     return () => clearTimeout(id)
-  }, [expanded, hovered, holdOpen, fs, notes])
+  }, [expanded, hovered, holdOpen, fs, notes, astraIntro])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -578,7 +826,12 @@ export default function App() {
     getVersion()
       .then((v) => {
         const r = releaseToShow(v)
-        if (r) {
+        if (!astraIntroSeen()) {
+          // Astra comes first; the notes follow once she has been answered
+          afterIntro.current = r
+          setAstraIntro(true)
+          setExpanded(true)
+        } else if (r) {
           setNotes(r)
           setExpanded(true)
         }
@@ -591,14 +844,24 @@ export default function App() {
     if (tab !== 'friends' && tab !== 'groups') setOpenChat({ friend: null, group: null })
   }, [tab])
 
-  // fullscreen only belongs to an open chat
+  // fullscreen only belongs to an open chat, the prompter or the schedule
   useEffect(() => {
-    if (fs && !(expanded && (tab === 'friends' || tab === 'groups'))) exitFullscreen()
+    if (fs && !(expanded && (tab === 'friends' || tab === 'groups' || tab === 'prompter' || tab === 'schedule' || tab === 'settings'))) exitFullscreen()
   }, [fs, expanded, tab, exitFullscreen])
 
   // what friends can see: the song or timer that is running
-  const activityText = playing && track ? `🎵 ${track.title} – ${track.artist}` : timer ? (pomo ? '🍅 Focusing' : '⏳ Timer running') : ''
+  const activityText = study
+    ? studyActivity(study, Boolean(study.gid))
+    : inClass
+      ? '🎓 In class'
+      : playing && track
+        ? `🎵 ${track.title} – ${track.artist}`
+        : timer
+          ? (pomo ? '🍅 Focusing' : '⏳ Timer running')
+          : ''
   const social = DEMO_SOCIAL ? demo.social : realSocial
+  const friendProfiles = useMemo(() => social.friends.map((f) => f.profile), [social.friends])
+  const studyBoard = useStudyBoard(auth.profile ?? null, friendProfiles, studyLog, settings.shareStudy && !DEMO_SOCIAL, expanded && tab === 'study')
   const { saveProfile } = auth
   useAutoIdle(auth.profile?.presence ?? (auth.profile ? 'online' : undefined), (v) => void saveProfile({ presence: v }), Boolean(auth.profile))
   useHeartbeat(DEMO_SOCIAL ? undefined : auth.user?.id)
@@ -624,6 +887,9 @@ export default function App() {
   const theme = useResolvedTheme(settings.theme)
   const eqLook = useMemo(() => ({ style: settings.eqStyle, color: settings.eqColor }), [settings.eqStyle, settings.eqColor])
   const accent = settings.accentFromMusic && playing && track ? `hsl(${track.hue} 78% 62%)` : settings.accent
+  const mascotColor = settings.mascotColor === 'accent' ? accent : settings.mascotColor
+  const glowPhase = assistant.state.phase
+  const glowFor = glowPhase === 'listening' ? 'listening' : glowPhase === 'thinking' ? 'thinking' : glowPhase === 'speaking' || glowPhase === 'done' || glowPhase === 'confirm' ? 'speaking' : glowPhase === 'error' ? 'error' : null
   const onAcc = settings.accentFromMusic && playing && track ? '#000' : onAccent(settings.accent)
 
   const lyricIdx = track?.lyrics ? currentLineIndex(track.lyrics, position + settings.lyricOffset) : -1
@@ -642,9 +908,42 @@ export default function App() {
     return null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.idle, settings.city, settings.fahrenheit, expanded])
-  const idleExtra = idleWeather?.text ?? ''
-  const weatherGlyph = idleWeather && !idleLyric ? <WeatherIcon code={idleWeather.code} night={isNight(new Date(now).getHours())} size={15} /> : null
-  const idleText = idleLyric ? lyricText : idleExtra
+  // the nearest open deadline; hovering the pill lists them all
+  const nearest = settings.idle === 'deadline' ? openDeadlines[0] : undefined
+  const idleDeadline = nearest ? `${nearest.title} · ${dueLabel(nearest.due, now)}` : ''
+
+  // what the pill says about studying, most pressing first: the running session, the class on now, a class about to start,
+  // a deadline a few hours away, a class later today. `key` stays the same while the text ticks, so the line does not re-animate.
+  const studyStatus = useMemo((): { text: string; key: string; kind: 'study' | 'class' | 'urgent' } | null => {
+    if (study && timer) {
+      const left = Math.max(0, Math.ceil((timer.endsAt - now) / 1000))
+      const clockLeft = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`
+      const what = study.label === DEFAULT_LABEL ? (study.gid ? 'Studying together' : 'Focus') : study.label
+      return { text: `${study.gid ? '📚' : '🍅'} ${what} · ${clockLeft}`, key: `study-${study.startedAt}`, kind: 'study' }
+    }
+    if (pomo && timer && pomo.phase !== 'focus') {
+      const left = Math.max(0, Math.ceil((timer.endsAt - now) / 1000))
+      return { text: `☕ Break · ${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`, key: `break-${pomo.done}`, kind: 'study' }
+    }
+    if (settings.classPill && cls.current && cls.endsIn !== undefined) {
+      return { text: `🎓 ${cls.current.title}${cls.current.room ? ` · ${cls.current.room}` : ''} · ${cls.endsIn}m left`, key: `class-${cls.current.id}`, kind: 'class' }
+    }
+    if (settings.classPill && cls.next && cls.startsIn !== undefined && cls.startsIn <= 20) {
+      return { text: `🎓 ${nextClassLabel(cls.next, cls.startsIn)}`, key: `next-${cls.next.id}`, kind: 'class' }
+    }
+    if (settings.deadlineAlert) {
+      const hot = openDeadlines.find((x) => x.due - now < URGENT_HOURS * 3600_000 && x.due - now > -30 * 60_000)
+      if (hot) return { text: `⚠ ${hot.title} · ${dueLabel(hot.due, now)}`, key: `dl-${hot.id}`, kind: 'urgent' }
+    }
+    if (settings.classPill && cls.next && cls.startsIn !== undefined && cls.startsIn <= 90) {
+      return { text: `🎓 ${nextClassLabel(cls.next, cls.startsIn)}`, key: `next-${cls.next.id}`, kind: 'class' }
+    }
+    return null
+  }, [study, timer, pomo, now, cls, openDeadlines, settings.classPill, settings.deadlineAlert])
+
+  const idleExtra = studyStatus?.text ?? idleWeather?.text ?? idleDeadline
+  const weatherGlyph = idleWeather && !idleLyric && !studyStatus ? <WeatherIcon code={idleWeather.code} night={isNight(new Date(now).getHours())} size={15} /> : null
+  const idleText = studyStatus ? studyStatus.text : idleLyric ? lyricText : idleExtra
   const d = new Date(now)
   const clock = clockText(d, settings.clock24)
   // while music plays the pill carries the album art and the waveform around its text:
@@ -654,7 +953,7 @@ export default function App() {
 
   // hovering the island while a call rings shows who is calling, with answer and decline
   const caller = ringing && !groupRing ? social.friends.find((f) => f.profile.id === activeCall.state.peer) : undefined
-  const groupCaller = ringing && groupRing ? demo.groups.groups.find((g) => g.id === groupRing) : undefined
+  const groupCaller = ringing && groupRing ? (DEMO_SOCIAL ? demo.groups : groupChats).groups.find((g) => g.id === groupRing) : undefined
   // while you are in a call the collapsed island becomes the call: a friend, or a group's voice chat
   const activeVoice = DEMO_SOCIAL ? demo.voice : voice
   const callPhase = activeCall.state.phase
@@ -664,23 +963,44 @@ export default function App() {
       ? (DEMO_SOCIAL ? demo.groups : groupChats).groups.find((g) => g.id === activeVoice.state.groupId)
       : undefined
   const inCall = Boolean(friendInCall || voiceGroup)
+  // the speech model downloads in the background: the collapsed island shows how far along it is
+  const stt = useSttStatus()
+  const updatePill = Boolean(updateVersion) && updateVersion !== seenUpdate && !updating && !expanded && !astraIntro && assistant.state.phase === 'idle'
+  useEffect(() => {
+    if (!updatePill || !hovered) return
+    markUpdateSeen(updateVersion)
+    setSeenUpdate(updateVersion)
+  }, [updatePill, hovered, updateVersion])
+  const modelPill = !updating && !expanded && !astraIntro && assistant.state.phase === 'idle' && stt.state === 'loading' && stt.progress > 0 && stt.progress < 1
+  const sawDownload = useRef(false)
+  useEffect(() => {
+    if (stt.state === 'loading' && stt.progress > 0) sawDownload.current = true
+    else if (stt.state === 'ready' && sawDownload.current) {
+      sawDownload.current = false
+      pushAlert({ icon: '✅', text: `${settings.mascotName || 'Astra'} is ready`, sub: 'Speech recognition downloaded' }, 'ready')
+    } else if (stt.state === 'error') sawDownload.current = false
+  }, [stt.state, stt.progress, pushAlert, settings.mascotName])
   const mode = updating
     ? 'alert'
-    : expanded
+    : assistant.state.phase !== 'idle'
+      ? 'assistant'
+      : expanded
       ? 'expanded'
       : (caller || groupCaller) && hovered
         ? 'call'
-        : alert
+        : alert || modelPill || updatePill
           ? 'alert'
           : inCall
             ? 'incall'
             : hovered
               ? 'peek'
               : 'idle'
+  // smart mode keeps the resting pill out of sight; hovering its spot, alerts and calls still bring it in
+  const tucked = settings.smartMode && mode === 'idle' && !moving
 
   // the card fits the page it shows; a page taller than the card scrolls inside it
   const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
-  const expandedHeight = notes
+  const expandedHeight = notes || astraIntro
     ? CARD_MAX
     : settings.cardFit
       ? Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
@@ -695,6 +1015,10 @@ export default function App() {
   const showVoicePeople = mode === 'incall' && hovered && voicePeople.length > 0
   const voiceRows = showVoicePeople ? Math.ceil(voicePeople.length / 2) : 0
 
+  // hovering the pill in deadline mode drops down the whole list (the first few, then a "+N more" row)
+  const dlShown = openDeadlines.slice(0, 6)
+  const dlRows = mode === 'peek' && settings.idle === 'deadline' && openDeadlines.length ? dlShown.length + (openDeadlines.length > dlShown.length ? 1 : 0) : 0
+
   const shape: Shape = useMemo(() => {
     switch (mode) {
       case 'expanded':
@@ -706,21 +1030,25 @@ export default function App() {
         if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
         if (!updating && alert?.nowPlaying) return { w: 360, h: 56, r: 24 }
         return { w: 340, h: 48, r: 22 }
+      case 'assistant':
+        return assistantShape(assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length > 0)
       case 'call':
         return { w: 340, h: 64, r: 28 }
       case 'incall':
         return voiceRows ? { w: 300, h: 42 + 14 + voiceRows * 30, r: 22 } : { w: 250, h: 42, r: 18 }
       case 'peek':
+        if (dlRows) return { w: 340, h: 14 + dlRows * 30, r: 20 }
         return { w: peekW, h: 40, r: 16 }
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows, dlRows, assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
     ? {
-        split: mode === 'idle' || mode === 'peek',
+        // while the pill itself counts down a study session the bubble would only repeat it
+        split: (mode === 'idle' && studyStatus?.kind !== 'study') || mode === 'peek',
         content: (
           <div className="bubble-inner">
             <Ring fraction={remaining / (timer.total / 1000)} size={28} stroke={3} />
@@ -774,18 +1102,101 @@ export default function App() {
   }, [expanded, tab])
 
   const startTimer = (minutes: number) => {
+    endStudy()
     setPomo(null)
     setTimer({ endsAt: Date.now() + minutes * 60_000, total: minutes * 60_000 })
   }
   const stopTimer = () => {
+    endStudy()
     setPomo(null)
     setTimer(null)
   }
   const startPomo = () => {
+    endStudy()
     setPomo({ phase: 'focus', done: 0 })
     setTimer({ endsAt: Date.now() + POMO_MIN.focus * 60_000, total: POMO_MIN.focus * 60_000 })
+    beginStudy(taskRef.current, { maxMin: POMO_MIN.focus, deadlineId: taskDeadline.current })
   }
   const skipPomo = () => pomo && advancePomo(pomo)
+  const pickTask = (t: string) => {
+    taskDeadline.current = undefined
+    setTask(t)
+  }
+  // one tap on a deadline: a focus session named after it
+  const startOnDeadline = (dl: Deadline) => {
+    endStudy()
+    taskDeadline.current = dl.id
+    taskRef.current = dl.title
+    setTask(dl.title)
+    setClockMode('pomodoro')
+    startPomo()
+    pushAlert({ icon: '🎯', text: 'Focus time', sub: dl.title.slice(0, 40) }, 'attention')
+  }
+
+  // studying by yourself: a plain countdown for a subject, logged when it ends or is stopped
+  const startSolo = (label: string, minutes: number) => {
+    endStudy()
+    const startedAt = Date.now()
+    setPomo(null)
+    setTimer({ endsAt: startedAt + minutes * 60_000, total: minutes * 60_000 })
+    setNow(startedAt)
+    beginStudy(label, { maxMin: minutes })
+  }
+
+  // sitting down in a group's study room puts you on the same clock as everyone in it
+  const startRoom = (gid: string, minutes: number) => {
+    endStudy()
+    const total = minutes * 60_000
+    const startedAt = Date.now()
+    const label = taskRef.current.trim() || DEFAULT_LABEL
+    setPomo(null)
+    setTimer({ endsAt: startedAt + total, total })
+    setNow(startedAt)
+    beginStudy(label, { gid, maxMin: minutes })
+    studyRoom.join(gid, { endsAt: startedAt + total, total, task: label === DEFAULT_LABEL ? '' : label })
+    const me = demo.auth.profile?.id
+    if (DEMO_SOCIAL && me) setDemoRooms((r) => ({ ...r, [gid]: { gid, endsAt: startedAt + total, total, task: label === DEFAULT_LABEL ? '' : label, host: me, members: [me] } }))
+  }
+  const joinRoom = (gid: string) => {
+    const room = rooms[gid]
+    if (!room || room.endsAt <= Date.now()) return
+    endStudy()
+    setPomo(null)
+    setTimer({ endsAt: room.endsAt, total: room.total })
+    setNow(Date.now())
+    beginStudy(room.task || DEFAULT_LABEL, { gid, maxMin: (room.endsAt - Date.now()) / 60_000 })
+    studyRoom.join(gid)
+    const me = demo.auth.profile?.id
+    if (DEMO_SOCIAL && me) setDemoRooms((r) => (r[gid] && !r[gid].members.includes(me) ? { ...r, [gid]: { ...r[gid], members: [...r[gid].members, me] } } : r))
+  }
+  // demo: leaving a pretend room takes you out of it, and it closes when nobody is left
+  useEffect(() => {
+    const me = demo.auth.profile?.id
+    if (!DEMO_SOCIAL || !me || study?.gid) return
+    setDemoRooms((cur) => {
+      if (!Object.values(cur).some((r) => r.members.includes(me))) return cur
+      const next: Record<string, StudyRoom> = {}
+      for (const r of Object.values(cur)) {
+        const members = r.members.filter((m) => m !== me)
+        if (members.length) next[r.gid] = { ...r, members }
+      }
+      return next
+    })
+  }, [study?.gid, demo.auth.profile?.id])
+  // demo: a friend starts a room in the first group, and a second one sits down a few seconds later
+  const demoStudyTogether = () => {
+    const group = demo.groups.groups[0]
+    const me = demo.auth.profile?.id
+    const others = group?.members.filter((p) => p.id !== me) ?? []
+    const host = others[0]
+    if (!group || !host) return
+    const total = 25 * 60_000
+    const room: StudyRoom = { gid: group.id, endsAt: Date.now() + total, total, task: 'Calculus', host: host.id, members: [host.id] }
+    setExpanded(false)
+    setDemoRooms({ [group.id]: room })
+    pushAlert({ icon: '📚', text: group.name, sub: `${host.display_name || host.username || 'Someone'} is studying · ${room.task}`.slice(0, 42), openTab: 'study' }, 'attention')
+    if (others[1]) setTimeout(() => setDemoRooms((r) => (r[group.id] ? { ...r, [group.id]: { ...r[group.id], members: [...r[group.id].members, others[1].id] } } : r)), 3500)
+  }
 
   const onSkip = (dir: -1 | 1) => {
     skip(dir)
@@ -883,9 +1294,7 @@ export default function App() {
             setMoving(true)
             invoke('set_dragging', { on: true }).catch(() => {})
           }
-          const maxX = window.screen.width / 2 - 80
-          const rawX = Math.max(-maxX, Math.min(maxX, g.ox + dx))
-          const rawY = Math.max(0, Math.min(window.screen.height - 56, g.oy + dy))
+          const { x: rawX, y: rawY } = clampPos(g.ox + dx, g.oy + dy)
           const m = motionRef.current
           // magnets grab at 24px and let go at 44px, so they feel sticky
           m.magX = Math.abs(rawX) < (m.magX ? 44 : 24)
@@ -919,7 +1328,22 @@ export default function App() {
   let content: React.ReactNode
   let contentKey: string
 
-  if (mode === 'expanded') {
+  if (mode === 'assistant') {
+    contentKey = `assistant-${assistantShape(assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length > 0).w}-${assistant.state.phase === 'error' ? 'err' : 'ok'}`
+    content = (
+      <AssistantCard
+        state={assistant.state}
+        level={assistant.level}
+        bands={assistant.bands}
+        name={settings.mascotName || 'Astra'}
+        color={mascotColor}
+        accessories={settings.mascotAccessories}
+        accessoryColors={settings.mascotAccessoryColors}
+        talk={settings.assistantTalk}
+        onConfirm={assistant.answerConfirm}
+      />
+    )
+  } else if (mode === 'expanded') {
     contentKey = 'expanded'
     const action =
       tab === 'shelf' && shelf.items.length ? (
@@ -938,7 +1362,7 @@ export default function App() {
         </>
       ) : null
     content = (
-      <div className={`expanded ${fs ? 'fs' : ''} ${settings.cardFit ? '' : 'fixed'}`}>
+      <div className={`expanded ${fs ? 'fs' : ''} ${settings.cardFit ? '' : 'fixed'} chat-${settings.chatAnim}`}>
         <div className="xtop">
           <span className="xtop-date">{d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span>
           <span className="xtop-status">
@@ -979,6 +1403,16 @@ export default function App() {
                 : {})}
             >
             <div className="page-fit" ref={fitRef}>
+            {tab === 'astra' && (
+              <AstraChatWidget
+                chat={assistant.chat}
+                name={settings.mascotName || 'Astra'}
+                color={mascotColor}
+                accessories={settings.mascotAccessories}
+                accessoryColors={settings.mascotAccessoryColors}
+                voiceOn={settings.assistantSpeak}
+              />
+            )}
             {tab === 'media' && (
               <MediaWidget
                 track={track}
@@ -1001,6 +1435,9 @@ export default function App() {
                 sw={sw}
                 setSw={setSw}
                 pomo={pomo}
+                task={task}
+                setTask={pickTask}
+                taskSuggestions={[...new Set([...slots.map((s) => s.title), ...openDeadlines.map((x) => x.title)])]}
                 onPomoStart={startPomo}
                 onPomoStop={stopTimer}
                 onPomoSkip={skipPomo}
@@ -1008,6 +1445,29 @@ export default function App() {
             )}
             {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
             {tab === 'notes' && <NotesWidget />}
+            {tab === 'prompter' && <PrompterWidget fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
+            {tab === 'deadlines' && <DeadlinesWidget deadlines={deadlines} setDeadlines={setDeadlines} now={now} onStart={startOnDeadline} studyingId={study?.deadlineId} />}
+            {tab === 'schedule' && <ScheduleWidget slots={slots} setSlots={setSlots} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
+            {tab === 'study' && (
+              <StudyWidget
+                log={studyLog}
+                history={studyHistory}
+                onClearHistory={clearStudyHistory}
+                onStartSolo={startSolo}
+                now={now}
+                session={study}
+                signedIn={Boolean(meId) || DEMO_SOCIAL}
+                friends={social.friends}
+                board={studyBoard}
+                groups={(DEMO_SOCIAL ? demo.groups : groupChats).groups}
+                rooms={rooms}
+                share={settings.shareStudy}
+                setShare={(shareStudy) => update({ shareStudy })}
+                onStartRoom={startRoom}
+                onJoinRoom={joinRoom}
+                onLeave={stopTimer}
+              />
+            )}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
             {tab === 'clipboard' && (
               <ClipboardWidget
@@ -1054,13 +1514,14 @@ export default function App() {
               />
             )}
             {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
-            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} />}
+            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
             </div>
             </motion.div>
           </AnimatePresence>
         </div>
         <div className="xrail">
             <Rail
+              astraColor={mascotColor}
               groups={groups}
               tab={tab}
               onPage={setTab}
@@ -1071,6 +1532,25 @@ export default function App() {
               dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
             />
         </div>
+        {astraIntro && (
+          <AstraWelcome
+            name={settings.mascotName || 'Astra'}
+            color={mascotColor}
+            accessories={settings.mascotAccessories}
+            accessoryColors={settings.mascotAccessoryColors}
+            shortcut={settings.assistantKey}
+            talk={settings.assistantTalk}
+            listenModel={settings.assistantListenModel}
+            simulate={!IS_TAURI}
+            onChoose={(use) => {
+              markAstraIntro(use)
+              update({ assistant: use })
+              setAstraIntro(false)
+              if (afterIntro.current) setNotes(afterIntro.current)
+              afterIntro.current = null
+            }}
+          />
+        )}
         {notes && (
           <div className="whatsnew" onClick={(e) => e.stopPropagation()}>
             <small>What's new in v{notes.version}</small>
@@ -1106,6 +1586,35 @@ export default function App() {
         </span>
         {!installing && <span className="al-val">{updating.percent}%</span>}
         <span className="edge" style={{ ['--v' as string]: `${installing ? 100 : updating.percent}%` }} />
+      </div>
+    )
+  } else if (mode === 'alert' && updatePill && !modelPill && !alert) {
+    contentKey = 'update-pill'
+    content = (
+      <div className="alert2">
+        <span className="al-ic">
+          <AlertIcon icon="⬆️" />
+        </span>
+        <span className="al-tx">
+          <b>Update available</b>
+          <small>{`v${updateVersion} · open Settings to install`}</small>
+        </span>
+      </div>
+    )
+  } else if (mode === 'alert' && modelPill && !alert) {
+    contentKey = 'model-download'
+    const pct = Math.round(stt.progress * 100)
+    content = (
+      <div className="alert2" style={{ ['--c' as string]: 'var(--info)' }}>
+        <span className="al-ic">
+          <AlertIcon icon="⬇️" />
+        </span>
+        <span className="al-tx">
+          <b>Getting {settings.mascotName || 'Astra'} ready</b>
+          <small>Downloading speech recognition</small>
+        </span>
+        <span className="al-val">{pct}%</span>
+        <span className="edge" style={{ ['--v' as string]: `${pct}%` }} />
       </div>
     )
   } else if (mode === 'alert' && alert?.kind) {
@@ -1157,8 +1666,8 @@ export default function App() {
         group={groupCaller}
         name={groupCaller.name}
         sub="Incoming group voice chat"
-        onDecline={demo.declineGroupRing}
-        onAnswer={demo.answerGroupRing}
+        onDecline={declineGroupRing}
+        onAnswer={answerGroupRing}
       />
     )
   } else if (mode === 'incall' && (friendInCall || voiceGroup)) {
@@ -1206,7 +1715,21 @@ export default function App() {
       </div>
     )
   } else if (mode === 'peek') {
-    if (peekText && track) {
+    if (dlRows) {
+      contentKey = 'peek-deadlines'
+      content = (
+        <ul className="dl-peek">
+          {dlShown.map((x) => (
+            <li key={x.id} className={`u-${urgency(x.due, now)}`}>
+              <i />
+              <span>{x.title}</span>
+              <small>{dueLabel(x.due, now)}</small>
+            </li>
+          ))}
+          {openDeadlines.length > dlShown.length && <li className="more">+{openDeadlines.length - dlShown.length} more</li>}
+        </ul>
+      )
+    } else if (peekText && track) {
       contentKey = 'peek-live'
       content = (
         <div className="live peek-live">
@@ -1233,7 +1756,7 @@ export default function App() {
       <div className="live">
         <Art track={track} size={22} />
         {weatherGlyph}
-        <LiveText text={live} k={idleLyric ? lyricIdx : live} />
+        <LiveText text={live} k={studyStatus ? studyStatus.key : idleLyric ? lyricIdx : live} />
         {(unreadCount > 0 || privacy.camera || privacy.mic) && (
           <span className="live-dots">
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
@@ -1252,7 +1775,7 @@ export default function App() {
           <>
             {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
             {weatherGlyph}
-            <span className="idle-lyric">{idleText}</span>
+            <span className={`idle-lyric ${studyStatus ? `st-${studyStatus.kind}` : ''}`}>{idleText}</span>
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1260,7 +1783,13 @@ export default function App() {
         ) : (
           <>
             {/* the clock stays in the exact middle; bars hang off its left, dots off its right */}
-            <span className="idle-side left">{playing && track && settings.idleBars && <Bars active hue={track.hue} />}</span>
+            <span className="idle-side left">
+              {playing && track && settings.idleBars ? (
+                <Bars active hue={track.hue} />
+              ) : (
+                settings.assistant && settings.mascotInPill && <MascotEyes height={15} accessories={settings.mascotAccessories} accessoryColors={settings.mascotAccessoryColors} />
+              )}
+            </span>
             <span>{clock}</span>
             <span className="idle-side right">
               {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
@@ -1276,7 +1805,7 @@ export default function App() {
   return (
     <EqContext.Provider value={eqLook}>
     <div
-      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''} ${fs || fsWin ? 'fullchat' : ''}`}
+      className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${tucked ? 'tucked' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''} ${fs || fsWin ? 'fullchat' : ''}`}
       style={{
         ['--accent' as string]: accent,
         ['--on-accent' as string]: onAcc,
@@ -1310,8 +1839,13 @@ export default function App() {
         onClick={(e) => {
           e.stopPropagation()
           if (justDragged.current) return
+          if (mode === 'assistant') return assistant.cancel()
           if (mode === 'alert' && alert?.nowPlaying) {
             setTab('media')
+            setAlert(null)
+          }
+          if (mode === 'alert' && alert?.openTab) {
+            setTab(alert.openTab)
             setAlert(null)
           }
           if (mode === 'alert' && alert?.chatWith) {
@@ -1325,6 +1859,8 @@ export default function App() {
         spring={SPRINGS[settings.anim]}
         intro={intro}
         ringing={incomingCall}
+        glow={glowFor}
+        glowLevel={assistant.level}
       >
         {content}
       </Island>
@@ -1410,6 +1946,15 @@ export default function App() {
             <button onClick={() => pushAlert({ icon: '📋', text: 'Copied' }, 'success', { emphasis: 'subtle' })}>Copied</button>
           </div>
           <div className="demo-row">
+            <span>Buddy</span>
+            <button onClick={() => (assistant.state.phase === 'listening' ? assistant.stop() : void assistant.start())}>{assistant.state.phase === 'listening' ? 'Stop' : `Talk (${settings.assistantKey})`}</button>
+            <button onClick={() => assistant.preview('thinking')}>Thinking</button>
+            <button onClick={() => assistant.preview('speaking')}>Speaking</button>
+            <button onClick={() => assistant.preview('error')}>Error</button>
+            <button onClick={() => assistant.preview('confirm')}>Confirm</button>
+            <button onClick={assistant.cancel}>Cancel</button>
+          </div>
+          <div className="demo-row">
             <span>Social</span>
             <button
               onClick={() => {
@@ -1437,15 +1982,42 @@ export default function App() {
             </button>
             {/* rings like a real call: the island glows, and hovering it shows the caller with answer and decline */}
             {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
-            {DEMO_SOCIAL && <button onClick={demo.ringGroupCall}>Incoming group call</button>}
+            {DEMO_SOCIAL && (
+              <button
+                onClick={() => {
+                  const group = demo.groups.groups[0]
+                  const from = group?.members.find((p) => p.id !== demo.auth.profile?.id)
+                  demo.ringGroupCall()
+                  // the same alert a real group ring brings
+                  if (group && auth.profile?.presence !== 'dnd')
+                    pushAlert({ icon: '📞', text: group.name, sub: `${from?.display_name || from?.username || 'Someone'} started a voice chat`, avatar: from }, 'attention')
+                }}
+              >
+                Incoming group call
+              </button>
+            )}
+            {DEMO_SOCIAL && <button onClick={demoStudyTogether}>Study together</button>}
+            <button onClick={playJoin}>Join sound</button>
+            <button onClick={playLeave}>Leave sound</button>
           </div>
           <div className="demo-row">
             <span>App</span>
-            <button onClick={() => pushAlert({ icon: '⬆️', text: 'Update available', sub: 'v9.9.9 · open Settings to install' }, 'ready')}>Update alert</button>
+            <button
+              onClick={() => {
+                markUpdateSeen('')
+                setSeenUpdate('')
+                cuedUpdate.current = ''
+                setFakeUpdate('9.9.9')
+                setExpanded(false)
+              }}
+            >
+              Update alert
+            </button>
             <button onClick={runDemoUpdate}>Update download</button>
             <button onClick={() => pushAlert({ icon: '⚠️', text: 'Update failed', sub: 'Try again from Settings' }, 'error')}>Update failed</button>
             <button
               onClick={() => {
+                setAstraIntro(false)
                 setNotes(CHANGELOG[0])
                 setExpanded(true)
               }}
@@ -1453,6 +2025,16 @@ export default function App() {
               What's new
             </button>
             <button onClick={() => setIntro((n) => n + 1)}>Replay intro</button>
+            <button
+              onClick={() => {
+                setNotes(null)
+                demoStt('reset')
+                setAstraIntro(true)
+                setExpanded(true)
+              }}
+            >
+              Astra welcome
+            </button>
           </div>
         </div>
       )}

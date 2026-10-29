@@ -4,6 +4,7 @@
 2. **SQL editor** → paste and run [`schema.sql`](schema.sql). It creates the tables, the row-level-security
    policies (friends only can message each other or see each other's activity) and enables realtime.
 2b. For group chats, also run [`groups.sql`](groups.sql) the same way (after `schema.sql`).
+2c. So settings follow the account (kept through updates and reinstalls), also run [`settings.sql`](settings.sql).
 3. **Authentication → Providers → Email**: for quick testing turn off "Confirm email",
    otherwise new accounts must click the link in their inbox before signing in.
 4. **Authentication → Providers → Google**: create an OAuth client in Google Cloud Console

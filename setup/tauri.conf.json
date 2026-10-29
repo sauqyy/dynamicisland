@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Dynamic Island Setup",
+  "productName": "Astra Isle Setup",
   "version": "0.3.8",
   "identifier": "com.dynamicisland.setup",
   "build": {
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Dynamic Island Setup",
+        "title": "Astra Isle Setup",
         "width": 600,
         "height": 380,
         "center": true,

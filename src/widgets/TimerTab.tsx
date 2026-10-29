@@ -99,6 +99,9 @@ function Pomodoro({
   pomo,
   timer,
   now,
+  task,
+  setTask,
+  suggestions,
   onStart,
   onStop,
   onSkip,
@@ -106,13 +109,37 @@ function Pomodoro({
   pomo: PomodoroState | null
   timer: TimerState | null
   now: number
+  task: string
+  setTask: (t: string) => void
+  suggestions: string[]
   onStart: () => void
   onStop: () => void
   onSkip: () => void
 }) {
   if (!pomo || !timer) {
     return (
-      <div className="timer">
+      <div className="timer pomo-setup">
+        <input
+          className="todo-input pomo-task"
+          placeholder="What are you working on?"
+          value={task}
+          maxLength={40}
+          data-cuelume-type
+          onChange={(e) => setTask(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter') onStart()
+          }}
+        />
+        {suggestions.length > 0 && (
+          <div className="pomo-sugg">
+            {suggestions.slice(0, 5).map((s) => (
+              <button key={s} className={`chip ${task === s ? 'on' : ''}`} aria-pressed={task === s} data-cuelume-select onClick={() => setTask(task === s ? '' : s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="timer-label">25 min focus · 5 min break · long break every 4</div>
         <button className="pill-btn" data-cuelume-tap onClick={onStart}>Start focus</button>
       </div>
@@ -131,6 +158,7 @@ function Pomodoro({
         <div className={`timer-label pomo-swap ${pomo.phase}`} key={phaseKey}>
           {PHASE_LABEL[pomo.phase]} · {pomo.done} done
         </div>
+        {task && <div className="pomo-on">{task}</div>}
         <div className="presets">
           <button className="pill-btn" data-cuelume-navigate data-cuelume-emphasis="subtle" onClick={onSkip}>Skip</button>
           <button className="pill-btn danger" data-cuelume-close onClick={onStop}>Stop</button>
@@ -150,6 +178,10 @@ interface Props {
   sw: StopwatchState
   setSw: (s: StopwatchState) => void
   pomo: PomodoroState | null
+  /** what the focus session is for: a course or a deadline */
+  task: string
+  setTask: (t: string) => void
+  taskSuggestions: string[]
   onPomoStart: () => void
   onPomoStop: () => void
   onPomoSkip: () => void
@@ -167,6 +199,9 @@ export function TimerTab({
   sw,
   setSw,
   pomo,
+  task,
+  setTask,
+  taskSuggestions,
   onPomoStart,
   onPomoStop,
   onPomoSkip,
@@ -184,7 +219,7 @@ export function TimerTab({
         <TimerWidget timer={pomo ? null : timer} now={now} onStart={onStart} onCancel={onCancel} />
       )}
       {mode === 'pomodoro' && (
-        <Pomodoro pomo={pomo} timer={timer} now={now} onStart={onPomoStart} onStop={onPomoStop} onSkip={onPomoSkip} />
+        <Pomodoro pomo={pomo} timer={timer} now={now} task={task} setTask={setTask} suggestions={taskSuggestions} onStart={onPomoStart} onStop={onPomoStop} onSkip={onPomoSkip} />
       )}
       {mode === 'stopwatch' && <Stopwatch sw={sw} setSw={setSw} />}
     </div>

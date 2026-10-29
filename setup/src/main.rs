@@ -7,13 +7,13 @@ use std::process::Command;
 
 use tauri::AppHandle;
 
-/// The regular Dynamic Island installer, packed inside this setup program and run silently.
+/// The regular Astra Isle installer, packed inside this setup program and run silently.
 const PAYLOAD: &[u8] = include_bytes!("../payload/installer.exe");
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const DETACHED_PROCESS: u32 = 0x0000_0008;
 
 fn install_dir() -> PathBuf {
-    PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Dynamic Island")
+    PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default()).join("Astra Isle")
 }
 
 fn app_exe() -> PathBuf {
@@ -50,7 +50,7 @@ async fn install() -> Result<(), String> {
             .map_err(|e| format!("Could not start the installer: {e}"));
         let _ = std::fs::remove_file(&payload);
         if !status?.success() || !app_exe().exists() {
-            return Err("Setup did not finish. Close other copies of Dynamic Island and try again.".into());
+            return Err("Setup did not finish. Close other copies of Astra Isle and try again.".into());
         }
         Ok(())
     })

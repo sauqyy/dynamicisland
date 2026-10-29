@@ -9,9 +9,9 @@ use std::time::{Duration, Instant};
 /// Must be listed in the Supabase "Redirect URLs".
 pub const OAUTH_PORT: u16 = 53682;
 
-const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Dynamic Island</title>\
+const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Astra Isle</title>\
 <body style=\"font-family:Segoe UI,sans-serif;background:#111;color:#fff;display:grid;place-items:center;height:100vh;margin:0\">\
-<div style=\"text-align:center\"><h2>You're signed in</h2><p style=\"opacity:.6\">You can close this tab and go back to Dynamic Island.</p></div>";
+<div style=\"text-align:center\"><h2>You're signed in</h2><p style=\"opacity:.6\">You can close this tab and go back to Astra Isle.</p></div>";
 
 /// Waits (up to 3 minutes) for the browser to be redirected here and returns the `code` query value.
 #[tauri::command]
@@ -43,7 +43,7 @@ pub async fn oauth_wait() -> Result<String, String> {
                     .split('&')
                     .find_map(|kv| kv.split_once('=').filter(|(k, _)| *k == key).map(|(_, v)| v.to_string()))
             };
-            let body = if find("code").is_some() { DONE_PAGE } else { "<!doctype html><title>Dynamic Island</title>Waiting…" };
+            let body = if find("code").is_some() { DONE_PAGE } else { "<!doctype html><title>Astra Isle</title>Waiting…" };
             let _ = write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",

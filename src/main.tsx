@@ -5,9 +5,10 @@ import '@fontsource-variable/geist/index.css'
 import '@fontsource-variable/geist-mono/index.css'
 import './styles/tokens.css'
 import App from './App.tsx'
+import { Showcase } from './mascot/Showcase.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {import.meta.env.DEV && location.search.includes('mascots') ? <Showcase /> : <App />}
   </StrictMode>,
 )

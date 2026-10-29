@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ACCENTS, type Settings } from '../lib/settings'
 import { BACKEND_READY } from '../lib/supabase'
 import { USERNAME_RE, type Auth } from '../lib/useAuth'
-import { squarePhoto } from '../lib/photo'
+import { NO_CROP, MAX_ZOOM, clampCrop, cropPhoto, cropRect, type Crop } from '../lib/photo'
 import { PRESENCES, presenceOf } from '../lib/presence'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { Avatar } from './Avatar'
@@ -105,6 +106,70 @@ function StatusField({ value, onChange }: { value: string; onChange: (v: string)
   )
 }
 
+/** A photo picked this session, kept so it can be re-cropped until the profile is saved. */
+interface Source {
+  url: string
+  bitmap: ImageBitmap
+}
+
+const STAGE = 168
+
+/** Drag to move, scroll or slide to zoom. The circle shows what friends will see. */
+function PhotoCropper({ source, crop, onChange, onDone }: { source: Source; crop: Crop; onChange: (c: Crop) => void; onDone: () => void }) {
+  const { width: w, height: h } = source.bitmap
+  const drag = useRef<{ px: number; py: number; start: Crop } | null>(null)
+  const r = cropRect(crop, w, h, STAGE)
+  const set = (c: Crop) => onChange(clampCrop(c, w, h))
+
+  return (
+    <div className="field photo-crop">
+      <label>Adjust photo</label>
+      <div
+        className="crop-stage"
+        style={{ width: STAGE, height: STAGE }}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          drag.current = { px: e.clientX, py: e.clientY, start: crop }
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current
+          if (!d) return
+          set({ ...d.start, x: d.start.x + (e.clientX - d.px) / STAGE, y: d.start.y + (e.clientY - d.py) / STAGE })
+        }}
+        onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
+        onWheel={(e) => set({ ...crop, zoom: crop.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08) })}
+      >
+        <img src={source.url} alt="" draggable={false} style={{ left: r.left, top: r.top, width: r.width, height: r.height }} />
+        <div className="crop-ring" />
+      </div>
+      <div className="row slider-row">
+        <span>Zoom</span>
+        <input
+          type="range"
+          min={1}
+          max={MAX_ZOOM}
+          step={0.01}
+          value={crop.zoom}
+          data-cuelume-select
+          data-cuelume-emphasis="subtle"
+          onChange={(e) => set({ ...crop, zoom: Number(e.target.value) })}
+        />
+        <span className="slider-value">{crop.zoom.toFixed(1)}×</span>
+      </div>
+      <small>Drag the photo to move it. It saves when you tap Done.</small>
+      <div className="presets">
+        <button className="chip" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={() => onChange(NO_CROP)}>
+          Reset
+        </button>
+        <button className="pill-btn" data-cuelume-close onClick={onDone}>
+          Done
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SignIn({ auth }: { auth: Auth }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -177,14 +242,24 @@ function Editor({ auth, settings, update, onHold }: Props) {
   const [emoji, setEmoji] = useState(p?.avatar_emoji ?? '🙂')
   const [color, setColor] = useState(p?.avatar_color ?? ACCENTS[1])
   const [photo, setPhoto] = useState<string | null>(p?.avatar_url ?? null)
+  const [source, setSource] = useState<Source | null>(null)
+  const [crop, setCrop] = useState<Crop>(NO_CROP)
+  const [cropping, setCropping] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [editName, setEditName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const root = useRef<HTMLDivElement>(null)
+  const [avatarPop, setAvatarPop] = useState<null | 'menu' | 'icons'>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [confirmName, setConfirmName] = useState(false)
 
   const uname = username.trim().toLowerCase()
   const valid = USERNAME_RE.test(uname)
-  const dirty =
-    !p || uname !== p.username || name !== p.display_name || status !== p.status || emoji !== p.avatar_emoji || color !== p.avatar_color || photo !== (p.avatar_url ?? null)
+  const nameChanged = !!p && uname !== p.username
+  // everything except the username saves itself once the profile exists
+  const pending = !!p && (name.trim() !== p.display_name || status.trim() !== p.status || emoji !== p.avatar_emoji || color !== p.avatar_color || photo !== (p.avatar_url ?? null))
 
   // the file dialog takes the pointer away, which would otherwise close the card under it
   const openPicker = () => {
@@ -193,10 +268,27 @@ function Editor({ auth, settings, update, onHold }: Props) {
     fileInput.current?.click()
   }
 
+  // free the previous pick's memory when it is replaced, dropped or the editor closes
+  useEffect(
+    () => () => {
+      if (!source) return
+      URL.revokeObjectURL(source.url)
+      source.bitmap.close()
+    },
+    [source],
+  )
+
+  useEffect(() => {
+    if (source) setPhoto(cropPhoto(source.bitmap, crop))
+  }, [source, crop])
+
   const pickPhoto = async (file: File | undefined) => {
     if (!file) return
     try {
-      setPhoto(await squarePhoto(file))
+      const bitmap = await createImageBitmap(file)
+      setSource({ url: URL.createObjectURL(file), bitmap })
+      setCrop(NO_CROP)
+      setCropping(true)
       setMsg(null)
     } catch {
       play('error', { emphasis: 'subtle' })
@@ -204,38 +296,82 @@ function Editor({ auth, settings, update, onHold }: Props) {
     }
   }
 
-  const save = async () => {
+  const removePhoto = () => {
+    setSource(null)
+    setCropping(false)
+    setPhoto(null)
+  }
+
+  const commit = async (patch: Parameters<Auth['saveProfile']>[0], done?: () => void) => {
     setBusy(true)
-    const err = await auth.saveProfile({
-      username: uname,
-      display_name: name.trim(),
-      status: status.trim(),
-      avatar_emoji: emoji,
-      avatar_color: color,
-      avatar_url: photo,
-    })
+    const err = await auth.saveProfile(patch)
     play(err ? 'error' : 'success', { emphasis: 'subtle' })
     setMsg(err ?? 'Saved')
+    if (!err) done?.()
     setBusy(false)
   }
 
+  const cancelRename = () => {
+    setUsername(p?.username ?? '')
+    setConfirmName(false)
+    setRenaming(false)
+  }
+
+  const saveName = () => {
+    setName(nameDraft)
+    setEditName(false)
+  }
+
+  // the popups sit on the whole expanded island so the scrolling list doesn't clip them
+  const host = root.current?.closest('.expanded') ?? null
+
+  const create = () =>
+    commit({ username: uname, display_name: name.trim(), status: status.trim(), avatar_emoji: emoji, avatar_color: color, avatar_url: photo })
+
+  const changeUsername = () =>
+    commit({ username: uname }, () => {
+      setConfirmName(false)
+      setRenaming(false)
+    })
+
+  // auto-save edits shortly after the last keystroke; a photo waits until its crop is done
+  useEffect(() => {
+    if (!p || !pending || cropping) return
+    const t = setTimeout(
+      () => commit({ display_name: name.trim(), status: status.trim(), avatar_emoji: emoji, avatar_color: color, avatar_url: photo }),
+      700,
+    )
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, status, emoji, color, photo, cropping, pending])
+
   return (
-    <div className="profile-edit">
+    <div className="profile-edit" ref={root}>
       <div className="profile-card">
         <div className="avatar-edit">
           <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={92} presence={p ? presenceOf(p) : undefined} />
           <div className="avatar-overlay">
-            <button className="ao-text" data-cuelume-open onClick={openPicker}>
-              Choose photo
+            <button className="ao-text" data-cuelume-open onClick={() => setAvatarPop('menu')}>
+              Change avatar
             </button>
-            <button className="ao-pen" aria-label="Choose photo" data-cuelume-open onClick={openPicker}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
-                <path d="m14.5 5.5 3 3" />
-              </svg>
-            </button>
+            {/* until it is saved, a fresh photo can be re-cropped from here */}
+            {source && !cropping ? (
+              <button className="ao-pen" aria-label="Adjust photo" title="Adjust photo" data-cuelume-open onClick={() => setCropping(true)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                  <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                </svg>
+              </button>
+            ) : (
+              <button className="ao-pen" aria-label="Change avatar" data-cuelume-open onClick={() => setAvatarPop('menu')}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                  <path d="m14.5 5.5 3 3" />
+                </svg>
+              </button>
+            )}
             {photo ? (
-              <button className="ao-text" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setPhoto(null)}>
+              <button className="ao-text" data-cuelume-close data-cuelume-emphasis="subtle" onClick={removePhoto}>
                 Remove photo
               </button>
             ) : (
@@ -254,8 +390,33 @@ function Editor({ auth, settings, update, onHold }: Props) {
           />
         </div>
         <div className="profile-id">
-          <b>{name.trim() || (uname ? `@${uname}` : 'New profile')}</b>
-          {uname && <span className="profile-handle">@{uname}</span>}
+          <b>
+            {name.trim() || (uname ? `@${uname}` : 'New profile')}
+            {p && (
+              <button className="rename-btn" aria-label="Change display name" title="Change display name" data-cuelume-open onClick={() => {
+                  setNameDraft(name)
+                  setEditName(true)
+                }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                    <path d="m14.5 5.5 3 3" />
+                  </svg>
+              </button>
+            )}
+          </b>
+          {uname && (
+            <span className="profile-handle">
+              @{p?.username ?? uname}
+              {p && (
+                <button className="rename-btn" aria-label="Change username" title="Change username" data-cuelume-open onClick={() => setRenaming(true)}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                    <path d="m14.5 5.5 3 3" />
+                  </svg>
+                </button>
+              )}
+            </span>
+          )}
           {status.trim() && <span className="profile-status">{status.trim()}</span>}
           <small>{auth.user?.email}</small>
         </div>
@@ -266,7 +427,218 @@ function Editor({ auth, settings, update, onHold }: Props) {
         )}
       </div>
 
+      {source && cropping && <PhotoCropper source={source} crop={crop} onChange={setCrop} onDone={() => setCropping(false)} />}
+
       {!p && <div className="form-msg">Pick a username so friends can find you.</div>}
+
+      {!p && (
+        <div className="field">
+          <label>Username</label>
+        <div className="at-input">
+          <span>@</span>
+          <input
+            className="todo-input"
+            placeholder="yourname"
+            value={username}
+            data-cuelume-type
+            maxLength={20}
+            autoFocus={!!p}
+            onChange={(e) => setUsername(e.target.value.replace(/^@/, '').replace(/[^A-Za-z0-9_]/g, ''))}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Escape') cancelRename()
+              if (e.key === 'Enter' && p && valid && nameChanged) setConfirmName(true)
+            }}
+          />
+        </div>
+        <small className={uname && !valid ? 'bad' : ''}>3–20 letters, numbers or _. Friends add you with this.</small>
+        </div>
+      )}
+
+      {!p && (
+        <div className="field">
+          <label>Display name</label>
+          <input
+            className="todo-input"
+            placeholder="Shown to your friends"
+            value={name}
+            data-cuelume-type
+            maxLength={40}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
+      {avatarPop && host && createPortal(
+        <div className="cp-pop" onClick={(e) => { e.stopPropagation(); setAvatarPop(null) }}>
+          <div className="rename-pop avatar-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="ap-head">
+              <b>{avatarPop === 'menu' ? 'Change avatar' : 'Choose an icon'}</b>
+              <button className="ap-close" aria-label="Close" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAvatarPop(null)}>
+                ✕
+              </button>
+            </div>
+            {avatarPop === 'menu' ? (
+              <div className="ap-tiles">
+                <button
+                  className="ap-tile"
+                  data-cuelume-open
+                  onClick={() => {
+                    setAvatarPop(null)
+                    openPicker()
+                  }}
+                >
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                    <path d="m3 16 5-5 4 4" />
+                    <path d="M18 2v6M15 5h6" />
+                  </svg>
+                  Upload photo
+                </button>
+                <button className="ap-tile" data-cuelume-open onClick={() => setAvatarPop('icons')}>
+                  <span className="ap-tile-icon" style={{ background: color }}>
+                    {emoji}
+                  </span>
+                  Choose icon
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="ap-preview">
+                  <Avatar profile={{ avatar_emoji: emoji, avatar_color: color, avatar_url: photo }} size={56} />
+                </div>
+                <div className="emoji-grid">
+                  {EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      className={!photo && e === emoji ? 'active' : ''}
+                      data-cuelume-select
+                      onClick={() => {
+                        setEmoji(e)
+                        if (photo) removePhoto()
+                      }}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+                <div className="swatches">
+                  {ACCENTS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-label={c}
+                      className={c === color ? 'active' : ''}
+                      data-cuelume-select
+                      style={{ background: c }}
+                      onClick={() => {
+                        setColor(c)
+                        if (photo) removePhoto()
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="presets">
+                  <button className="pill-btn" data-cuelume-tap onClick={() => setAvatarPop(null)}>
+                    Done
+                  </button>
+                  <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAvatarPop('menu')}>
+                    Back
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        host,
+      )}
+
+      {p && renaming && host && createPortal(
+        <div className="cp-pop" onClick={(e) => { e.stopPropagation(); cancelRename() }}>
+          <div className="rename-pop" onClick={(e) => e.stopPropagation()}>
+            {confirmName ? (
+              <>
+                <b>Change username?</b>
+                <small>
+                  Your username becomes @{uname}. Friends will need the new one to find you, and @{p.username} may be taken by someone else.
+                </small>
+                <div className="presets">
+                  <button className="pill-btn" disabled={busy} data-cuelume-tap onClick={changeUsername}>
+                    Yes, change it
+                  </button>
+                  <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={cancelRename}>
+                    Keep @{p.username}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <b>Change username</b>
+        <div className="at-input">
+          <span>@</span>
+          <input
+            className="todo-input"
+            placeholder="yourname"
+            value={username}
+            data-cuelume-type
+            maxLength={20}
+            autoFocus={!!p}
+            onChange={(e) => setUsername(e.target.value.replace(/^@/, '').replace(/[^A-Za-z0-9_]/g, ''))}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Escape') cancelRename()
+              if (e.key === 'Enter' && p && valid && nameChanged) setConfirmName(true)
+            }}
+          />
+        </div>
+        <small className={uname && !valid ? 'bad' : ''}>3–20 letters, numbers or _. Friends add you with this.</small>
+                <div className="presets">
+                  <button className="pill-btn" disabled={!valid || !nameChanged || busy} data-cuelume-tap onClick={() => setConfirmName(true)}>
+                    Continue
+                  </button>
+                  <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={cancelRename}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>,
+        host,
+      )}
+
+      {p && editName && host && createPortal(
+        <div className="cp-pop" onClick={(e) => { e.stopPropagation(); setEditName(false) }}>
+          <div className="rename-pop" onClick={(e) => e.stopPropagation()}>
+            <b>Change display name</b>
+            <input
+              className="todo-input"
+              placeholder="Shown to your friends"
+              value={nameDraft}
+              data-cuelume-type
+              maxLength={40}
+              autoFocus
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Escape') setEditName(false)
+                if (e.key === 'Enter') saveName()
+              }}
+            />
+            <div className="presets">
+              <button className="pill-btn" data-cuelume-tap onClick={saveName}>
+                Save
+              </button>
+              <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setEditName(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        host,
+      )}
 
       {p && (
         <div className="field">
@@ -297,64 +669,21 @@ function Editor({ auth, settings, update, onHold }: Props) {
         </div>
       )}
 
-      <div className="field">
-        <label>Avatar</label>
-        <small>{photo ? 'Hover your picture to change or remove the photo. It replaces the emoji.' : 'Hover your picture to add a photo, or pick an emoji and a colour:'}</small>
-        <div className="emoji-grid">
-          {EMOJIS.map((e) => (
-            <button key={e} className={e === emoji ? 'active' : ''} data-cuelume-select onClick={() => setEmoji(e)}>
-              {e}
-            </button>
-          ))}
-        </div>
-        <div className="swatches">
-          {ACCENTS.map((c) => (
-            <button key={c} aria-label={c} className={c === color ? 'active' : ''} data-cuelume-select style={{ background: c }} onClick={() => setColor(c)} />
-          ))}
-        </div>
-      </div>
-
-      <div className="field">
-        <label>Username</label>
-        <div className="at-input">
-          <span>@</span>
-          <input
-            className="todo-input"
-            placeholder="yourname"
-            value={username}
-            data-cuelume-type
-            maxLength={20}
-            onChange={(e) => setUsername(e.target.value.replace(/^@/, '').replace(/[^A-Za-z0-9_]/g, ''))}
-            onKeyDown={(e) => e.stopPropagation()}
-          />
-        </div>
-        <small className={uname && !valid ? 'bad' : ''}>3–20 letters, numbers or _. Friends add you with this.</small>
-      </div>
-
-      <div className="field">
-        <label>Display name</label>
-        <input
-          className="todo-input"
-          placeholder="Shown to your friends"
-          value={name}
-          data-cuelume-type
-          maxLength={40}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.stopPropagation()}
-        />
-      </div>
 
       <div className="field">
         <label>Status</label>
         <StatusField value={status} onChange={setStatus} />
       </div>
 
-      <div className="profile-actions">
-        <button className="pill-btn" disabled={!valid || !dirty || busy} data-cuelume-tap onClick={save}>
-          {p ? 'Save profile' : 'Create profile'}
-        </button>
-        {msg && <span className="form-msg">{msg}</span>}
-      </div>
+      {!p && (
+        <div className="profile-actions">
+          <button className="pill-btn" disabled={!valid || busy} data-cuelume-tap onClick={create}>
+            Create profile
+          </button>
+          {msg && <span className="form-msg">{msg}</span>}
+        </div>
+      )}
+      {p && msg && <div className="form-msg">{msg}</div>}
 
       {p && (
         <div className="row share-row">

@@ -1,7 +1,7 @@
 [package]
 name = "dynamic-island-setup"
 version = "0.3.8"
-description = "Setup for Dynamic Island"
+description = "Setup for Astra Isle"
 edition = "2024"
 rust-version = "1.90"
 

@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
-import { BACKEND_READY, type Message } from '../lib/supabase'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { BACKEND_READY, type Message, type Profile } from '../lib/supabase'
 import type { Auth } from '../lib/useAuth'
 import type { Friend, Social } from '../lib/useSocial'
 import type { Groups } from '../lib/useGroups'
@@ -11,6 +12,7 @@ import { DEMO_SOCIAL } from '../lib/useDemo'
 import { shownPresence } from '../lib/presence'
 import { Avatar } from './Avatar'
 import { ChatInput } from './ChatInput'
+import { ProfileAvatar, ProfileOpener, ProfileView } from './ProfileView'
 import { play } from 'cuelume'
 import { disclosureCue } from '../lib/sound'
 
@@ -141,7 +143,7 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
         <button className="chip" onClick={() => { play('navigate', { direction: 'back' }); onBack() }}>
           ‹ Back
         </button>
-        <Avatar profile={friend.profile} size={22} presence={shownPresence(friend.profile)} />
+        <ProfileAvatar profile={friend.profile} size={22} presence />
         <b>{friend.profile.display_name || `@${friend.profile.username}`}</b>
         {friend.profile.display_name && <small className="handle">@{friend.profile.username}</small>}
         {friend.activity && <small className="chat-activity">{friend.activity}</small>}
@@ -236,9 +238,55 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
   )
 }
 
-export function FriendsWidget({ auth, social, call, voice, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
+/** how long the chat's closing animation runs before it is really gone (matches the CSS) */
+const CHAT_CLOSE_MS = 230
+
+/** The Social pages, with anyone's avatar opening their profile over the card. */
+export function FriendsWidget(props: Props) {
+  // drawn over the whole card, like the what's new card: the page itself scrolls, so a cover inside it could sit off screen
+  const anchor = useRef<HTMLSpanElement>(null)
+  const [view, setView] = useState<{ profile: Profile; host: Element } | null>(null)
+  const open = useCallback((profile: Profile) => {
+    const host = anchor.current?.closest('.expanded')
+    if (host) setView({ profile, host })
+  }, [])
+  const { social, chat, onChat, section = 'friends', auth } = props
+  const viewing = view?.profile
+  // friends' rows are kept fresh, so their latest picture, status and activity show
+  const friend = viewing ? social.friends.find((f) => f.profile.id === viewing.id) : undefined
+  const chatOpen = section === 'friends' && chat.friend === viewing?.id
+  return (
+    <>
+      <span ref={anchor} hidden />
+      <ProfileOpener value={open}>
+        <FriendsBody {...props} />
+      </ProfileOpener>
+      {view &&
+        viewing &&
+        createPortal(
+          <ProfileView
+            key={viewing.id}
+            profile={friend?.profile ?? viewing}
+            activity={friend?.activity}
+            onMessage={friend && viewing.id !== auth.user?.id && !chatOpen ? () => {
+              setView(null)
+              onChat({ friend: viewing.id, group: null }, 'friends')
+            } : undefined}
+            onClose={() => setView(null)}
+          />,
+          view.host,
+        )}
+    </>
+  )
+}
+
+function FriendsBody({ auth, social, call, voice, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
   const [username, setUsername] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
+  // going back plays the chat's closing animation first, then really leaves
+  const [leaving, setLeaving] = useState(false)
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(leaveTimer.current), [])
 
   useEffect(() => {
     if (openChatId && social.friends.some((f) => f.profile.id === openChatId)) {
@@ -272,8 +320,13 @@ export function FriendsWidget({ auth, social, call, voice, groups, section = 'fr
     onChat({ friend: null, group: id }, 'groups')
   }
   const back = () => {
-    onFullscreen?.(false)
-    onChat({ friend: null, group: null })
+    if (leaving) return
+    setLeaving(true)
+    leaveTimer.current = setTimeout(() => {
+      setLeaving(false)
+      onFullscreen?.(false)
+      onChat({ friend: null, group: null })
+    }, CHAT_CLOSE_MS)
   }
   const chatView = friend ? (
     <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} voiceBusy={Boolean(voice?.state.groupId)} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
@@ -283,14 +336,14 @@ export function FriendsWidget({ auth, social, call, voice, groups, section = 'fr
   if (chatView) {
     if (!fullscreen) {
       return (
-        <div className="friends" onClick={(e) => e.stopPropagation()}>
+        <div className={`friends ${leaving ? 'leaving' : ''}`} onClick={(e) => e.stopPropagation()}>
           {chatView}
         </div>
       )
     }
     // fullscreen: friends down the left with the group chats below them, the open chat filling the right
     return (
-      <div className="friends fs-split" onClick={(e) => e.stopPropagation()}>
+      <div className={`friends fs-split ${leaving ? 'leaving' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="fs-contacts">
           {social.friends.map((f) => (
             <button
@@ -361,7 +414,7 @@ export function FriendsWidget({ auth, social, call, voice, groups, section = 'fr
 
       {social.incoming.map((r) => (
         <div key={r.friendshipId} className="friend-row request">
-          <Avatar profile={r.profile} size={30} />
+          <ProfileAvatar profile={r.profile} size={30} />
           <div className="friend-meta">
             <b>{r.profile.display_name || `@${r.profile.username}`}</b>
             <small>
@@ -379,7 +432,7 @@ export function FriendsWidget({ auth, social, call, voice, groups, section = 'fr
 
       {social.friends.map((f) => (
         <div key={f.friendshipId} className="friend-row" data-cuelume-navigate onClick={() => openFriend(f.profile.id)}>
-          <Avatar profile={f.profile} size={30} presence={shownPresence(f.profile)} />
+          <ProfileAvatar profile={f.profile} size={30} presence />
           <div className="friend-meta">
             <b>{f.profile.display_name || `@${f.profile.username}`}</b>
             <small>
@@ -406,7 +459,7 @@ export function FriendsWidget({ auth, social, call, voice, groups, section = 'fr
 
       {social.outgoing.map((r) => (
         <div key={r.friendshipId} className="friend-row pending">
-          <Avatar profile={r.profile} size={30} />
+          <ProfileAvatar profile={r.profile} size={30} />
           <div className="friend-meta">
             <b>{r.profile.display_name || `@${r.profile.username}`}</b>
             <small>

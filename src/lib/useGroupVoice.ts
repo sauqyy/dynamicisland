@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { BACKEND_READY, supabase } from './supabase'
 import { openMic, trackOutput } from './audioDevices'
 import { ICE } from './useCall'
+import { playJoin, playLeave } from './callSounds'
 import type { Group } from './useGroups'
 
 /** The most people allowed in one group's voice chat. */
@@ -40,6 +41,17 @@ interface Session {
   peers: Map<string, Peer>
   /** our presence is published; before that we only look at who is already in */
   tracked: boolean
+  /** we opened an empty room, so the group was rung */
+  started: boolean
+  /** someone else has been in the room with us */
+  joined: boolean
+}
+
+export interface VoiceRing {
+  /** you opened the group's empty voice chat */
+  start: (gid: string) => void
+  /** you left it before anyone else came in */
+  stop: (gid: string) => void
 }
 
 interface VSignal {
@@ -63,11 +75,13 @@ function closePeer(p: Peer) {
  * The cap is enforced by the apps themselves: the first MAX_VOICE people by join time stay,
  * anyone later leaves on their own.
  */
-export function useGroupVoice(me: string | null, groups: Group[]) {
+export function useGroupVoice(me: string | null, groups: Group[], ring?: VoiceRing) {
   const [state, setState] = useState<VoiceState>(IDLE)
   const stateRef = useRef(state)
   const groupsRef = useRef(groups)
   groupsRef.current = groups
+  const ringRef = useRef(ring)
+  ringRef.current = ring
   const sess = useRef<Session | null>(null)
   const errorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -82,6 +96,8 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
       const s = sess.current
       sess.current = null
       if (s) {
+        if (stateRef.current.since !== null) playLeave()
+        if (s.started && !s.joined) ringRef.current?.stop(s.gid)
         s.peers.forEach(closePeer)
         s.peers.clear()
         s.mic.getTracks().forEach((t) => t.stop())
@@ -114,7 +130,7 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
       }
 
       const channel = supabase.channel(`voice-${gid}`, { config: { broadcast: { self: false }, presence: { key: me } } })
-      const s: Session = { gid, channel, mic, peers: new Map(), tracked: false }
+      const s: Session = { gid, channel, mic, peers: new Map(), tracked: false, started: false, joined: false }
       sess.current = s
 
       const isMember = (id: string) => groupsRef.current.find((g) => g.id === gid)?.members.some((m) => m.id === id) ?? false
@@ -174,6 +190,11 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
             }
             s.tracked = true
             channel.track({ joinedAt: Date.now() })
+            // nobody was in yet: you are starting the voice chat, so ring the rest of the group
+            if (present.length === 0) {
+              s.started = true
+              ringRef.current?.start(gid)
+            }
             return
           }
           const order = present.map((p) => p.id)
@@ -184,6 +205,7 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
           }
           const room = order.slice(0, MAX_VOICE)
           const others = room.filter((id) => id !== me && isMember(id))
+          if (others.length) s.joined = true
           s.peers.forEach((p, id) => {
             if (!others.includes(id)) {
               closePeer(p)
@@ -192,7 +214,11 @@ export function useGroupVoice(me: string | null, groups: Group[]) {
           })
           // the lower id makes the offer, so two people never both offer
           for (const id of others) if (!s.peers.has(id) && me < id) offerTo(id).catch(() => {})
-          set({ ...stateRef.current, joining: false, members: room, since: stateRef.current.since ?? Date.now() })
+          const prev = stateRef.current
+          if (prev.since === null) playJoin()
+          else if (room.length > prev.members.length) playJoin()
+          else if (room.length < prev.members.length) playLeave()
+          set({ ...prev, joining: false, members: room, since: prev.since ?? Date.now() })
         })
         .on('broadcast', { event: '*' }, ({ event, payload }) => {
           const p = payload as VSignal

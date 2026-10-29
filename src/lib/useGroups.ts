@@ -72,6 +72,8 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [reads, setReads] = useState<GroupReads>({})
   const openGroup = useRef<string | null>(null)
+  /** How far you have read in each group, kept in step with reads[gid][me] so markRead can tell at once whether to save. */
+  const myReads = useRef<Record<string, number>>({})
   const seen = useRef(loadSeen())
   const incomingCb = useRef(onIncoming)
   incomingCb.current = onIncoming
@@ -92,16 +94,12 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
   const markRead = useCallback(
     (gid: string, id: number) => {
       if (!me || !BACKEND_READY) return
-      let fresh = false
-      setReads((cur) => {
-        if ((cur[gid]?.[me] ?? 0) >= id) return cur
-        fresh = true
-        return { ...cur, [gid]: { ...cur[gid], [me]: id } }
-      })
+      // decided here, not inside the setReads updater: React may run that updater only at the next render, too late to know
+      if ((myReads.current[gid] ?? 0) >= id) return
+      myReads.current[gid] = id
+      setReads((cur) => ((cur[gid]?.[me] ?? 0) >= id ? cur : { ...cur, [gid]: { ...cur[gid], [me]: id } }))
       // the table may not exist yet if groups.sql has not been run again; reading still works without it
-      queueMicrotask(() => {
-        if (fresh) void supabase.from('group_reads').upsert({ group_id: gid, user_id: me, last_read_id: id, updated_at: new Date().toISOString() }).then(() => {})
-      })
+      void supabase.from('group_reads').upsert({ group_id: gid, user_id: me, last_read_id: id, updated_at: new Date().toISOString() }).then(() => {})
     },
     [me],
   )
@@ -155,7 +153,10 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
         supabase.from('group_reads').select('group_id, last_read_id').eq('user_id', me),
       ])
       const readTo: Record<string, number> = {}
-      for (const r of (mine ?? []) as { group_id: string; last_read_id: number }[]) readTo[r.group_id] = r.last_read_id
+      for (const r of (mine ?? []) as { group_id: string; last_read_id: number }[]) {
+        readTo[r.group_id] = r.last_read_id
+        myReads.current[r.group_id] = Math.max(myReads.current[r.group_id] ?? 0, r.last_read_id)
+      }
       setReads((cur) => {
         const next = { ...cur }
         for (const [gid, id] of Object.entries(readTo)) next[gid] = { ...next[gid], [me]: Math.max(next[gid]?.[me] ?? 0, id) }
@@ -172,6 +173,7 @@ export function useGroups(me: string | null, onIncoming?: (m: GroupMessage, grou
 
   useEffect(() => {
     if (!me || !BACKEND_READY) return
+    myReads.current = {}
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh()
     const poll = setInterval(refresh, 60_000)

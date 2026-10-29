@@ -1,8 +1,10 @@
-import { FolderOpen, ListChecks, Music2, Settings2, Users, type LucideIcon } from 'lucide-react'
+import { CalendarClock, Sparkles, FolderOpen, ListChecks, Music2, Settings2, Users, type LucideIcon } from 'lucide-react'
 
 const ICONS: Record<string, LucideIcon> = {
+  astra: Sparkles,
   home: Music2,
   tools: ListChecks,
+  plan: CalendarClock,
   files: FolderOpen,
   social: Users,
   settings: Settings2,

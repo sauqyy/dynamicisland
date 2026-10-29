@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mascot designs</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 28px 20px 40px; background: #0b0b10; color: #e9e9f2; font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.sub { margin: 0 0 22px; color: #8b8ba0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; max-width: 1100px; }
+  .card { background: linear-gradient(180deg, #16161f, #101017); border: 1px solid #23232f; border-radius: 22px; padding: 16px 12px 14px; text-align: center; }
+  .card svg { width: 150px; height: 150px; display: block; margin: 0 auto 6px; animation: float 3.4s ease-in-out infinite; overflow: visible; }
+  .card:nth-child(even) svg { animation-delay: -1.2s; }
+  .pill { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 34px; margin: 0 0 8px; background: #000; border-radius: 0 0 14px 14px; color: #fff; font-size: 12px; }
+  .pill svg { width: 24px; height: 24px; margin: 0; animation: none; }
+  .n { font-weight: 600; } .d { color: #8b8ba0; font-size: 12px; }
+  @keyframes float { 50% { transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .card svg { animation: none; } }
+</style>
+</head>
+<body>
+<h1>Mascot designs</h1>
+<p class="sub">Pick a number. Each one is shown big and at pill size (24px) on the island.</p>
+<div class="grid" id="grid"></div>
+
+<script>
+// each design is a function of an id prefix, so gradients never clash between the big and the small copy
+const D = [
+{ n: '1 · Visor', d: 'Pearl body, dark glass visor, glowing eyes', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd3e6"/></linearGradient>
+<linearGradient id="${p}v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#23253a"/><stop offset="1" stop-color="#0d0e18"/></linearGradient>
+<radialGradient id="${p}e" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e6fdff"/><stop offset="1" stop-color="#37d6f0"/></radialGradient>
+</defs>
+<ellipse cx="70" cy="128" rx="34" ry="5" fill="#000" opacity=".35"/>
+<rect x="6" y="62" width="10" height="26" rx="5" fill="#b7bcd4"/><rect x="124" y="62" width="10" height="26" rx="5" fill="#b7bcd4"/>
+<rect x="14" y="18" width="112" height="104" rx="46" fill="url(#${p}b)"/>
+<path d="M30 34 Q52 22 84 24" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".9"/>
+<rect x="26" y="42" width="88" height="56" rx="26" fill="url(#${p}v)"/>
+<rect x="46" y="58" width="14" height="22" rx="7" fill="url(#${p}e)"/><rect x="80" y="58" width="14" height="22" rx="7" fill="url(#${p}e)"/>
+<rect x="46" y="58" width="14" height="22" rx="7" fill="#37d6f0" opacity=".35" transform="translate(0 0) scale(1)"/>
+<path d="M62 90 Q70 96 78 90" stroke="#37d6f0" stroke-width="3" stroke-linecap="round" fill="none"/>
+<circle cx="34" cy="86" r="4" fill="#ff8fb1" opacity=".8"/><circle cx="106" cy="86" r="4" fill="#ff8fb1" opacity=".8"/>` },
+
+{ n: '2 · Orb', d: 'Glossy gradient sphere, soft eyes', svg: p => `
+<defs>
+<radialGradient id="${p}b" cx=".35" cy=".28" r=".85"><stop offset="0" stop-color="#b9a8ff"/><stop offset=".55" stop-color="#6f56f0"/><stop offset="1" stop-color="#3a24a8"/></radialGradient>
+</defs>
+<ellipse cx="70" cy="128" rx="30" ry="5" fill="#000" opacity=".35"/>
+<circle cx="70" cy="70" r="54" fill="url(#${p}b)"/>
+<ellipse cx="50" cy="38" rx="20" ry="11" fill="#fff" opacity=".35" transform="rotate(-28 50 38)"/>
+<ellipse cx="52" cy="72" rx="7" ry="10" fill="#fff"/><ellipse cx="88" cy="72" rx="7" ry="10" fill="#fff"/>
+<circle cx="54" cy="74" r="3.5" fill="#2b1a7a"/><circle cx="90" cy="74" r="3.5" fill="#2b1a7a"/>
+<path d="M62 92 Q70 99 78 92" stroke="#fff" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="38" cy="90" rx="7" ry="4" fill="#ff9ec0" opacity=".55"/><ellipse cx="102" cy="90" rx="7" ry="4" fill="#ff9ec0" opacity=".55"/>` },
+
+{ n: '3 · Beacon', d: 'Mint squircle with a glowing antenna', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ff0cf"/><stop offset="1" stop-color="#2fb98f"/></linearGradient>
+<radialGradient id="${p}g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#ffe27a"/><stop offset="1" stop-color="#ffb800" stop-opacity="0"/></radialGradient>
+</defs>
+<ellipse cx="70" cy="128" rx="34" ry="5" fill="#000" opacity=".35"/>
+<line x1="70" y1="34" x2="70" y2="16" stroke="#2fb98f" stroke-width="5" stroke-linecap="round"/>
+<circle cx="70" cy="14" r="14" fill="url(#${p}g)"/><circle cx="70" cy="14" r="6" fill="#fff6c9"/>
+<rect x="14" y="30" width="112" height="94" rx="44" fill="url(#${p}b)"/>
+<path d="M30 46 Q50 36 80 38" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55"/>
+<circle cx="50" cy="76" r="9" fill="#12372d"/><circle cx="90" cy="76" r="9" fill="#12372d"/>
+<circle cx="53" cy="72.5" r="3.2" fill="#fff"/><circle cx="93" cy="72.5" r="3.2" fill="#fff"/>
+<path d="M63 92 Q70 98 77 92" stroke="#12372d" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="34" cy="90" rx="7" ry="4.2" fill="#ff8fb1" opacity=".7"/><ellipse cx="106" cy="90" rx="7" ry="4.2" fill="#ff8fb1" opacity=".7"/>` },
+
+{ n: '4 · Graphite', d: 'Dark premium shell, amber smiling eyes', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a4d63"/><stop offset="1" stop-color="#1a1b27"/></linearGradient>
+<linearGradient id="${p}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset="1" stop-color="#ffffff" stop-opacity=".04"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="128" rx="34" ry="5" fill="#000" opacity=".5"/>
+<rect x="4" y="58" width="14" height="34" rx="7" fill="#ffb347"/><rect x="122" y="58" width="14" height="34" rx="7" fill="#ffb347"/>
+<rect x="14" y="20" width="112" height="102" rx="46" fill="url(#${p}b)"/>
+<rect x="14.75" y="20.75" width="110.5" height="100.5" rx="45.5" fill="none" stroke="url(#${p}r)" stroke-width="1.5"/>
+<path d="M42 72 Q52 60 62 72" stroke="#ffc15a" stroke-width="6" stroke-linecap="round" fill="none"/>
+<path d="M78 72 Q88 60 98 72" stroke="#ffc15a" stroke-width="6" stroke-linecap="round" fill="none"/>
+<path d="M60 88 Q70 98 80 88" stroke="#ffc15a" stroke-width="5" stroke-linecap="round" fill="none"/>
+<ellipse cx="36" cy="86" rx="7" ry="4" fill="#ff7da0" opacity=".45"/><ellipse cx="104" cy="86" rx="7" ry="4" fill="#ff7da0" opacity=".45"/>` },
+
+{ n: '5 · Aurora', d: 'Dark glass with a living colour glow inside', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232438"/><stop offset="1" stop-color="#0c0c16"/></linearGradient>
+<linearGradient id="${p}a" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3be0c3"/><stop offset=".5" stop-color="#6f7bff"/><stop offset="1" stop-color="#ff6fd8"/></linearGradient>
+<clipPath id="${p}c"><rect x="14" y="20" width="112" height="102" rx="46"/></clipPath>
+</defs>
+<ellipse cx="70" cy="128" rx="34" ry="5" fill="#000" opacity=".5"/>
+<rect x="14" y="20" width="112" height="102" rx="46" fill="url(#${p}b)"/>
+<g clip-path="url(#${p}c)"><ellipse cx="70" cy="128" rx="70" ry="38" fill="url(#${p}a)" opacity=".75"/></g>
+<rect x="14.5" y="20.5" width="111" height="101" rx="45.5" fill="none" stroke="#fff" stroke-opacity=".2"/>
+<path d="M52 56 L55 66 L65 69 L55 72 L52 82 L49 72 L39 69 L49 66 Z" fill="#fff"/>
+<path d="M90 56 L93 66 L103 69 L93 72 L90 82 L87 72 L77 69 L87 66 Z" fill="#fff"/>
+<path d="M62 94 Q70 101 78 94" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>` },
+
+{ n: '6 · Ghosty', d: 'Soft lilac ghost, wavy hem, tiny arms', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d5cdfa"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="130" rx="30" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M18 70 C18 36 40 16 70 16 C100 16 122 36 122 70 L122 112 Q113 124 104 112 Q95 124 87 112 Q78 124 70 112 Q62 124 53 112 Q45 124 36 112 Q27 124 18 112 Z" fill="url(#${p}b)"/>
+<ellipse cx="6" cy="76" rx="7" ry="11" fill="#e6e0ff" transform="rotate(20 6 76)"/><ellipse cx="134" cy="76" rx="7" ry="11" fill="#e6e0ff" transform="rotate(-20 134 76)"/>
+<path d="M34 40 Q50 28 74 28" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"/>
+<circle cx="52" cy="66" r="6.5" fill="#2a2240"/><circle cx="88" cy="66" r="6.5" fill="#2a2240"/>
+<circle cx="54" cy="63.5" r="2.2" fill="#fff"/><circle cx="90" cy="63.5" r="2.2" fill="#fff"/>
+<path d="M64 80 Q70 86 76 80" stroke="#2a2240" stroke-width="3" stroke-linecap="round" fill="none"/>
+<ellipse cx="38" cy="80" rx="7" ry="4.2" fill="#ff8fb1" opacity=".6"/><ellipse cx="102" cy="80" rx="7" ry="4.2" fill="#ff8fb1" opacity=".6"/>` },
+
+{ n: '7 · Cyclops', d: 'One big expressive eye, warm peach pebble', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd2b8"/><stop offset="1" stop-color="#ff9d85"/></linearGradient>
+<radialGradient id="${p}i" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#7dd3ff"/><stop offset=".7" stop-color="#3b6cf0"/><stop offset="1" stop-color="#1c2f8a"/></radialGradient>
+</defs>
+<ellipse cx="70" cy="130" rx="36" ry="5" fill="#000" opacity=".35"/>
+<path d="M16 76 C16 36 40 18 72 18 C106 18 126 40 124 78 C122 108 100 124 70 124 C36 124 16 108 16 76 Z" fill="url(#${p}b)"/>
+<path d="M32 44 Q50 30 80 32" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".6"/>
+<ellipse cx="70" cy="70" rx="27" ry="25" fill="#fff"/>
+<circle cx="70" cy="71" r="17" fill="url(#${p}i)"/><circle cx="70" cy="71" r="8" fill="#0b1240"/>
+<circle cx="63" cy="64" r="5" fill="#fff"/><circle cx="76" cy="78" r="2.4" fill="#fff" opacity=".8"/>
+<path d="M60 104 Q70 111 80 104" stroke="#7a3320" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="30" cy="92" rx="7" ry="4" fill="#ff6f96" opacity=".5"/><ellipse cx="110" cy="92" rx="7" ry="4" fill="#ff6f96" opacity=".5"/>` },
+
+{ n: '8 · Capsule', d: 'Tall pearl capsule with a screen face', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4f5fb"/><stop offset=".6" stop-color="#e3e6f4"/><stop offset="1" stop-color="#b9bfd9"/></linearGradient>
+<linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c2a3e"/><stop offset="1" stop-color="#0a121e"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="28" ry="4.5" fill="#000" opacity=".4"/>
+<ellipse cx="22" cy="86" rx="9" ry="13" fill="#c9cee4"/><ellipse cx="118" cy="86" rx="9" ry="13" fill="#c9cee4"/>
+<rect x="26" y="6" width="88" height="124" rx="44" fill="url(#${p}b)"/>
+<rect x="36" y="28" width="68" height="46" rx="22" fill="url(#${p}s)"/>
+<path d="M50 52 H60" stroke="#7affc9" stroke-width="5" stroke-linecap="round"/><path d="M80 52 H90" stroke="#7affc9" stroke-width="5" stroke-linecap="round"/>
+<path d="M62 62 Q70 67 78 62" stroke="#7affc9" stroke-width="3" stroke-linecap="round" fill="none"/>
+<circle cx="70" cy="96" r="7" fill="#7affc9" opacity=".9"/><circle cx="70" cy="96" r="3" fill="#fff"/>
+<path d="M44 16 Q60 9 84 12" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none"/>` },
+
+{ n: '9 · Droplet', d: 'Glassy aqua drop with a sparkle', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1=".2" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="#b8f3ff"/><stop offset=".6" stop-color="#4fc3f7"/><stop offset="1" stop-color="#2878e6"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="130" rx="30" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M70 8 C84 34 122 58 122 88 C122 114 100 126 70 126 C40 126 18 114 18 88 C18 58 56 34 70 8 Z" fill="url(#${p}b)"/>
+<path d="M44 62 Q38 80 42 96" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none" opacity=".65"/>
+<circle cx="53" cy="88" r="8" fill="#10304f"/><circle cx="87" cy="88" r="8" fill="#10304f"/>
+<circle cx="56" cy="84.5" r="2.8" fill="#fff"/><circle cx="90" cy="84.5" r="2.8" fill="#fff"/>
+<path d="M63 104 Q70 110 77 104" stroke="#10304f" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="38" cy="102" rx="6.5" ry="4" fill="#ff9ec0" opacity=".6"/><ellipse cx="102" cy="102" rx="6.5" ry="4" fill="#ff9ec0" opacity=".6"/>
+<path d="M104 30 L106 37 L113 39 L106 41 L104 48 L102 41 L95 39 L102 37 Z" fill="#fff"/>` },
+
+{ n: '10 · Halo', d: 'Calm round head with a floating gold ring', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe3ee"/><stop offset="1" stop-color="#ffb3cd"/></linearGradient>
+<linearGradient id="${p}h" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd86b"/><stop offset=".5" stop-color="#fff3b8"/><stop offset="1" stop-color="#ffb938"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="32" ry="4.5" fill="#000" opacity=".35"/>
+<ellipse cx="70" cy="18" rx="30" ry="9" fill="none" stroke="url(#${p}h)" stroke-width="6"/>
+<rect x="12" y="28" width="116" height="98" rx="49" fill="url(#${p}b)"/>
+<path d="M30 48 Q50 38 80 40" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".75"/>
+<path d="M40 76 Q50 86 60 76" stroke="#5a2340" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+<path d="M80 76 Q90 86 100 76" stroke="#5a2340" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+<path d="M63 96 Q70 102 77 96" stroke="#5a2340" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="32" cy="92" rx="8" ry="4.6" fill="#ff7da0" opacity=".6"/><ellipse cx="108" cy="92" rx="8" ry="4.6" fill="#ff7da0" opacity=".6"/>` },
+{ n: '11 · Bunny', d: 'Cloud-white body with soft pink ears', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e4e2f2"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="32" ry="4.5" fill="#000" opacity=".35"/>
+<rect x="38" y="-2" width="24" height="56" rx="12" fill="url(#${p}b)" transform="rotate(-8 50 26)"/><rect x="41" y="6" width="12" height="38" rx="6" fill="#ffb8d0" transform="rotate(-8 50 26)"/>
+<rect x="78" y="-2" width="24" height="56" rx="12" fill="url(#${p}b)" transform="rotate(8 90 26)"/><rect x="87" y="6" width="12" height="38" rx="6" fill="#ffb8d0" transform="rotate(8 90 26)"/>
+<rect x="14" y="34" width="112" height="92" rx="46" fill="url(#${p}b)"/>
+<circle cx="52" cy="78" r="6.5" fill="#2e2740"/><circle cx="88" cy="78" r="6.5" fill="#2e2740"/>
+<circle cx="54" cy="75.5" r="2.2" fill="#fff"/><circle cx="90" cy="75.5" r="2.2" fill="#fff"/>
+<path d="M66 90 L74 90 L70 95 Z" fill="#ff8fb1"/><path d="M70 95 Q66 100 62 97 M70 95 Q74 100 78 97" stroke="#2e2740" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+<ellipse cx="34" cy="92" rx="8" ry="4.6" fill="#ffa0c0" opacity=".6"/><ellipse cx="106" cy="92" rx="8" ry="4.6" fill="#ffa0c0" opacity=".6"/>` },
+
+{ n: '12 · Kitty', d: 'Cream cat bot with pointed ears', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1dc"/><stop offset="1" stop-color="#f4c98f"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="34" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M18 52 L22 12 Q24 8 28 11 L52 32 Z" fill="url(#${p}b)"/><path d="M26 40 L28 22 L42 33 Z" fill="#ffb3a0"/>
+<path d="M122 52 L118 12 Q116 8 112 11 L88 32 Z" fill="url(#${p}b)"/><path d="M114 40 L112 22 L98 33 Z" fill="#ffb3a0"/>
+<rect x="12" y="26" width="116" height="100" rx="50" fill="url(#${p}b)"/>
+<path d="M40 76 Q50 66 60 76" stroke="#4a2e1a" stroke-width="4.5" stroke-linecap="round" fill="none"/><path d="M80 76 Q90 66 100 76" stroke="#4a2e1a" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+<path d="M66 88 L74 88 L70 93 Z" fill="#e8737f"/><path d="M70 93 Q66 99 61 95 M70 93 Q74 99 79 95" stroke="#4a2e1a" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+<path d="M18 86 L36 90 M18 96 L36 94 M122 86 L104 90 M122 96 L104 94" stroke="#c99a62" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="38" cy="100" rx="7" ry="4" fill="#ff9d8a" opacity=".5"/><ellipse cx="102" cy="100" rx="7" ry="4" fill="#ff9d8a" opacity=".5"/>` },
+
+{ n: '13 · Teddy', d: 'Warm bear with round ears and a snout', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9a273"/><stop offset="1" stop-color="#a86a3f"/></linearGradient>
+<linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9cf"/><stop offset="1" stop-color="#f0c79a"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="34" ry="4.5" fill="#000" opacity=".35"/>
+<circle cx="30" cy="30" r="20" fill="url(#${p}b)"/><circle cx="30" cy="30" r="10" fill="#f0c79a"/>
+<circle cx="110" cy="30" r="20" fill="url(#${p}b)"/><circle cx="110" cy="30" r="10" fill="#f0c79a"/>
+<rect x="12" y="26" width="116" height="100" rx="52" fill="url(#${p}b)"/>
+<path d="M34 42 Q54 30 84 34" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".35"/>
+<ellipse cx="70" cy="94" rx="24" ry="19" fill="url(#${p}s)"/>
+<circle cx="50" cy="72" r="6" fill="#2b1810"/><circle cx="90" cy="72" r="6" fill="#2b1810"/>
+<circle cx="52" cy="69.5" r="2" fill="#fff"/><circle cx="92" cy="69.5" r="2" fill="#fff"/>
+<ellipse cx="70" cy="86" rx="7" ry="5" fill="#3a2013"/><path d="M70 91 V96 M62 98 Q70 104 78 98" stroke="#3a2013" stroke-width="2.8" stroke-linecap="round" fill="none"/>` },
+
+{ n: '14 · Jelly', d: 'Translucent jelly dome with a wobbly hem', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb8ee"/><stop offset=".6" stop-color="#b48cff"/><stop offset="1" stop-color="#7a6bff"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="32" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M16 76 C16 34 40 16 70 16 C100 16 124 34 124 76 L124 100 Q116 112 108 100 Q100 112 92 100 Q84 112 76 100 Q68 112 60 100 Q52 112 44 100 Q36 112 28 100 L16 100 Z" fill="url(#${p}b)" opacity=".95"/>
+<path d="M30 52 Q40 30 68 26" stroke="#fff" stroke-width="7" stroke-linecap="round" fill="none" opacity=".6"/>
+<rect x="30" y="102" width="8" height="20" rx="4" fill="#b48cff" opacity=".8"/><rect x="66" y="104" width="8" height="24" rx="4" fill="#b48cff" opacity=".8"/><rect x="102" y="102" width="8" height="20" rx="4" fill="#b48cff" opacity=".8"/>
+<ellipse cx="52" cy="66" rx="6.5" ry="8.5" fill="#2a1a5e"/><ellipse cx="88" cy="66" rx="6.5" ry="8.5" fill="#2a1a5e"/>
+<circle cx="54" cy="62.5" r="2.6" fill="#fff"/><circle cx="90" cy="62.5" r="2.6" fill="#fff"/>
+<path d="M63 82 Q70 88 77 82" stroke="#2a1a5e" stroke-width="3" stroke-linecap="round" fill="none"/>
+<ellipse cx="38" cy="80" rx="7" ry="4" fill="#fff" opacity=".35"/><ellipse cx="102" cy="80" rx="7" ry="4" fill="#fff" opacity=".35"/>` },
+
+{ n: '15 · Neon chip', d: 'Dark squircle with glowing ring eyes', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f2433"/><stop offset="1" stop-color="#0a0d16"/></linearGradient>
+<linearGradient id="${p}n" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b6ff5c"/><stop offset="1" stop-color="#2be3b0"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="130" rx="34" ry="4.5" fill="#000" opacity=".5"/>
+<rect x="14" y="18" width="112" height="108" rx="40" fill="url(#${p}b)"/>
+<rect x="15" y="19" width="110" height="106" rx="39" fill="none" stroke="url(#${p}n)" stroke-width="2.5"/>
+<path d="M14 70 H4 M126 70 H136 M70 18 V8 M70 126 V136" stroke="url(#${p}n)" stroke-width="3" stroke-linecap="round"/>
+<circle cx="50" cy="66" r="14" fill="none" stroke="url(#${p}n)" stroke-width="5"/><circle cx="90" cy="66" r="14" fill="none" stroke="url(#${p}n)" stroke-width="5"/>
+<circle cx="52" cy="67" r="5" fill="#d8ff9c"/><circle cx="92" cy="67" r="5" fill="#d8ff9c"/>
+<path d="M58 96 Q70 106 82 96" stroke="url(#${p}n)" stroke-width="4.5" stroke-linecap="round" fill="none"/>` },
+
+{ n: '16 · Moonlet', d: 'Sleepy pale-gold moon with a tiny star', svg: p => `
+<defs>
+<radialGradient id="${p}b" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#fff8d6"/><stop offset=".7" stop-color="#ffe08a"/><stop offset="1" stop-color="#f5b94a"/></radialGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="30" ry="4.5" fill="#000" opacity=".35"/>
+<circle cx="70" cy="72" r="54" fill="url(#${p}b)"/>
+<circle cx="42" cy="50" r="7" fill="#f0c65a" opacity=".6"/><circle cx="102" cy="96" r="9" fill="#f0c65a" opacity=".55"/><circle cx="96" cy="46" r="4" fill="#f0c65a" opacity=".5"/>
+<path d="M38 74 Q50 82 62 74 Z" fill="#fff8d6" stroke="#5a3d12" stroke-width="3.5" stroke-linejoin="round"/><path d="M78 74 Q90 82 102 74 Z" fill="#fff8d6" stroke="#5a3d12" stroke-width="3.5" stroke-linejoin="round"/>
+<path d="M62 94 Q70 99 78 94" stroke="#5a3d12" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="36" cy="90" rx="7" ry="4" fill="#ff9d8a" opacity=".55"/><ellipse cx="104" cy="90" rx="7" ry="4" fill="#ff9d8a" opacity=".55"/>
+<path d="M122 14 L125 23 L134 26 L125 29 L122 38 L119 29 L110 26 L119 23 Z" fill="#fff3b8"/>` },
+
+{ n: '17 · Puff', d: 'Fluffy sky cloud with happy eyes', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfe4ff"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="34" ry="4.5" fill="#000" opacity=".35"/>
+<g fill="url(#${p}b)"><circle cx="38" cy="82" r="28"/><circle cx="102" cy="82" r="28"/><circle cx="52" cy="52" r="30"/><circle cx="90" cy="54" r="28"/><rect x="26" y="78" width="88" height="48" rx="24"/></g>
+<path d="M36 56 Q50 40 72 40" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none"/>
+<path d="M42 84 Q52 74 62 84" stroke="#2b3a5e" stroke-width="4.5" stroke-linecap="round" fill="none"/><path d="M78 84 Q88 74 98 84" stroke="#2b3a5e" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+<path d="M62 98 Q70 107 78 98 Z" fill="#2b3a5e"/>
+<ellipse cx="36" cy="98" rx="8" ry="4.6" fill="#ffa0c0" opacity=".6"/><ellipse cx="104" cy="98" rx="8" ry="4.6" fill="#ffa0c0" opacity=".6"/>` },
+
+{ n: '18 · Gem', d: 'Faceted prism with a calm face', svg: p => `
+<defs>
+<linearGradient id="${p}a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9bf0ff"/><stop offset="1" stop-color="#4a8cff"/></linearGradient>
+<linearGradient id="${p}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c9a8ff"/><stop offset="1" stop-color="#6a5cf5"/></linearGradient>
+<linearGradient id="${p}d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc2e6"/><stop offset="1" stop-color="#b06cff"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="32" ry="4.5" fill="#000" opacity=".4"/>
+<path d="M40 14 H100 L130 52 L70 128 L10 52 Z" fill="url(#${p}a)" stroke-linejoin="round"/>
+<path d="M40 14 L70 52 L10 52 Z" fill="url(#${p}d)" opacity=".9"/><path d="M100 14 L130 52 L70 52 Z" fill="url(#${p}c)" opacity=".9"/>
+<path d="M10 52 L70 52 L70 128 Z" fill="#fff" opacity=".12"/>
+<path d="M44 20 L66 20" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+<ellipse cx="54" cy="74" rx="5.5" ry="7.5" fill="#14204a"/><ellipse cx="86" cy="74" rx="5.5" ry="7.5" fill="#14204a"/>
+<circle cx="56" cy="71" r="2" fill="#fff"/><circle cx="88" cy="71" r="2" fill="#fff"/>
+<path d="M63 90 Q70 96 77 90" stroke="#14204a" stroke-width="3" stroke-linecap="round" fill="none"/>` },
+
+{ n: '19 · Retro screen', d: 'Rounded monitor with pixel-dot face', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fdfdff"/><stop offset="1" stop-color="#cdd1e6"/></linearGradient>
+<linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#12162a"/><stop offset="1" stop-color="#070914"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="34" ry="4.5" fill="#000" opacity=".4"/>
+<rect x="46" y="112" width="48" height="12" rx="6" fill="#b7bcd4"/>
+<rect x="12" y="14" width="116" height="102" rx="32" fill="url(#${p}b)"/>
+<rect x="22" y="24" width="96" height="82" rx="22" fill="url(#${p}s)"/>
+<g fill="#5ff3ff"><rect x="42" y="48" width="8" height="8" rx="2"/><rect x="50" y="48" width="8" height="8" rx="2"/><rect x="42" y="56" width="8" height="8" rx="2"/><rect x="50" y="56" width="8" height="8" rx="2"/></g>
+<g fill="#ff7ad9"><rect x="82" y="48" width="8" height="8" rx="2"/><rect x="90" y="48" width="8" height="8" rx="2"/><rect x="82" y="56" width="8" height="8" rx="2"/><rect x="90" y="56" width="8" height="8" rx="2"/></g>
+<g fill="#fff"><rect x="46" y="80" width="6" height="6" rx="2"/><rect x="88" y="80" width="6" height="6" rx="2"/><rect x="52" y="86" width="36" height="6" rx="3"/></g>
+<path d="M28 36 Q34 30 46 30" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity=".3"/>
+<circle cx="112" cy="124" r="0" fill="none"/>` },
+
+{ n: '20 · Sprout', d: 'Fresh green head with a growing leaf', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6f7a8"/><stop offset="1" stop-color="#8fd25a"/></linearGradient>
+<linearGradient id="${p}l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7be08a"/><stop offset="1" stop-color="#2fa860"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="34" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M70 38 Q70 22 66 16" stroke="#3aa75a" stroke-width="5" stroke-linecap="round" fill="none"/>
+<path d="M68 22 Q50 4 30 14 Q40 34 68 22 Z" fill="url(#${p}l)"/><path d="M70 20 Q88 0 112 8 Q104 32 70 20 Z" fill="url(#${p}l)"/>
+<path d="M68 22 Q52 16 38 16" stroke="#fff" stroke-width="2" stroke-linecap="round" fill="none" opacity=".5"/>
+<rect x="12" y="32" width="116" height="94" rx="47" fill="url(#${p}b)"/>
+<path d="M32 50 Q52 40 82 42" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".6"/>
+<circle cx="50" cy="80" r="7" fill="#21381a"/><circle cx="90" cy="80" r="7" fill="#21381a"/>
+<circle cx="52.5" cy="77" r="2.4" fill="#fff"/><circle cx="92.5" cy="77" r="2.4" fill="#fff"/>
+<path d="M62 96 Q70 103 78 96" stroke="#21381a" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="34" cy="94" rx="8" ry="4.6" fill="#ff9d8a" opacity=".55"/><ellipse cx="106" cy="94" rx="8" ry="4.6" fill="#ff9d8a" opacity=".55"/>` },
+{ n: '21 · Origami fox', d: 'Folded-paper fox with sharp, clean facets', svg: p => `
+<defs>
+<linearGradient id="${p}a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb06b"/><stop offset="1" stop-color="#f2762e"/></linearGradient>
+<linearGradient id="${p}c" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a4d"/><stop offset="1" stop-color="#d9591a"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="32" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M14 18 L52 40 L30 74 Z" fill="url(#${p}c)"/><path d="M126 18 L88 40 L110 74 Z" fill="url(#${p}c)"/>
+<path d="M22 28 L40 40 L30 58 Z" fill="#3a2a2a"/><path d="M118 28 L100 40 L110 58 Z" fill="#3a2a2a"/>
+<path d="M30 74 L52 40 L88 40 L110 74 L70 128 Z" fill="url(#${p}a)"/>
+<path d="M30 74 L70 78 L70 128 Z" fill="#fff" opacity=".18"/><path d="M110 74 L70 78 L70 128 Z" fill="#000" opacity=".1"/>
+<path d="M52 40 L70 78 L30 74 Z" fill="#ffd9a8"/><path d="M88 40 L70 78 L110 74 Z" fill="#ffd9a8"/>
+<path d="M44 84 L62 88 L56 96 Z" fill="#fff" opacity="0"/>
+<ellipse cx="52" cy="76" rx="4.5" ry="6.5" fill="#2a1710"/><ellipse cx="88" cy="76" rx="4.5" ry="6.5" fill="#2a1710"/>
+<circle cx="53.5" cy="73.5" r="1.8" fill="#fff"/><circle cx="89.5" cy="73.5" r="1.8" fill="#fff"/>
+<path d="M63 104 L77 104 L70 114 Z" fill="#2a1710"/>` },
+
+{ n: '22 · Wisp', d: 'A floating light orb in a ring, no body at all', svg: p => `
+<defs>
+<radialGradient id="${p}o" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#9fe8ff"/><stop offset="1" stop-color="#4b6bff"/></radialGradient>
+<radialGradient id="${p}g" cx=".5" cy=".5" r=".5"><stop offset=".55" stop-color="#6fb8ff" stop-opacity=".5"/><stop offset="1" stop-color="#6fb8ff" stop-opacity="0"/></radialGradient>
+<linearGradient id="${p}r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff8be0"/><stop offset="1" stop-color="#7ad6ff"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="22" ry="3.5" fill="#6fb8ff" opacity=".35"/>
+<circle cx="70" cy="68" r="66" fill="url(#${p}g)"/>
+<ellipse cx="70" cy="70" rx="62" ry="16" fill="none" stroke="url(#${p}r)" stroke-width="3.5" transform="rotate(-18 70 70)" opacity=".9"/>
+<circle cx="70" cy="68" r="40" fill="url(#${p}o)"/>
+<ellipse cx="54" cy="46" rx="14" ry="7" fill="#fff" opacity=".6" transform="rotate(-30 54 46)"/>
+<ellipse cx="57" cy="72" rx="4.5" ry="7.5" fill="#143060"/><ellipse cx="83" cy="72" rx="4.5" ry="7.5" fill="#143060"/>
+<circle cx="58.5" cy="69" r="1.8" fill="#fff"/><circle cx="84.5" cy="69" r="1.8" fill="#fff"/>
+<path d="M64 86 Q70 91 76 86" stroke="#143060" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+<path d="M10 70 Q70 100 130 54" stroke="url(#${p}r)" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0"/>` },
+
+{ n: '23 · Planet', d: 'Little ringed planet with a friendly face', svg: p => `
+<defs>
+<radialGradient id="${p}b" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#ffd0a8"/><stop offset=".6" stop-color="#ff8f6b"/><stop offset="1" stop-color="#c8446a"/></radialGradient>
+<linearGradient id="${p}r" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffe9a8"/><stop offset="1" stop-color="#ffb347"/></linearGradient>
+<clipPath id="${p}t"><rect x="0" y="0" width="140" height="70"/></clipPath><clipPath id="${p}u"><rect x="0" y="70" width="140" height="70"/></clipPath>
+</defs>
+<ellipse cx="70" cy="134" rx="30" ry="4" fill="#000" opacity=".35"/>
+<ellipse cx="70" cy="76" rx="66" ry="16" fill="none" stroke="url(#${p}r)" stroke-width="7" transform="rotate(-14 70 76)" clip-path="url(#${p}t)"/>
+<circle cx="70" cy="72" r="46" fill="url(#${p}b)"/>
+<path d="M30 56 Q70 42 110 56" stroke="#fff" stroke-width="3" fill="none" opacity=".25"/><path d="M26 90 Q70 104 114 90" stroke="#fff" stroke-width="3" fill="none" opacity=".18"/>
+<ellipse cx="50" cy="42" rx="14" ry="7" fill="#fff" opacity=".35" transform="rotate(-28 50 42)"/>
+<ellipse cx="70" cy="76" rx="66" ry="16" fill="none" stroke="url(#${p}r)" stroke-width="7" transform="rotate(-14 70 76)" clip-path="url(#${p}u)"/>
+<circle cx="54" cy="68" r="6" fill="#3a1226"/><circle cx="88" cy="68" r="6" fill="#3a1226"/>
+<circle cx="56" cy="65.5" r="2" fill="#fff"/><circle cx="90" cy="65.5" r="2" fill="#fff"/>
+<path d="M63 82 Q71 89 79 82" stroke="#3a1226" stroke-width="3" stroke-linecap="round" fill="none"/>
+<circle cx="116" cy="22" r="3" fill="#fff"/><circle cx="20" cy="30" r="2" fill="#fff" opacity=".7"/>` },
+
+{ n: '24 · Owl', d: 'Wise round owl with big calm eyes', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b79cf0"/><stop offset="1" stop-color="#6c4fc4"/></linearGradient>
+<linearGradient id="${p}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2e0"/><stop offset="1" stop-color="#f5d6b0"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="132" rx="32" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M20 44 L28 14 L52 30 Z" fill="#5b3fb0"/><path d="M120 44 L112 14 L88 30 Z" fill="#5b3fb0"/>
+<rect x="12" y="24" width="116" height="102" rx="50" fill="url(#${p}b)"/>
+<path d="M34 40 Q54 30 84 32" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".35"/>
+<path d="M70 82 Q40 80 26 100 Q40 126 70 126 Q100 126 114 100 Q100 80 70 82 Z" fill="url(#${p}f)" opacity=".95"/>
+<circle cx="48" cy="66" r="21" fill="url(#${p}f)"/><circle cx="92" cy="66" r="21" fill="url(#${p}f)"/>
+<circle cx="50" cy="67" r="11" fill="#2a1d55"/><circle cx="90" cy="67" r="11" fill="#2a1d55"/>
+<circle cx="53" cy="63" r="4" fill="#fff"/><circle cx="93" cy="63" r="4" fill="#fff"/>
+<path d="M64 82 L76 82 L70 94 Z" fill="#ffb13d"/>
+<path d="M50 108 Q56 112 62 108 M78 108 Q84 112 90 108" stroke="#d9b98f" stroke-width="2.4" stroke-linecap="round" fill="none"/>` },
+
+{ n: '25 · Astro', d: 'Round helmet with a glass visor and a tiny suit', svg: p => `
+<defs>
+<linearGradient id="${p}h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c5cbe6"/></linearGradient>
+<linearGradient id="${p}v" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b4cc8"/><stop offset=".6" stop-color="#1a1f5c"/><stop offset="1" stop-color="#0c0f33"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="136" rx="30" ry="4" fill="#000" opacity=".4"/>
+<rect x="38" y="104" width="64" height="30" rx="14" fill="url(#${p}h)"/><rect x="58" y="112" width="24" height="12" rx="4" fill="#ff7a59"/><circle cx="66" cy="118" r="2.4" fill="#fff"/><circle cx="74" cy="118" r="2.4" fill="#8cf"/>
+<circle cx="70" cy="60" r="54" fill="url(#${p}h)"/>
+<rect x="22" y="58" width="12" height="20" rx="6" fill="#ff7a59"/><rect x="106" y="58" width="12" height="20" rx="6" fill="#ff7a59"/>
+<rect x="24" y="30" width="92" height="64" rx="32" fill="url(#${p}v)"/>
+<path d="M36 46 Q46 36 64 36" stroke="#fff" stroke-width="4.5" stroke-linecap="round" fill="none" opacity=".65"/>
+<ellipse cx="54" cy="64" rx="5.5" ry="8" fill="#9ff3ff"/><ellipse cx="86" cy="64" rx="5.5" ry="8" fill="#9ff3ff"/>
+<path d="M63 80 Q70 86 77 80" stroke="#9ff3ff" stroke-width="3" stroke-linecap="round" fill="none"/>
+<path d="M44 12 Q56 6 70 6" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none" opacity=".7"/>` },
+
+{ n: '26 · Shroom', d: 'Spotted red cap on a creamy face', svg: p => `
+<defs>
+<linearGradient id="${p}c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6b6b"/><stop offset="1" stop-color="#d63a4a"/></linearGradient>
+<linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e6"/><stop offset="1" stop-color="#f1d9b4"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="134" rx="30" ry="4" fill="#000" opacity=".35"/>
+<rect x="30" y="70" width="80" height="62" rx="30" fill="url(#${p}s)"/>
+<path d="M4 76 C4 34 34 8 70 8 C106 8 136 34 136 76 C136 84 128 86 120 84 Q70 94 20 84 C12 86 4 84 4 76 Z" fill="url(#${p}c)"/>
+<path d="M22 44 Q38 24 66 20" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".4"/>
+<circle cx="40" cy="48" r="8" fill="#fff"/><circle cx="76" cy="30" r="9" fill="#fff"/><circle cx="108" cy="52" r="7" fill="#fff"/><circle cx="64" cy="62" r="5" fill="#fff"/>
+<circle cx="54" cy="104" r="6" fill="#3a2618"/><circle cx="86" cy="104" r="6" fill="#3a2618"/>
+<circle cx="56" cy="101.5" r="2" fill="#fff"/><circle cx="88" cy="101.5" r="2" fill="#fff"/>
+<path d="M64 116 Q70 121 76 116" stroke="#3a2618" stroke-width="3" stroke-linecap="round" fill="none"/>
+<ellipse cx="42" cy="114" rx="6" ry="3.6" fill="#ff8fa0" opacity=".6"/><ellipse cx="98" cy="114" rx="6" ry="3.6" fill="#ff8fa0" opacity=".6"/>` },
+
+{ n: '27 · Whaley', d: 'Chubby blue whale with a little spout', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc4ff"/><stop offset="1" stop-color="#3b78e0"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="134" rx="40" ry="4.5" fill="#000" opacity=".35"/>
+<path d="M70 38 C70 22 58 20 54 10 M70 38 C70 22 82 20 86 10" stroke="#bfe6ff" stroke-width="4" stroke-linecap="round" fill="none"/>
+<path d="M8 84 C8 52 34 36 70 36 C106 36 128 54 128 84 C128 112 106 128 70 128 C34 128 8 114 8 84 Z" fill="url(#${p}b)"/>
+<path d="M124 76 Q138 60 136 46 Q126 50 120 64 Z" fill="#3b78e0"/>
+<path d="M18 96 Q70 130 122 98 Q112 124 70 128 Q28 124 18 96 Z" fill="#eaf6ff"/>
+<path d="M30 56 Q48 44 76 44" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".45"/>
+<circle cx="48" cy="82" r="6.5" fill="#12285e"/><circle cx="88" cy="82" r="6.5" fill="#12285e"/>
+<circle cx="50" cy="79.5" r="2.2" fill="#fff"/><circle cx="90" cy="79.5" r="2.2" fill="#fff"/>
+<path d="M62 98 Q69 104 76 98" stroke="#12285e" stroke-width="3" stroke-linecap="round" fill="none"/>
+<ellipse cx="34" cy="94" rx="7" ry="4" fill="#ff9ec0" opacity=".6"/><ellipse cx="102" cy="94" rx="7" ry="4" fill="#ff9ec0" opacity=".6"/>` },
+
+{ n: '28 · Pill', d: 'Two-tone capsule, mint and pearl, with a face', svg: p => `
+<defs>
+<linearGradient id="${p}m" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7defc6"/><stop offset="1" stop-color="#2fc28f"/></linearGradient>
+<linearGradient id="${p}p" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d4d9ee"/></linearGradient>
+<clipPath id="${p}c"><rect x="30" y="4" width="80" height="130" rx="40"/></clipPath>
+</defs>
+<ellipse cx="70" cy="136" rx="26" ry="3.5" fill="#000" opacity=".4"/>
+<g clip-path="url(#${p}c)"><rect x="30" y="4" width="80" height="68" fill="url(#${p}m)"/><rect x="30" y="68" width="80" height="68" fill="url(#${p}p)"/><rect x="30" y="66" width="80" height="5" fill="#000" opacity=".12"/></g>
+<path d="M44 22 Q46 12 62 10" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".7"/>
+<ellipse cx="55" cy="76" rx="5" ry="7" fill="#1c2b3a"/><ellipse cx="85" cy="76" rx="5" ry="7" fill="#1c2b3a"/>
+<circle cx="56.5" cy="73" r="1.8" fill="#fff"/><circle cx="86.5" cy="73" r="1.8" fill="#fff"/>
+<path d="M64 92 Q70 98 76 92" stroke="#1c2b3a" stroke-width="3" stroke-linecap="round" fill="none"/>
+<ellipse cx="44" cy="90" rx="6" ry="3.6" fill="#ff9ec0" opacity=".6"/><ellipse cx="96" cy="90" rx="6" ry="3.6" fill="#ff9ec0" opacity=".6"/>` },
+
+{ n: '29 · Lantern', d: 'Warm paper lantern that glows when it talks', svg: p => `
+<defs>
+<radialGradient id="${p}b" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#fff2b0"/><stop offset=".55" stop-color="#ffb13d"/><stop offset="1" stop-color="#e8631f"/></radialGradient>
+<radialGradient id="${p}g" cx=".5" cy=".5" r=".5"><stop offset=".5" stop-color="#ffb13d" stop-opacity=".45"/><stop offset="1" stop-color="#ffb13d" stop-opacity="0"/></radialGradient>
+</defs>
+<circle cx="70" cy="74" r="68" fill="url(#${p}g)"/>
+<path d="M70 4 V18" stroke="#8a4a1f" stroke-width="3" stroke-linecap="round"/>
+<rect x="46" y="16" width="48" height="12" rx="5" fill="#7a3d16"/>
+<ellipse cx="70" cy="72" rx="52" ry="46" fill="url(#${p}b)"/>
+<path d="M70 26 Q34 72 70 118 M70 26 Q106 72 70 118" stroke="#d9561a" stroke-width="2.4" fill="none" opacity=".55"/>
+<rect x="46" y="116" width="48" height="10" rx="5" fill="#7a3d16"/><path d="M70 126 V136 M62 126 V133 M78 126 V133" stroke="#ffb13d" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="50" cy="52" rx="14" ry="7" fill="#fff" opacity=".45" transform="rotate(-28 50 52)"/>
+<path d="M48 72 Q56 64 64 72" stroke="#5a2410" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M76 72 Q84 64 92 72" stroke="#5a2410" stroke-width="4" stroke-linecap="round" fill="none"/>
+<path d="M62 86 Q70 95 78 86" stroke="#5a2410" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+<ellipse cx="40" cy="84" rx="7" ry="4" fill="#ff6f6f" opacity=".5"/><ellipse cx="100" cy="84" rx="7" ry="4" fill="#ff6f6f" opacity=".5"/>` },
+
+{ n: '30 · Octo', d: 'Glossy coral octopus with curly arms', svg: p => `
+<defs>
+<linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9fb8"/><stop offset="1" stop-color="#e8527e"/></linearGradient>
+</defs>
+<ellipse cx="70" cy="136" rx="36" ry="3.5" fill="#000" opacity=".35"/>
+<g fill="none" stroke="url(#${p}b)" stroke-width="12" stroke-linecap="round">
+<path d="M30 92 Q14 112 28 126 Q36 130 40 122"/><path d="M52 104 Q46 126 58 132"/><path d="M88 104 Q94 126 82 132"/><path d="M110 92 Q126 112 112 126 Q104 130 100 122"/></g>
+<path d="M14 70 C14 34 38 12 70 12 C102 12 126 34 126 70 C126 100 104 112 70 112 C36 112 14 100 14 70 Z" fill="url(#${p}b)"/>
+<path d="M32 40 Q50 24 82 26" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none" opacity=".5"/>
+<circle cx="30" cy="94" r="3" fill="#fff" opacity=".4"/><circle cx="110" cy="94" r="3" fill="#fff" opacity=".4"/>
+<ellipse cx="52" cy="66" rx="8" ry="10" fill="#fff"/><ellipse cx="88" cy="66" rx="8" ry="10" fill="#fff"/>
+<circle cx="54" cy="68" r="5" fill="#40142a"/><circle cx="90" cy="68" r="5" fill="#40142a"/>
+<circle cx="55.5" cy="66" r="1.8" fill="#fff"/><circle cx="91.5" cy="66" r="1.8" fill="#fff"/>
+<path d="M62 90 Q70 98 78 90" stroke="#40142a" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+<ellipse cx="34" cy="86" rx="7" ry="4" fill="#fff" opacity=".35"/><ellipse cx="106" cy="86" rx="7" ry="4" fill="#fff" opacity=".35"/>` },
+];
+const grid = document.getElementById('grid');
+D.forEach((m, i) => {
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.innerHTML = `<div class="pill"><svg viewBox="-4 -6 148 148">${m.svg('s' + i)}</svg><span>10:19</span></div>
+    <svg viewBox="-4 -6 148 148" role="img" aria-label="${m.n}">${m.svg('b' + i)}</svg>
+    <div class="n">${m.n}</div><div class="d">${m.d}</div>`;
+  grid.appendChild(c);
+});
+</script>
+</body>
+</html>

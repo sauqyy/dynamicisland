@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { AnimatePresence, animate, motion, useMotionValue, useSpring, useTransform } from 'motion/react'
+import { AnimatePresence, animate, motion, useMotionValue, useSpring, useTransform, type MotionValue } from 'motion/react'
 
 /** Flat top (the island hangs from the screen edge), rounded bottom. */
 function radii(r: number, floating = false) {
@@ -39,6 +39,10 @@ interface Props {
   centered?: boolean
   /** someone is calling: the pill glows until it is answered */
   ringing?: boolean
+  /** the assistant is awake: the outline glows in a way that matches what it is doing */
+  glow?: 'listening' | 'thinking' | 'speaking' | 'error' | null
+  /** 0-1 microphone / voice loudness, drives the listening glow without re-rendering */
+  glowLevel?: MotionValue<number>
 }
 
 const BUBBLE = 34
@@ -97,7 +101,7 @@ function notchPath(w: number, h: number, r: number, floating: boolean) {
  * pill crisply on top with proper curves, and the content layer sits above, unfiltered,
  * so text stays sharp.
  */
-export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false, ringing = false }: Props) {
+export function Island({ shape, contentKey, children, bubble, onClick, onHover, spring, floating = false, dragHandlers, intro = 0, offset = { x: 0, y: 0 }, centered = false, ringing = false, glow = null, glowLevel }: Props) {
   const SPRING = { type: 'spring', ...spring } as const
   const bubbleX = bubble?.split ? shape.w / 2 + BUBBLE / 2 + 4 : 0
 
@@ -139,7 +143,10 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
   )
 
   return (
-    <motion.div className={`stage ${ringing ? 'ringing' : ''}`} style={{ translate: enterT }}>
+    <motion.div
+      className={`stage ${ringing ? 'ringing' : ''} ${glow ? `glow glow-${glow}` : ''}`}
+      style={{ translate: enterT, ...(glowLevel ? ({ '--level': glowLevel } as object) : {}) }}
+    >
       <div className="goo-layer">
         {/* Only needed to melt the timer bubble into the pill. Inset a little so the crisp
             outline above is the only thing that defines the visible edge. */}

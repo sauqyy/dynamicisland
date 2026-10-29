@@ -1,10 +1,21 @@
+#[cfg(windows)]
+mod actions;
+#[cfg(target_os = "macos")]
+#[path = "actions_mac.rs"]
+mod actions;
+mod assistant;
 mod auth;
+mod claude;
+mod llm;
+mod llm_core;
 #[cfg(windows)]
 mod files;
 #[cfg(windows)]
 mod media;
 #[cfg(windows)]
 mod screen;
+#[cfg(windows)]
+mod speech;
 #[cfg(windows)]
 mod system;
 #[cfg(target_os = "macos")]
@@ -16,6 +27,9 @@ mod media;
 #[cfg(target_os = "macos")]
 #[path = "screen_mac.rs"]
 mod screen;
+#[cfg(target_os = "macos")]
+#[path = "speech_mac.rs"]
+mod speech;
 #[cfg(target_os = "macos")]
 #[path = "system_mac.rs"]
 mod system;
@@ -355,6 +369,8 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // the assistant hotkey is registered from the webview, so it can be rebound in Settings
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             set_hit_area,
             idle_seconds,
@@ -375,7 +391,30 @@ pub fn run() {
             media::media_toggle,
             media::media_next,
             media::media_prev,
-            media::media_seek
+            media::media_seek,
+            speech::speech_prepare,
+            speech::speech_start,
+            speech::speech_stop,
+            assistant::assistant_has_key,
+            assistant::assistant_set_key,
+            assistant::assistant_clear_key,
+            assistant::assistant_tts,
+            assistant::assistant_log,
+            claude::claude_status,
+            claude::claude_login,
+            claude::claude_logout,
+            claude::claude_chat,
+            llm::llm_prepare,
+            llm::llm_chat,
+            llm::llm_installed,
+            llm::llm_info,
+            actions::app_list,
+            actions::app_launch,
+            actions::volume_set,
+            actions::volume_adjust,
+            actions::volume_mute,
+            actions::power_action,
+            actions::power_cancel
         ])
         .manage(HitArea(Mutex::new((130.0, 34.0))))
         .setup(|app| {
@@ -384,14 +423,18 @@ pub fn run() {
             macos::float_above_menu_bar(&window);
             place_window(&window);
 
-            let quit = MenuItem::with_id(app, "quit", "Quit Dynamic Island", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let quit = MenuItem::with_id(app, "quit", "Quit Astra Isle", true, None::<&str>)?;
+            // a way back to the top centre that does not need the pill to be clickable
+            let reset = MenuItem::with_id(app, "reset-position", "Reset island position", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&reset, &quit])?;
             let mut tray = TrayIconBuilder::new()
-                .tooltip("Dynamic Island")
+                .tooltip("Astra Isle")
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     if event.id() == "quit" {
                         app.exit(0);
+                    } else if event.id() == "reset-position" {
+                        let _ = app.emit("reset-position", ());
                     }
                 });
             if let Some(icon) = app.default_window_icon() {
@@ -408,6 +451,12 @@ pub fn run() {
             system::spawn_privacy(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while building tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            // the built-in brain runs as its own program; it goes when the app does
+            if let tauri::RunEvent::Exit = event {
+                llm::shutdown();
+            }
+        });
 }

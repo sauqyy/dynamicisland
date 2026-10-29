@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { BACKEND_READY, supabase } from './supabase'
 import type { Friend } from './useSocial'
 import { openMic, trackOutput } from './audioDevices'
+import { playJoin, playLeave } from './callSounds'
 
 export type CallPhase = 'idle' | 'calling' | 'incoming' | 'connecting' | 'active'
 
@@ -86,6 +87,7 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
     (error: string | null = null) => {
       clearTimeout(ringTimer.current)
       clearTimeout(errorTimer.current)
+      if (stateRef.current.phase === 'active') playLeave()
       const conn = pc.current
       pc.current = null
       if (conn) {
@@ -139,7 +141,10 @@ export function useCall(me: string | null, friends: Friend[], onIncoming?: (from
       }
       conn.onconnectionstatechange = () => {
         if (pc.current !== conn) return
-        if (conn.connectionState === 'connected') set({ ...stateRef.current, phase: 'active', since: Date.now() })
+        if (conn.connectionState === 'connected') {
+          if (stateRef.current.phase !== 'active') playJoin()
+          set({ ...stateRef.current, phase: 'active', since: Date.now() })
+        }
         else if (conn.connectionState === 'failed') end("Couldn't connect")
       }
       mic.current?.getTracks().forEach((t) => conn.addTrack(t, mic.current!))

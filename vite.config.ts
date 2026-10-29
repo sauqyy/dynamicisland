@@ -5,6 +5,8 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
+  // the natural voice runs in a module worker that loads its model with dynamic imports
+  worker: { format: 'es' },
   server: {
     port: 5173,
     strictPort: true,
