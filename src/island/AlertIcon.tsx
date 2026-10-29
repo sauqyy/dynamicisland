@@ -35,7 +35,8 @@ import {
 } from 'lucide-react'
 import { UiLogo } from '../widgets/UiLogo'
 // written out, not imported, so the bundler can drop the logo from the regular build
-const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
+// also the browser dev server, for the SCELE demo (see campus.ts)
+const CAMPUS = (import.meta.env.VITE_CAMPUS === '1' || (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window) && !location.search.includes('nocampus')))
 
 /** Alerts are raised with an emoji; known ones are drawn as line icons, anything else shows the emoji. */
 const BY_EMOJI: Record<string, LucideIcon> = {

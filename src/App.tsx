@@ -23,6 +23,7 @@ import { dueLabel, upcoming, urgency, useDeadlines } from './lib/deadlines'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { SceleWidget } from './widgets/SceleWidget'
 import { useScele } from './lib/useScele'
+import { demoPostGrade, demoResetScele, demoSubmitLab } from './lib/scele'
 import { NO_STUDENT, useStudent } from './lib/sso'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
@@ -91,7 +92,8 @@ function loadTodos(): Todo[] {
 
 const TAB_KEY = 'di.tab'
 /** The Universitas Indonesia build (VITE_CAMPUS=1). Written out here, not imported, so the bundler can drop the campus modules from the regular build. */
-const CAMPUS = import.meta.env.VITE_CAMPUS === '1'
+// also the browser dev server, for the SCELE demo (see campus.ts)
+const CAMPUS = (import.meta.env.VITE_CAMPUS === '1' || (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window) && !location.search.includes('nocampus')))
 const CAMPUS_PAGES: Tab[] = ['deadlines', 'classes', 'inbox']
 /** what the campus hook returns in the regular build, where it is never called */
 const NO_SCELE = { deadlines: [], notices: [] } as unknown as ReturnType<typeof useScele>
@@ -1504,12 +1506,40 @@ export default function App() {
             {DEMO_SOCIAL && <button onClick={demo.ringCall}>Incoming call</button>}
             {DEMO_SOCIAL && <button onClick={demo.ringGroupCall}>Incoming group call</button>}
           </div>
-          {campus && <div className="demo-row">
+          {CAMPUS && campus && <div className="demo-row">
             <span>SCELE</span>
-            <button onClick={() => pushAlert({ icon: '📅', text: 'PPW: Lab 8: Todo app', sub: 'Due in 2h 30m', openTab: 'deadlines' }, 'attention')}>Deadline</button>
+            <button onClick={() => pushAlert({ icon: '📅', text: 'PBD: Lab 8: Todo app', sub: 'Due in 2h 30m · still a draft', openTab: 'deadlines' }, 'attention')}>Deadline</button>
             <button onClick={() => pushAlert({ icon: '🎓', text: 'PPW in 30m · 2.2304', sub: 'Week 9: React Hooks & State', openTab: 'classes' }, 'attention')}>Class soon</button>
             <button onClick={() => pushAlert({ icon: '📣', text: 'PPW: Perubahan deadline Lab 8', sub: 'Deadline Lab 8 diundur ke Jumat 23.55.', openTab: 'inbox' }, 'ready')}>Announcement</button>
             <button onClick={() => pushAlert({ icon: '📄', text: 'New in SDA', sub: 'Slide AVL Tree', openTab: 'inbox' }, 'ready')}>New material</button>
+          </div>}
+          {CAMPUS && campus && <div className="demo-row">
+            <span>SCELE work</span>
+            {/* these change the demo's SCELE data and sync, so the Due page and alerts react as they would to the real thing */}
+            <button
+              onClick={() => {
+                demoSubmitLab()
+                scele.refresh()
+              }}
+            >
+              Submit Lab 8
+            </button>
+            <button
+              onClick={() => {
+                demoPostGrade()
+                scele.refresh()
+              }}
+            >
+              Post a grade
+            </button>
+            <button
+              onClick={() => {
+                demoResetScele()
+                scele.refresh()
+              }}
+            >
+              Reset
+            </button>
           </div>}
           <div className="demo-row">
             <span>App</span>

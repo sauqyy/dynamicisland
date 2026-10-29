@@ -21,7 +21,7 @@ export interface Student {
   verified_at: number
 }
 
-// the browser demo keeps a pretend verification so the Campus pages can be tried
+// the browser demo starts verified so the Campus pages can be tried at once; Remove stores '0'
 const DEMO_KEY = 'di.sso.demo'
 const DEMO_STUDENT: Student = {
   username: 'demo.mahasiswa',
@@ -39,7 +39,7 @@ const DEMO_STUDENT: Student = {
 
 function demoSaved(): Student | null {
   try {
-    return localStorage.getItem(DEMO_KEY) ? DEMO_STUDENT : null
+    return localStorage.getItem(DEMO_KEY) === '0' ? null : DEMO_STUDENT
   } catch {
     return null
   }
@@ -87,7 +87,7 @@ export function useStudent() {
     if (IS_TAURI) invoke('sso_forget').catch(() => {})
     else
       try {
-        localStorage.removeItem(DEMO_KEY)
+        localStorage.setItem(DEMO_KEY, '0')
       } catch {
         /* ignore */
       }
