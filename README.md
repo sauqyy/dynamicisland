@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" width="96" alt="Astra Isle logo" />
+<img src="assets/logo-astra.svg" width="96" alt="Astra Isle logo: Astra's star eyes in the island" />
 
 # Astra Isle
 
@@ -61,6 +61,8 @@ Volume, brightness, battery, charging and downloads appear for a moment and fold
 - Pick your microphone and speaker in Settings
 
 ### Astra, your voice assistant (beta)
+
+<img src="assets/readme/astra.svg" width="760" alt="Astra's eyes in the pill, then the island growing as she hears Open Spotify, Set a timer and Turn the volume up, and answering each" />
 
 Astra is a little assistant who lives in the island. She is off until you turn her on in Settings, and her listening model downloads once, after she tells you how big it is.
 
