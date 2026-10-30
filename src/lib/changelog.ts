@@ -11,6 +11,19 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.13',
+    campus: true,
+    title: 'Meet Lumi',
+    items: [
+      "Lumi is the island's new mascot. Her eyes and the time sit in the resting pill, and the first time she says hello and asks what to call you.",
+      "Every reminder now has her face: classes, deadlines, submissions, grades and notices. Deadlines climb a lock-in ladder from three days down to the last hour.",
+      "She cheers when you submit, finish an exam or clear your to-dos, checks on you (water, a stretch, a word when it's late), and moves about on her own.",
+      "Calm mode in Settings takes out the explosions, shaking and flashes and quietens her sounds. Her sounds, her nudges and the time beside her can each be turned off.",
+      "Weather you can act on: Lumi tells you when rain is on its way (\"Raining in about an hour\"), when it should stop, and about rainy days, storms, strong sun and heat. The Weather page can find where you are, and it follows you.",
+      "The island redraws far less while music plays, so it runs smoother.",
+    ],
+  },
+  {
     version: '0.7.12',
     campus: true,
     title: 'Today, and a welcome back',
