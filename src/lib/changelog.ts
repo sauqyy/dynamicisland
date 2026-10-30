@@ -11,6 +11,18 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.12',
+    campus: true,
+    title: 'Today, and a welcome back',
+    items: [
+      'Connect Universitas Indonesia in one place: sign in with SSO UI, then type your password once for SCELE and your SLCM timetable. It isn\'t saved, and the SCELE sign-in now lives in your system\'s credential store.',
+      'Today shows your next class, what\'s due, your to-dos and your schedule on one page. Due now lists your own deadlines with SCELE\'s.',
+      'When you come back after a while, or switch the computer on, the island greets you with what needs you and what you missed.',
+      'To-dos open into a description, a due date, links and files, and you tick one off by clicking its text. Dates can be typed ("fri 5pm", "besok jam 9").',
+      'Profile lists what\'s kept on this computer, and Disconnect everything removes it all. Timers can have a goal.',
+    ],
+  },
+  {
     version: '0.8.5',
     title: 'Astra in the pill',
     items: [
