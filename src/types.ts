@@ -137,6 +137,12 @@ export interface IslandAlert {
   nowPlaying?: boolean
   /** clicking the alert opens the card on this page */
   openTab?: Tab
+  /** Lumi's mood for it (Universitas Indonesia build); the app works it out from the icon when this is left out */
+  lumi?: import('./mascot/lumi/moods').LumiMood
+  /** buttons on the card (Lumi asks something) */
+  actions?: { label: string; primary?: boolean; run: () => void }[]
+  /** how long it stays, in ms */
+  ms?: number
 }
 
 export interface TimerState {

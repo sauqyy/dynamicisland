@@ -56,6 +56,14 @@ import { playJoin, playLeave } from './lib/callSounds'
 import { useClipboard } from './lib/useClipboard'
 import { Rail } from './island/Rail'
 import { MascotEyes } from './mascot/MascotEyes'
+import { LumiFace } from './mascot/lumi/LumiFace'
+import { LumiCard, lumiShape } from './mascot/lumi/LumiCard'
+import { LumiIntro } from './mascot/lumi/LumiIntro'
+import { useLumiRoutines, type ExamRef } from './mascot/lumi/useLumi'
+import { LumiCalmContext } from './mascot/lumi/calm'
+import { configureLumiSound, hasSfx } from './mascot/lumi/lumiSfx'
+import { DUE_QUIP, moodForAlert, say } from './mascot/lumi/moments'
+import type { LumiMood } from './mascot/lumi/moods'
 import { AstraChatWidget } from './widgets/AstraChatWidget'
 import { AssistantCard, assistantShape } from './widgets/AssistantCard'
 import { useAssistant } from './lib/useAssistant'
@@ -134,8 +142,25 @@ function loadTab(): Tab {
 
 /** the day the "Verify your SSO UI" alert was last shown */
 const VERIFY_NUDGE_KEY = 'di.ui.verifyNudge'
+/** set once Lumi has introduced herself and been told what to call the user */
+const LUMI_INTRO_KEY = 'di.lumi.intro'
 /** set once connecting Universitas Indonesia is finished and its "all set" has been seen */
 const SETUP_DONE_KEY = 'di.ui.setupDone'
+
+/** Has Lumi said hello yet? */
+function lumiSeen() {
+  try {
+    return localStorage.getItem(LUMI_INTRO_KEY) === '1'
+  } catch {
+    return true
+  }
+}
+
+/** "ZHILLAN BANIAKSA" → "Zhillan": the first name, written the way people write names */
+function niceName(full: string) {
+  const first = full.trim().split(/\s+/)[0] ?? ''
+  return first ? first[0].toUpperCase() + first.slice(1).toLowerCase() : ''
+}
 
 /** What verifying with SSO UI has opened up, each a tap away. */
 const UNLOCKED: { tab: Tab; title: string; text: string }[] = [
@@ -229,7 +254,9 @@ function clockText(d: Date, clock24: boolean) {
 }
 
 export default function App() {
-  const { track, playing, position, toggle, seek, skip } = useMedia()
+  // the playback position is only needed smoothly while the Playing page is open (see below)
+  const mediaFast = useRef(false)
+  const { track, playing, position, toggle, seek, skip } = useMedia(mediaFast)
   const { settings, update, adopt } = useSettings()
   const assistant = useAssistant({
     enabled: settings.assistant,
@@ -321,6 +348,27 @@ export default function App() {
   const afterIntro = useRef<Release | null>(null) // the update notes that wait behind it
   // the welcome after SSO UI verification succeeds, and Today's "Verify" sending the user to Profile
   const [welcome, setWelcome] = useState(false)
+  // Lumi's first hello (once per install, or when an update brings her), and whether it has happened
+  const [lumiIntro, setLumiIntro] = useState(false)
+  const [lumiMet, setLumiMet] = useState(() => {
+    try {
+      return localStorage.getItem(LUMI_INTRO_KEY) === '1'
+    } catch {
+      return true
+    }
+  })
+  const lumiOn = CAMPUS && settings.lumi
+  const lumiOnRef = useRef(lumiOn)
+  useEffect(() => {
+    configureLumiSound({ on: settings.uiSounds, volume: settings.soundVolume, calm: settings.lumiCalm })
+  }, [settings.uiSounds, settings.soundVolume, settings.lumiCalm])
+  lumiOnRef.current = lumiOn
+  /** the demo panel: one of her moments, as if it had just happened */
+  const lumiDemo = (mood: LumiMood, extra: Partial<IslandAlert> = {}) => {
+    const s = say(mood, settings.callMe.trim() || 'Zhillan')
+    setExpanded(false)
+    pushAlert({ icon: '✨', text: s.title, sub: s.sub, lumi: mood, ms: 6500, ...extra }, 'ready')
+  }
   // how tall the catch-up's content is, so the island fits it
   const [catchUpH, setCatchUpH] = useState(0)
   const [spotlight, setSpotlight] = useState(0)
@@ -390,6 +438,7 @@ export default function App() {
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
+  mediaFast.current = expanded && tab === 'media'
   // the Campus pages only exist for a Fasilkom student verified with SSO UI on the Profile page
   const student = CAMPUS ? useStudent() : NO_STUDENT
   const campus = Boolean(student.student?.fasilkom)
@@ -499,8 +548,13 @@ export default function App() {
   }, [timer])
 
   const pushAlert = useCallback((a: Omit<IslandAlert, 'id'>, cue?: SoundName, opts?: PlayOptions) => {
-    setAlert({ ...a, id: ++alertId.current })
-    if (cue) play(cue, opts)
+    // the Universitas Indonesia build gives the alerts it already raises Lumi's face
+    const lumi = CAMPUS && lumiOnRef.current ? (a.lumi ?? (a.avatar || a.nowPlaying ? undefined : (moodForAlert(a) ?? undefined))) : undefined
+    // a deadline reminder carries a short line for how close it is ("time to lock in.")
+    const quip = lumi && a.icon === '📅' && a.sub ? DUE_QUIP[lumi] : undefined
+    setAlert({ ...a, lumi, ...(quip ? { sub: `${a.sub} · ${quip}` } : null), id: ++alertId.current })
+    // she has her own voice for a moment, so the generic alert sound stays out of her way
+    if (cue && !(lumi && hasSfx(lumi))) play(cue, opts)
   }, [])
   pushAlertRef.current = pushAlert
   expandedRef.current = expanded
@@ -776,9 +830,11 @@ export default function App() {
 
   useEffect(() => {
     if (!alert) return
-    const id = setTimeout(() => setAlert(null), 2600)
+    // Lumi's moments stay longer, and stay while the pointer is on them
+    if (alert.lumi && hovered) return
+    const id = setTimeout(() => setAlert(null), alert.lumi ? (alert.ms ?? (alert.actions?.length ? 12000 : 5200)) : 2600)
     return () => clearTimeout(id)
-  }, [alert])
+  }, [alert, alert?.lumi ? hovered : false])
 
   const advancePomo = useCallback(
     (p: PomodoroState) => {
@@ -1049,10 +1105,10 @@ export default function App() {
 
   // Clicking outside can't be detected when click-through, so collapse when the cursor leaves.
   useEffect(() => {
-    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes || astraIntro || welcome || catchUp.digest) return
+    if (!IS_TAURI || !expanded || hovered || holdOpen || fs || notes || astraIntro || lumiIntro || welcome || catchUp.digest) return
     const id = setTimeout(() => setExpanded(false), 700)
     return () => clearTimeout(id)
-  }, [expanded, hovered, holdOpen, fs, notes, astraIntro, welcome, catchUp.digest])
+  }, [expanded, hovered, holdOpen, fs, notes, astraIntro, lumiIntro, welcome, catchUp.digest])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1075,8 +1131,12 @@ export default function App() {
     getVersion()
       .then((v) => {
         const r = releaseToShow(v)
-        // (the Universitas Indonesia build has no Astra, so no welcome for her)
-        if (!CAMPUS && !astraIntroSeen()) {
+        // (the Universitas Indonesia build has no Astra; Lumi says hello first, then the notes follow)
+        if (CAMPUS && !lumiSeen()) {
+          afterIntro.current = r
+          setLumiIntro(true)
+          setExpanded(true)
+        } else if (!CAMPUS && !astraIntroSeen()) {
           // Astra comes first; the notes follow once she has been answered
           afterIntro.current = r
           setAstraIntro(true)
@@ -1087,6 +1147,16 @@ export default function App() {
         }
       })
       .catch(() => {})
+  }, [])
+
+  // the browser demo has no update to announce, so Lumi simply says hello once the page has settled
+  useEffect(() => {
+    if (!CAMPUS || IS_TAURI || lumiSeen()) return
+    const id = setTimeout(() => {
+      setLumiIntro(true)
+      setExpanded(true)
+    }, 1400)
+    return () => clearTimeout(id)
   }, [])
 
   // chats only live on the Friends and Groups pages
@@ -1129,7 +1199,7 @@ export default function App() {
     [social.friends, social.unread, groupChats.groups, groupChats.unread],
   )
   // what to call the user: their SSO UI name (Universitas Indonesia), else their profile's
-  const firstName = ((CAMPUS && student.student?.name) || auth.profile?.display_name || '').trim().split(/\s+/)[0] ?? ''
+  const firstName = ((CAMPUS && settings.callMe.trim()) || (CAMPUS && student.student?.name) || auth.profile?.display_name || '').trim().split(/\s+/)[0] ?? ''
   // a catch-up opens the island; a welcome back with nothing new and nothing needing the user isn't shown
   // ("All quiet while you were away" is for when something still needs them, like a deadline today)
   const digest = catchUp.digest
@@ -1260,6 +1330,39 @@ export default function App() {
       pushAlert({ icon: '✅', text: `${settings.mascotName || 'Astra'} is ready`, sub: 'Speech recognition downloaded' }, 'ready')
     } else if (stt.state === 'error') sawDownload.current = false
   }, [stt.state, stt.progress, pushAlert, settings.mascotName])
+  // Lumi's own doings: sleeping and waking, good morning, exam wishes, cheering for ticked to-dos, water
+  const exams = useMemo<ExamRef[]>(
+    () =>
+      CAMPUS && campus && scele.upcoming
+        ? scele
+            .upcoming(now, 3)
+            .filter((m) => m.kind === 'exam' && m.slot.start)
+            .map((m) => ({ key: `${m.title}|${m.start}`, title: m.title.replace(/\s*\(.*\)\s*$/, ''), start: m.start, end: m.end }))
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [now, campus, scele.syncedAt],
+  )
+  const { rest: lumiRest } = useLumiRoutines({
+    enabled: lumiOn,
+    nudges: settings.lumiNudges,
+    met: lumiMet && !lumiIntro,
+    name: firstName,
+    now,
+    push: alertOrHold,
+    todos,
+    exams,
+    busy: Boolean(study) || Boolean(cls.current),
+    summary: () => {
+      const t = Date.now()
+      const day = new Date(t).toDateString()
+      const classes = CAMPUS && campus && scele.upcoming ? scele.upcoming(t, 1).filter((m) => m.kind !== 'off' && new Date(m.start).toDateString() === day).length : 0
+      const due =
+        (CAMPUS && campus ? scele.deadlines.filter((d) => d.submission !== 'submitted' && d.due > t && d.due < t + 24 * 3600_000).length : 0) +
+        deadlines.filter((d) => !d.done && d.due > t && d.due < t + 24 * 3600_000).length
+      const parts = [classes ? `${classes} class${classes > 1 ? 'es' : ''} today` : '', due ? `${due} due in the next day` : ''].filter(Boolean)
+      return parts.length ? parts.join(' · ') : 'A clear day so far. Enjoy it.'
+    },
+  })
   const mode = updating
     ? 'alert'
     : assistant.state.phase !== 'idle'
@@ -1280,7 +1383,7 @@ export default function App() {
 
   // the card fits the page it shows; a page taller than the card scrolls inside it
   const hasActions = (tab === 'shelf' && shelf.items.length > 0) || tab === 'clipboard'
-  const expandedHeight = notes || astraIntro || welcome
+  const expandedHeight = notes || astraIntro || lumiIntro || welcome
     ? CARD_MAX
     : catchUp.digest
       ? Math.min(CARD_MAX, Math.max(CARD_MIN, catchUpH || CARD_MAX))
@@ -1289,7 +1392,7 @@ export default function App() {
       : Math.min(CARD_MAX, settings.cardH)
 
   // grow the pill to fit the lyric line, up to what the stage can hold
-  const idleW = live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
+  const idleW = (live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140) + (lumiOn && !idleText && settings.lumiClock ? (live ? 44 : 30) : 0)
   const peekW = peekText ? Math.max(340, liveWidth(peekText)) : 300
 
   // hovering the pill during a group call drops down who is in the voice chat
@@ -1308,6 +1411,7 @@ export default function App() {
         return { w: settings.cardW, h: expandedHeight, r: 32 }
       case 'alert':
         // volume and brightness are a slim level meter; a message has room for the friend and a reply
+        if (!updating && alert?.lumi) return lumiShape(alert.actions?.length ?? 0, alert.lumi, settings.lumiCalm)
         if (!updating && alert?.kind) return { w: 290, h: 40, r: 16 }
         if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
         if (!updating && alert?.nowPlaying) return { w: 360, h: 56, r: 24 }
@@ -1324,7 +1428,7 @@ export default function App() {
       default:
         return { w: idleW, h: 34, r: 13 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows, dlRows, assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.lumi, alert?.actions?.length, alert?.avatar, alert?.nowPlaying, voiceRows, dlRows, assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -1888,6 +1992,28 @@ export default function App() {
             }}
           />
         )}
+        {lumiIntro && (
+          <LumiIntro
+            suggest={niceName(student.student?.name ?? '')}
+            onDone={(name, nudges) => {
+              try {
+                localStorage.setItem(LUMI_INTRO_KEY, '1')
+              } catch {
+                /* ignore */
+              }
+              setLumiMet(true)
+              setLumiIntro(false)
+              update({ callMe: name, lumiNudges: nudges })
+              if (afterIntro.current) setNotes(afterIntro.current)
+              else {
+                setExpanded(false)
+                const s = say('hello', name)
+                setTimeout(() => pushAlert({ icon: '👋', text: name ? `Nice to meet you, ${name}!` : s.title, sub: "I'll be right here. Tap me whenever you like.", lumi: 'delight', ms: 6500 }, 'ready'), 700)
+              }
+              afterIntro.current = null
+            }}
+          />
+        )}
         {notes && (
           <div className="whatsnew" onClick={(e) => e.stopPropagation()}>
             <small>What's new in v{notes.version}</small>
@@ -1922,6 +2048,7 @@ export default function App() {
             }}
             onClose={catchUp.dismiss}
             onHeight={setCatchUpH}
+            mascot={lumiOn ? <LumiFace mood={catchUp.digest.kind === 'hello' ? 'goodMorning' : 'welcomeBack'} height={58} body still roam={6} /> : undefined}
             onToday={
               CAMPUS
                 ? () => {
@@ -2012,6 +2139,10 @@ export default function App() {
         <span className="hud-val">{alert.value ?? 0}</span>
       </div>
     )
+  } else if (mode === 'alert' && alert?.lumi) {
+    // Lumi says it: her face doing the mood, the words typed out, and buttons when she asks
+    contentKey = `alert-${alert.id}`
+    content = <LumiCard mood={alert.lumi} title={alert.text} sub={alert.sub} actions={alert.actions} ms={alert.ms ?? (alert.actions?.length ? 12000 : 5200)} />
   } else if (mode === 'alert' && alert?.nowPlaying && track) {
     contentKey = `alert-${alert.id}`
     content = (
@@ -2134,16 +2265,23 @@ export default function App() {
       <div className="live">
         <Art track={track} size={22} />
         {weatherGlyph}
-        <LiveText text={live} k={studyStatus ? studyStatus.key : idleLyric ? lyricIdx : live} />
-        {(unreadCount > 0 || privacy.camera || privacy.mic || dueToday > 0) && (
+        {lumiOn && !idleText && (
+          // she bobs to the beat, so the pill needs no equalizer bars
+          <span className={playing ? 'lumi-vibe' : ''}>
+            <LumiFace mood={lumiRest} height={26} roam={5} />
+          </span>
+        )}
+        {(!lumiOn || idleText || settings.lumiClock) && <LiveText text={live} k={studyStatus ? studyStatus.key : idleLyric ? lyricIdx : live} />}
+        {/* no count badge in the pill with Lumi: due dates reach you as reminders, on Today and on hover */}
+        {(unreadCount > 0 || privacy.camera || privacy.mic || (!lumiOn && dueToday > 0)) && (
           <span className="live-dots">
-            {dueBadge}
+            {!lumiOn && dueBadge}
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
           </span>
         )}
-        {settings.idleBars && <Bars active hue={track.hue} />}
+        {settings.idleBars && !lumiOn && <Bars active hue={track.hue} />}
       </div>
     )
   } else {
@@ -2160,6 +2298,15 @@ export default function App() {
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
           </>
+        ) : lumiOn ? (
+          // the resting pill: Lumi's eyes, and the time beside them (turn the time off in Settings)
+          <span className="idle-lumi">
+            <LumiFace mood={lumiRest} height={30} roam={settings.lumiClock ? 6 : 26} />
+            {settings.lumiClock && <span className="idle-time">{clock}</span>}
+            {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
+            {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
+            {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
+          </span>
         ) : settings.assistant && settings.mascotInPill && settings.mascotEyesOnly ? (
           <span className="idle-eyes" style={{ gridColumn: '1 / -1', justifySelf: 'center', display: 'flex' }}>
             <MascotEyes height={15} accessories={settings.mascotAccessories} accessoryColors={settings.mascotAccessoryColors} />
@@ -2189,6 +2336,7 @@ export default function App() {
 
   return (
     <EqContext.Provider value={eqLook}>
+    <LumiCalmContext.Provider value={settings.lumiCalm}>
     <div
       className={`root ${IS_TAURI ? 'native' : 'demo'} ${hidden ? 'hidden' : ''} ${tucked ? 'tucked' : ''} ${theme} ${theme === 'glass' ? `tint-${settings.glassTint}` : ''} ${moving ? 'dragging' : ''} ${fs || fsWin ? 'fullchat' : ''}`}
       style={{
@@ -2424,6 +2572,72 @@ export default function App() {
               Verify (succeeds)
             </button>
           </div>}
+          {CAMPUS && <div className="demo-row">
+            <span>Lumi</span>
+            {/* her first hello, and one example of each kind of moment; every one of them is on the gallery at /?lumi */}
+            <button
+              onClick={() => {
+                setNotes(null)
+                setLumiIntro(true)
+                setExpanded(true)
+              }}
+            >
+              First hello
+            </button>
+            {(
+              [
+                ['Good morning', 'goodMorning'],
+                ['Class in 1h', 'class1h'],
+                ['Class in 10m', 'class10m'],
+                ['Due in 3 days', 'due3d'],
+                ['Due in 1h', 'due1h'],
+                ['Overdue', 'overdue'],
+                ['Submitted', 'submitted'],
+                ['Grade', 'graded'],
+                ['Exam tomorrow', 'examTomorrow'],
+                ['Good luck', 'examLuck'],
+                ['Water', 'hydrate'],
+                ['Stretch', 'stretch'],
+                ['Late night', 'lateNight'],
+                ['All to-dos done', 'allTodosDone'],
+                ['Error', 'error'],
+              ] as [string, LumiMood][]
+            ).map(([label, mood]) => (
+              <button key={mood} onClick={() => lumiDemo(mood)}>
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                const s = say('examDone', firstName || 'Zhillan')
+                pushAlert(
+                  {
+                    icon: '🎉',
+                    text: s.title,
+                    sub: 'Algoritma. How did it go?',
+                    lumi: 'examDone',
+                    ms: 14000,
+                    actions: [
+                      { label: 'It went well', primary: true, run: () => lumiDemo('allTodosDone', { text: 'I knew it!', sub: 'Proud of you. Enjoy the rest of your day.' }) },
+                      { label: 'A tough one', run: () => lumiDemo('classDone', { text: "It's over now", sub: 'You did what you could. Rest, then eat something.' }) },
+                    ],
+                  },
+                  'success',
+                )
+              }}
+            >
+              Exam finished
+            </button>
+            <button
+              onClick={() => {
+                const s = say('confirm', firstName)
+                pushAlert({ icon: '❓', text: s.title, sub: s.sub, lumi: 'confirm', actions: [{ label: 'Yes, remove it', primary: true, run: () => lumiDemo('todoDone', { text: 'Removed', sub: 'Done.' }) }, { label: 'Keep it', run: () => setAlert(null) }] }, 'attention')
+              }}
+            >
+              Ask something
+            </button>
+            <button onClick={() => window.open('/?lumi', '_blank')}>Gallery</button>
+          </div>}
           <div className="demo-row">
             <span>Away</span>
             {/* as if the user left and is back now; what would have popped up meanwhile is held for the catch-up */}
@@ -2518,6 +2732,7 @@ export default function App() {
         </div>
       )}
     </div>
+    </LumiCalmContext.Provider>
     </EqContext.Provider>
   )
 }

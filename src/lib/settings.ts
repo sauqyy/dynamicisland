@@ -65,6 +65,16 @@ export interface Settings {
   messageSound: boolean
   /** coming back to the computer: a greeting or welcome back with what happened meanwhile */
   catchUp: boolean
+  /** Lumi, the Universitas Indonesia build's mascot: her eyes in the resting pill and her moments */
+  lumi: boolean
+  /** she speaks up on her own: good morning, a stretch, a cheer, a word when it is late */
+  lumiNudges: boolean
+  /** what Lumi calls the user */
+  callMe: string
+  /** calm mode: no explosions, shaking or flashes, and quieter sounds */
+  lumiCalm: boolean
+  /** the time, beside Lumi's eyes in the resting pill */
+  lumiClock: boolean
   /** small sounds for clicks, typing, pages and alerts; off = muted */
   uiSounds: boolean
   /** which material the interface sounds are made of */
@@ -327,6 +337,11 @@ const DEFAULTS: Settings = {
   eqColor: 'art',
   messageSound: true,
   catchUp: true,
+  lumi: true,
+  lumiNudges: true,
+  callMe: '',
+  lumiCalm: false,
+  lumiClock: true,
   uiSounds: true,
   soundPack: 'mech',
   soundVolume: 1,
