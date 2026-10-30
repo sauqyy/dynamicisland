@@ -44,7 +44,7 @@ const DEMO_INFO: NativeMedia = {
  * The currently playing track. Native: from the Windows media session (Spotify, browser, ...),
  * with lyrics looked up on LRCLIB. Browser: a fake looping demo track.
  */
-export function useMedia() {
+export function useMedia(fast?: { current: boolean }) {
   const [info, setInfo] = useState<NativeMedia | null>(IS_TAURI ? null : DEMO_INFO)
   const [art, setArt] = useState<{ id: string; url: string } | null>(null)
   const [lyrics, setLyrics] = useState<{ id: string; lines: LyricLine[] | null } | null>(
@@ -90,6 +90,10 @@ export function useMedia() {
   // local clock between events
   const duration = info?.duration ?? 0
   useEffect(() => {
+    // The clock itself ticks often, but the app is only told every quarter of a second, unless something on
+    // screen needs it smooth (the timeline on the Playing page). Every update redraws the whole island, so
+    // telling it 20 times a second while nothing reads the value is what made everything stutter.
+    let told = 0
     const id = setInterval(() => {
       const s = sync.current
       let p = s.pos + (s.playing ? (performance.now() - s.at) / 1000 : 0)
@@ -100,10 +104,14 @@ export function useMedia() {
           p = 0
         }
       }
-      setPosition(p)
+      const t = performance.now()
+      if (fast?.current || t - told >= 250) {
+        told = t
+        setPosition(p)
+      }
     }, 50)
     return () => clearInterval(id)
-  }, [duration, resync])
+  }, [duration, resync, fast])
 
   const [demoPlaying, setDemoPlaying] = useState(true)
   const playing = IS_TAURI ? (info?.playing ?? false) : demoPlaying
