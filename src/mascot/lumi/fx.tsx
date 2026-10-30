@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { Bell, BatteryLow, Calendar, Check as CheckIcon, Clover as CloverIcon, Coffee, Droplet, FileText, Lightbulb, Mail, Trophy as TrophyIcon, Zap as ZapIcon, type LucideIcon } from 'lucide-react'
+import { Bell, BatteryLow, Calendar, CloudLightning, CloudRain, Sun as SunIcon, Thermometer, Umbrella, Check as CheckIcon, Clover as CloverIcon, Coffee, Droplet, FileText, Lightbulb, Mail, Trophy as TrophyIcon, Zap as ZapIcon, type LucideIcon } from 'lucide-react'
 import { BOX } from '../MascotEyes'
 
 /**
@@ -51,6 +51,11 @@ export type FxId =
   | 'focusLines'
   | 'blast'
   | 'handChin'
+  | 'rainCloud'
+  | 'umbrella'
+  | 'stormCloud'
+  | 'heat'
+  | 'sunStrong'
   | 'anger'
   | 'tear'
   | 'handWave'
@@ -727,6 +732,16 @@ export function Fx({ id, c, uid }: { id: FxId; c: string; uid: string }): ReactN
       return <Blast />
     case 'handChin':
       return <HandChin />
+    case 'rainCloud':
+      return <Badge Icon={CloudRain} c="#7fb8ff" />
+    case 'umbrella':
+      return <Badge Icon={Umbrella} c="#7fb8ff" />
+    case 'stormCloud':
+      return <Badge Icon={CloudLightning} c="#c4b5fd" />
+    case 'heat':
+      return <Badge Icon={Thermometer} c="#ff8a5c" />
+    case 'sunStrong':
+      return <Badge Icon={SunIcon} c="#ffd166" />
     case 'anger':
       return <Anger />
     case 'tear':

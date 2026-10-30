@@ -7,7 +7,14 @@ export interface Weather {
   humidity: number
   wind: number
   /** every hour of today and tomorrow, from today's midnight */
-  hourly: { hour: string; temp: number; code: number }[]
+  hourly: { hour: string; temp: number; code: number; /** chance of rain, % */ pop?: number; /** rain that hour, mm */ mm?: number; uv?: number; feels?: number }[]
+  /** the instant (ms) the first hour of `hourly` starts, and the place's offset from UTC in seconds */
+  dayStart?: number
+  utcOffset?: number
+  /** rain in the last quarter-hour, mm */
+  precipNow?: number
+  /** the next twelve hours of rain, a quarter-hour at a time (mm); `at` is the instant it starts */
+  rain15?: { at: number; mm: number }[]
   /** index in `hourly` of the current hour */
   nowHour?: number
   fetchedAt: number
@@ -43,7 +50,7 @@ export function cachedWeather(city: string, fahrenheit: boolean): Weather | null
 }
 
 // a forecast cached before tomorrow's hours were kept is refreshed once
-export const isFresh = (w: Weather) => w.nowHour != null && w.hourly.length > 24 && Date.now() - w.fetchedAt < MAX_AGE
+export const isFresh = (w: Weather) => w.nowHour != null && w.hourly.length > 24 && w.rain15 != null && Date.now() - w.fetchedAt < MAX_AGE
 
 export interface CityHit {
   name: string
@@ -75,8 +82,11 @@ interface ForecastResult {
     weather_code: number
     relative_humidity_2m: number
     wind_speed_10m: number
+    precipitation?: number
   }
-  hourly: { time: string[]; temperature_2m: number[]; weather_code: number[] }
+  utc_offset_seconds?: number
+  hourly: { time: string[]; temperature_2m: number[]; weather_code: number[]; precipitation_probability?: number[]; precipitation?: number[]; uv_index?: number[]; apparent_temperature?: number[] }
+  minutely_15?: { time: string[]; precipitation: number[] }
 }
 
 /** Open-Meteo: free, no API key. */
@@ -96,8 +106,11 @@ export async function fetchWeather(
   const params = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m',
-    hourly: 'temperature_2m,weather_code',
+    current: 'temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,precipitation',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,uv_index,apparent_temperature',
+    // the rain, a quarter of an hour at a time for the next twelve hours: this is what the rain alerts are built on
+    minutely_15: 'precipitation',
+    forecast_minutely_15: '48',
     forecast_days: '2',
     timezone: 'auto',
     temperature_unit: fahrenheit ? 'fahrenheit' : 'celsius',
@@ -108,10 +121,17 @@ export async function fetchWeather(
 
   const day = f.current.time.slice(0, 10)
   const first = Math.max(0, f.hourly.time.findIndex((t) => t.startsWith(day)))
+  // Open-Meteo's times are the place's own clock, with no offset written: the offset says what instant they are
+  const offset = f.utc_offset_seconds ?? 0
+  const instant = (t: string) => Date.parse(`${t.length === 16 ? t : t.slice(0, 16)}:00Z`) - offset * 1000
   const hourly = f.hourly.time.slice(first, first + 48).map((t, i) => ({
     hour: t.slice(11, 13),
     temp: Math.round(f.hourly.temperature_2m[first + i]),
     code: f.hourly.weather_code[first + i],
+    pop: f.hourly.precipitation_probability?.[first + i],
+    mm: f.hourly.precipitation?.[first + i],
+    uv: f.hourly.uv_index?.[first + i],
+    feels: f.hourly.apparent_temperature?.[first + i] != null ? Math.round(f.hourly.apparent_temperature[first + i]) : undefined,
   }))
   const nowHour = Math.min(hourly.length - 1, Number(f.current.time.slice(11, 13)))
 
@@ -125,6 +145,10 @@ export async function fetchWeather(
     wind: Math.round(f.current.wind_speed_10m),
     hourly,
     nowHour,
+    dayStart: instant(f.hourly.time[first]),
+    utcOffset: offset,
+    precipNow: f.current.precipitation,
+    rain15: f.minutely_15?.time.map((t, i) => ({ at: instant(t), mm: f.minutely_15!.precipitation[i] ?? 0 })),
     fetchedAt: Date.now(),
   }
   try {

@@ -60,6 +60,13 @@ export type LumiMood =
   | 'awkward'
   | 'unemotional'
   | 'sleepy'
+  | 'rainSoon'
+  | 'rainNow'
+  | 'rainEnds'
+  | 'rainyDay'
+  | 'storm'
+  | 'hot'
+  | 'strongSun'
   | 'idleHop'
   | 'idlePeek'
   | 'idleOrbit'
@@ -930,6 +937,14 @@ export const MOODS: Record<LumiMood, MoodDef> = {
   awkward: { label: 'Awkward', group: 'Expression sheet', tint: '#ffd9a0', glow: 0.2, brow: 8, mouth: 'awkward', pose: { ...REST0, x: -4, y: 1 }, fx: ['sweat'] },
   unemotional: { label: 'Unemotional', group: 'Expression sheet', tint: '#c9d3ff', glow: 0.12, brow: 9, mouth: 'dot', pose: REST0, fx: [] },
   sleepy: { label: 'Sleepy', group: 'Expression sheet', tint: '#9aa7ff', glow: 0.15, shape: 'sleepy', mouth: 'tiny', pose: { ...REST0, y: 1 }, loop: { y: [1, 2.4, 1], dur: 3.4 }, fx: ['zzz'] },
+  // ---- the weather: she notices it, reacts, and tells you what to do about it
+  rainSoon: { label: 'Rain on its way: sees the cloud, reacts, winks at you', group: 'Weather', ...scene({ tint: '#7fb8ff', glow: 0.4, prop: ['rainCloud'], look: [5, -2], react: { scale: 1.08, y: -1 }, settle: { closedR: 1 } }) },
+  rainNow: { label: 'Raining: glances at the umbrella, content', group: 'Weather', ...scene({ tint: '#7fb8ff', glow: 0.35, prop: ['umbrella'], look: [5, -1], react: { y: 1 }, settle: {} }) },
+  rainEnds: { label: 'The rain is stopping: relief, and the sun comes out', group: 'Weather', ...scene({ tint: '#ffd166', glow: 0.5, prop: ['sunStrong'], look: [5, -3], react: { ...C }, settle: { scale: 1.05 }, settleFx: ['sparks'] }) },
+  rainyDay: { label: 'A rainy day: looks out the window and settles in, cosy', group: 'Weather', ...scene({ tint: '#8ab4ff', glow: 0.3, prop: ['rainCloud'], look: [5, -2], react: { y: 2 }, settle: { ...C }, settleLoop: { y: [0, 1, 0], dur: 2.6 } }) },
+  storm: { label: 'A thunderstorm: eyes wide, a gulp, a nervous mouth', group: 'Weather', mouth: 'wavy', ...scene({ tint: '#c4b5fd', glow: 0.5, prop: ['stormCloud'], look: [5, -2], react: { scale: 1.15, apart: 2 }, reactFx: ['sweat'], settle: { scale: 1.1 }, settleFx: ['sweat'] }) },
+  hot: { label: 'A hot day: sweating, heavy-lidded', group: 'Weather', mouth: 'flat', ...scene({ tint: '#ff8a5c', glow: 0.4, prop: ['heat'], look: [5, -1], react: { scale: 1.05 }, reactFx: ['sweat'], settle: { y: 1 }, settleFx: ['sweat'], lid: 0.22 }) },
+  strongSun: { label: 'Strong sun: squints against it', group: 'Weather', mouth: 'flat', ...scene({ tint: '#ffd166', glow: 0.45, prop: ['sunStrong'], look: [5, -3], react: { scale: 1.04 }, settle: {}, lid: 0.3 }) },
   ...IDLE_STORIES,
 }
 

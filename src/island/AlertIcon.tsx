@@ -8,6 +8,8 @@ import {
   Camera,
   CircleArrowUp,
   CircleCheck,
+  CloudLightning,
+  CloudRain,
   ClipboardCheck,
   Coffee,
   Download,
@@ -28,8 +30,10 @@ import {
   Sun,
   SunDim,
   Target,
+  Thermometer,
   Timer,
   TriangleAlert,
+  Umbrella,
   Users,
   Volume1,
   Volume2,
@@ -82,6 +86,11 @@ const BY_EMOJI: Record<string, LucideIcon> = {
   '📄': FileText,
   '✅': CircleCheck,
   '🏅': Award,
+  '🌧️': CloudRain,
+  '☂️': Umbrella,
+  '⛈️': CloudLightning,
+  '🌡️': Thermometer,
+  '☀️': Sun,
 }
 
 /** Colour of an alert by what it is about (status colours from tokens.css). */
@@ -108,6 +117,11 @@ const TONE: Record<string, string> = {
   '📄': 'var(--info)',
   '✅': 'var(--charge)',
   '🏅': 'var(--accent)',
+  '🌧️': 'var(--info)',
+  '☂️': 'var(--info)',
+  '⛈️': 'var(--warn)',
+  '🌡️': 'var(--warn)',
+  '☀️': 'var(--warn)',
 }
 
 export const alertTone = (icon: string) => TONE[icon] ?? 'var(--text-1)'

@@ -61,6 +61,7 @@ import { LumiCard, lumiShape } from './mascot/lumi/LumiCard'
 import { LumiIntro } from './mascot/lumi/LumiIntro'
 import { useLumiRoutines, type ExamRef } from './mascot/lumi/useLumi'
 import { LumiCalmContext } from './mascot/lumi/calm'
+import { useFollowLocation, useWeatherAlerts } from './lib/useWeatherAlerts'
 import { configureLumiSound, hasSfx } from './mascot/lumi/lumiSfx'
 import { DUE_QUIP, moodForAlert, say } from './mascot/lumi/moments'
 import type { LumiMood } from './mascot/lumi/moods'
@@ -1342,6 +1343,17 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [now, campus, scele.syncedAt],
   )
+  // the weather: told what matters (rain on its way, when it stops, a rainy day...) for where the user is
+  useWeatherAlerts({
+    enabled: settings.weatherAlerts,
+    city: settings.city,
+    lat: settings.cityLat,
+    lon: settings.cityLon,
+    fahrenheit: settings.fahrenheit,
+    push: alertOrHold,
+    nextClass: cls.next && cls.startsIn !== undefined ? { title: cls.next.title, start: now + cls.startsIn * 60_000 } : undefined,
+  })
+  useFollowLocation({ enabled: settings.weatherAuto, lat: settings.cityLat, lon: settings.cityLon, update })
   const { rest: lumiRest } = useLumiRoutines({
     enabled: lumiOn,
     nudges: settings.lumiNudges,
