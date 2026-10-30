@@ -146,7 +146,8 @@ export const GLIDE = { type: 'spring', stiffness: 170, damping: 17, mass: 0.8 } 
 export const FADE = { duration: 0.22, ease: [0.4, 0, 0.2, 1] } as const
 
 /** Runs one act after another, a few seconds apart, never the same one twice in a row. */
-export function useIdleActs(force?: EyeAct, enabled = true, paused = false) {
+/** `pace` stretches the gaps between acts: 1 is Astra's lively default, more is calmer */
+export function useIdleActs(force?: EyeAct, enabled = true, paused = false, pace = 1) {
   const [pose, setPose] = useState<Pose>(REST)
   const [fx, setFx] = useState({ sparks: 0, z: 0 })
   useEffect(() => {
@@ -162,16 +163,16 @@ export function useIdleActs(force?: EyeAct, enabled = true, paused = false) {
       if (act.sparks) setFx((f) => ({ ...f, sparks: f.sparks + 1 }))
       if (act.z) setFx((f) => ({ ...f, z: f.z + 1 }))
       later(() => setPose(REST), act.duration)
-      later(next, act.duration + (force ? 900 : 3200 + Math.random() * 5000))
+      later(next, act.duration + (force ? 900 : (3200 + Math.random() * 5000) * pace))
     }
     const next = () => {
       if (force) return run(force)
       const options = EYE_ACTS.filter((a) => a !== last)
       run(options[Math.floor(Math.random() * options.length)])
     }
-    later(next, force ? 300 : 2500 + Math.random() * 3000)
+    later(next, force ? 300 : (2500 + Math.random() * 3000) * pace)
     return () => timers.forEach(clearTimeout)
-  }, [force, enabled, paused])
+  }, [force, enabled, paused, pace])
   return { pose: enabled && !paused ? pose : REST, fx }
 }
 
