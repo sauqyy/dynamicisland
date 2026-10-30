@@ -1158,7 +1158,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
             <div className="row">
               <div className="row-text">
                 <span>Lumi</span>
-                <small>The little eyes in the resting pill. She reacts to classes, deadlines and your wins</small>
+                <small>The little character in the island: her eyes in the resting pill, and she tells you about classes, deadlines, the weather and your wins. Off: the plain clock and plain alerts</small>
               </div>
               <Toggle on={settings.lumi} onChange={(v) => update({ lumi: v })} />
             </div>
@@ -1208,6 +1208,20 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
         <div className="row">
           <span>Fahrenheit</span>
           <Toggle on={settings.fahrenheit} onChange={(v) => update({ fahrenheit: v })} />
+        </div>
+        <div className="row">
+          <div className="row-text">
+            <span>Weather alerts</span>
+            <small>Rain on its way, when it should stop, a rainy day, storms, strong sun and heat. Needs a city on the Weather page</small>
+          </div>
+          <Toggle on={settings.weatherAlerts} onChange={(v) => update({ weatherAlerts: v })} />
+        </div>
+        <div className="row">
+          <div className="row-text">
+            <span>Follow my location</span>
+            <small>Use where you are for the weather, and move it as you do. Your device's location is used when it allows it, otherwise your connection's (about city accuracy)</small>
+          </div>
+          <Toggle on={settings.weatherAuto} onChange={(v) => update({ weatherAuto: v })} />
         </div>
         {/* one screen: nothing to choose (still shown if a screen picked before is unplugged, to pick again) */}
         {(monitors > 1 || settings.monitor > 0) && (

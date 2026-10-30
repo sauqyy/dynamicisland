@@ -155,6 +155,16 @@ export function moodForAlert(a: { icon: string; text: string; sub?: string; kind
       return /submitted|handed|well done/i.test(text) ? 'submitted' : /session done/i.test(text) ? 'focusDone' : 'todoDone'
     case '🏅':
       return 'graded'
+    case '🌧️':
+      return /stop|ease/i.test(a.text) ? 'rainEnds' : /rainy day/i.test(a.text) ? 'rainyDay' : /it's raining|raining now/i.test(a.text) ? 'rainNow' : 'rainSoon'
+    case '☂️':
+      return 'rainSoon'
+    case '⛈️':
+      return 'storm'
+    case '🌡️':
+      return 'hot'
+    case '☀️':
+      return 'strongSun'
     case '📣':
       return 'announcement'
     case '📄':

@@ -9247,3 +9247,26 @@ button.cu-new:not(:disabled):hover {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- the rain for the next three hours ---------- */
+.wx-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+  margin-top: 8px;
+}
+.wx-bars i {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--info);
+}
+.wx-rain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.wx-rain .wx-bars {
+  flex-basis: 100%;
+}

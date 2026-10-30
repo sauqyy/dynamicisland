@@ -75,6 +75,10 @@ export interface Settings {
   lumiCalm: boolean
   /** the time, beside Lumi's eyes in the resting pill */
   lumiClock: boolean
+  /** tell the user about the weather that matters: rain on its way, when it stops, a rainy day, storms, strong sun, heat */
+  weatherAlerts: boolean
+  /** the weather follows the user: the city is found from where they are, and updated as they move */
+  weatherAuto: boolean
   /** small sounds for clicks, typing, pages and alerts; off = muted */
   uiSounds: boolean
   /** which material the interface sounds are made of */
@@ -342,6 +346,8 @@ const DEFAULTS: Settings = {
   callMe: '',
   lumiCalm: false,
   lumiClock: true,
+  weatherAlerts: true,
+  weatherAuto: false,
   uiSounds: true,
   soundPack: 'mech',
   soundVolume: 1,

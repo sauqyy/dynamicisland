@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { play } from 'cuelume'
 import { cachedWeather, describe, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
 import type { Settings } from '../lib/settings'
-import { CloudRain, Droplets, Wind } from 'lucide-react'
+import { CloudRain, Droplets, LocateFixed, MapPin, Wind } from 'lucide-react'
+import { detectPlace } from '../lib/location'
+import { clockAt, inWords, nextRain } from '../lib/weatherOutlook'
 import { WeatherIcon, isNight } from './WeatherIcon'
 
 interface Props {
@@ -17,6 +19,32 @@ export function WeatherWidget({ settings, update }: Props) {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(!city)
   const [draft, setDraft] = useState(city)
+  const [locating, setLocating] = useState(false)
+  const [locError, setLocError] = useState<string | null>(null)
+
+  /** find where the user is and follow it; `network` allows the (city-level) lookup by connection when the device cannot say */
+  const locate = async (network: boolean) => {
+    setLocating(true)
+    setLocError(null)
+    try {
+      const p = await detectPlace({ allowNetwork: network })
+      update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: true })
+      setWeather(null)
+      setEditing(false)
+    } catch (e) {
+      setLocError((e as Error).message)
+    } finally {
+      setLocating(false)
+    }
+  }
+  // the first time there is no city at all: ask the device where it is (this is what brings up the permission prompt)
+  const asked = useRef(false)
+  useEffect(() => {
+    if (city || asked.current) return
+    asked.current = true
+    void locate(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!city) return
@@ -47,10 +75,14 @@ export function WeatherWidget({ settings, update }: Props) {
         canCancel={!!city}
         onCancel={() => setEditing(false)}
         onPick={(hit) => {
-          update({ city: hit.name, cityLat: hit.latitude, cityLon: hit.longitude })
+          // a city picked by hand stays: the weather stops following the user
+          update({ city: hit.name, cityLat: hit.latitude, cityLon: hit.longitude, weatherAuto: false })
           setWeather(null)
           setEditing(false)
         }}
+        onLocate={() => void locate(true)}
+        locating={locating}
+        locError={locError}
       />
     )
   }
@@ -75,7 +107,19 @@ export function WeatherWidget({ settings, update }: Props) {
   const temps = weather.hourly.slice(0, 24).map((h) => h.temp)
   const hi = Math.max(...temps)
   const lo = Math.min(...temps)
-  // the next rain in the coming hours (or how long the current rain lasts)
+  // what the rain is doing: from the minute-by-minute forecast when we have it
+  const ev = weather.rain15 ? nextRain(weather, Date.now()) : null
+  const evMins = ev ? (ev.start - Date.now()) / 60_000 : 0
+  const rainLine = !weather.rain15
+    ? ''
+    : !ev
+      ? 'No rain expected for the next 12 hours'
+      : ev.now
+        ? `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}.` : 'It looks like it will last for hours.'}`
+        : evMins <= 480
+          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}. Bring an umbrella if you head out.`
+          : 'No rain expected for the next 8 hours'
+  // (without it: the next rain in the coming hours, or how long the current rain lasts)
   const rainingNow = isRain(weather.code)
   const rainFrom = rainingNow ? -1 : hours.findIndex((h, i) => i > 0 && isRain(h.code))
   const rainUntil = rainingNow ? hours.findIndex((h, i) => i > 0 && !isRain(h.code)) : -1
@@ -101,17 +145,33 @@ export function WeatherWidget({ settings, update }: Props) {
           </span>
         </span>
         <button className="chip wx-city" data-cuelume-open data-cuelume-emphasis="subtle" onClick={() => { setDraft(city); setEditing(true) }}>
+          {settings.weatherAuto && <MapPin size={11} aria-label="Following your location" style={{ marginRight: 4, verticalAlign: -1 }} />}
           {weather.city} · {unit}
         </button>
       </div>
-      {rainText && (
+      {(rainLine || rainText) && (
         <div className="wx-rain">
           <CloudRain size={16} aria-hidden />
-          <span>{rainText}</span>
+          <span>{rainLine || rainText}</span>
+          {weather.rain15 && ev && (ev.now || evMins <= 180) && <RainBars slots={weather.rain15} />}
         </div>
       )}
       <TempCurve hours={weather.hourly} now={start} />
     </div>
+  )
+}
+
+/** The next three hours of rain, a quarter-hour per bar: how much, and when it starts and stops. */
+function RainBars({ slots }: { slots: { at: number; mm: number }[] }) {
+  const now = Date.now()
+  const next = slots.filter((s) => s.at + 15 * 60_000 > now).slice(0, 12)
+  const top = Math.max(0.6, ...next.map((s) => s.mm))
+  return (
+    <span className="wx-bars" aria-label="Rain over the next three hours">
+      {next.map((s) => (
+        <i key={s.at} title={`${s.mm.toFixed(1)} mm`} style={{ height: `${Math.max(8, Math.min(100, (s.mm / top) * 100))}%`, opacity: s.mm >= 0.12 ? 1 : 0.22 }} />
+      ))}
+    </span>
   )
 }
 
@@ -262,11 +322,17 @@ function CityPicker({
   canCancel,
   onPick,
   onCancel,
+  onLocate,
+  locating,
+  locError,
 }: {
   initial: string
   canCancel: boolean
   onPick: (hit: CityHit) => void
   onCancel: () => void
+  onLocate: () => void
+  locating: boolean
+  locError: string | null
 }) {
   const [query, setQuery] = useState(initial)
   const [hits, setHits] = useState<CityHit[]>([])
@@ -304,6 +370,11 @@ function CityPicker({
   return (
     <div className="weather center city-picker" onClick={(e) => e.stopPropagation()}>
       <div className="timer-label">Which city?</div>
+      <button className="pill-btn" data-cuelume-tap disabled={locating} onClick={onLocate}>
+        <LocateFixed size={14} aria-hidden style={{ marginRight: 6, verticalAlign: -2 }} />
+        {locating ? 'Finding you…' : 'Use my location'}
+      </button>
+      {locError && <div className="city-note">{locError}. You can search for a city instead.</div>}
       <div className="city-box">
         <input
           className="todo-input"
