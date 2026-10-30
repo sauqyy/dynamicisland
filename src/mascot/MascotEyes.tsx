@@ -69,7 +69,7 @@ export const EYE_LABELS: Record<EyeAct, string> = {
 export const EYE_ACTS = Object.keys(EYE_LABELS) as EyeAct[]
 
 /** Where the eyes are, at one moment. */
-interface Pose {
+export interface Pose {
   /** the pair's position */
   x: number
   y: number
@@ -89,17 +89,17 @@ interface Pose {
   jump: boolean
 }
 
-const REST: Pose = { x: 0, y: 0, scale: 1, sx: 1, sy: 1, rot: 0, apart: 0, closedL: 0, closedR: 0, heartL: 0, heartR: 0, jump: false }
+export const REST: Pose = { x: 0, y: 0, scale: 1, sx: 1, sy: 1, rot: 0, apart: 0, closedL: 0, closedR: 0, heartL: 0, heartR: 0, jump: false }
 
-type Step = [at: number, pose: Partial<Pose>]
-interface Act {
+export type Step = [at: number, pose: Partial<Pose>]
+export interface Act {
   duration: number
   steps: Step[]
   sparks?: boolean
   z?: boolean
 }
 
-const ACTS: Record<EyeAct, (side: 'l' | 'r') => Act> = {
+export const ACTS: Record<EyeAct, (side: 'l' | 'r') => Act> = {
   lookLeft: () => ({ duration: 1700, steps: [[0, { x: -7 }], [1100, { x: 0 }]] }),
   lookRight: () => ({ duration: 1700, steps: [[0, { x: 7 }], [1100, { x: 0 }]] }),
   lookUp: () => ({ duration: 1600, steps: [[0, { y: -4.5 }], [1000, { y: 0 }]] }),
@@ -129,7 +129,7 @@ const ACTS: Record<EyeAct, (side: 'l' | 'r') => Act> = {
   sad: () => ({ duration: 2600, steps: [[0, { y: 3.5, sy: 0.72 }], [1900, { y: 0, sy: 1 }]] }),
 }
 
-const BOX = { transformBox: 'fill-box', transformOrigin: 'center' } as const
+export const BOX = { transformBox: 'fill-box', transformOrigin: 'center' } as const
 const CY = 14
 
 /** A softly rounded four-point sparkle, the shape of the eyes. */
@@ -142,14 +142,16 @@ const heart = (cx: number) => `M${cx} ${CY + 9} C${cx - 14} ${CY - 1} ${cx - 8} 
 const arc = (cx: number) => `M${cx - 7} ${CY + 3} Q${cx} ${CY - 7} ${cx + 7} ${CY + 3}`
 
 /** gliding: soft springs, a little bouncy; the blink is a quick tween instead, so it never overshoots */
-const GLIDE = { type: 'spring', stiffness: 170, damping: 17, mass: 0.8 } as const
-const FADE = { duration: 0.22, ease: [0.4, 0, 0.2, 1] } as const
+export const GLIDE = { type: 'spring', stiffness: 170, damping: 17, mass: 0.8 } as const
+export const FADE = { duration: 0.22, ease: [0.4, 0, 0.2, 1] } as const
 
 /** Runs one act after another, a few seconds apart, never the same one twice in a row. */
-function useIdleActs(force?: EyeAct) {
+export function useIdleActs(force?: EyeAct, enabled = true, paused = false) {
   const [pose, setPose] = useState<Pose>(REST)
   const [fx, setFx] = useState({ sparks: 0, z: 0 })
   useEffect(() => {
+    if (!enabled || paused) return
+    setPose(REST)
     const timers: number[] = []
     let last: EyeAct | null = null
     const later = (fn: () => void, ms: number) => void timers.push(window.setTimeout(fn, ms))
@@ -169,8 +171,8 @@ function useIdleActs(force?: EyeAct) {
     }
     later(next, force ? 300 : 2500 + Math.random() * 3000)
     return () => timers.forEach(clearTimeout)
-  }, [force])
-  return { pose, fx }
+  }, [force, enabled, paused])
+  return { pose: enabled && !paused ? pose : REST, fx }
 }
 
 interface Props {
