@@ -61,7 +61,7 @@ export function useRoam({ roam, gentle, settle = 0 }: Opts) {
     const later = (ms: number, fn: () => void) => {
       t = window.setTimeout(() => alive && fn(), ms)
     }
-    const next = () => later(2800 + Math.random() * 3600, act)
+    const next = () => later(12_000 + Math.random() * 14_000, act)
     const act = () => {
       const m = pick()
       last.current = m
@@ -119,7 +119,7 @@ export function useRoam({ roam, gentle, settle = 0 }: Opts) {
         })
       }
     }
-    later(settle + 1800 + Math.random() * 2400, act)
+    later(settle + 7000 + Math.random() * 6000, act)
     return () => {
       alive = false
       window.clearTimeout(t)

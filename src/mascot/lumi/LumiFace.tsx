@@ -20,6 +20,8 @@ const BVH = 90
 const CY = 14
 /** the pair sits at x 17 and 47, so the middle is at 32 */
 const MID = 32
+/** how calm she is when nothing is happening: small acts every 10 to 25 seconds, a longer story about once a minute */
+const IDLE_PACE = 3.2
 /** the pose with nothing asked of either eye */
 const LREST: LumiPose = { ...REST, lx: 0, ly: 0, rx: 0, ry: 0, lo: 1, ro: 1, lrot: 0, rrot: 0, brot: 0, by: 0, bsy: 1 }
 
@@ -207,7 +209,7 @@ function LumiFaceBase({ mood: moodProp = 'idle', height = 28, force, replay = 0,
             plan(false)
           }, storyLength(id))
         },
-        first ? 4500 + Math.random() * 4000 : 5000 + Math.random() * 6000,
+        first ? 16_000 + Math.random() * 10_000 : 32_000 + Math.random() * 30_000,
       )
     }
     plan(true)
@@ -231,7 +233,7 @@ function LumiFaceBase({ mood: moodProp = 'idle', height = 28, force, replay = 0,
     if (!sound) return
     return playTrack(mood)
   }, [sound, mood, replay])
-  const { pose: idlePose, fx: idleFx } = useIdleActs(force, resting && !still, Boolean(bit))
+  const { pose: idlePose, fx: idleFx } = useIdleActs(force, resting && !still, Boolean(bit), IDLE_PACE)
   const { look, love } = usePointerLook(ref, calm && follow && !gaze)
   const blink = useBlink(mood !== 'sleep' && !def.shape)
 
