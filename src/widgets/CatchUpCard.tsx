@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertIcon, alertTone } from '../island/AlertIcon'
 import type { CatchUpDigest } from '../lib/useCatchUp'
 import type { Meeting } from '../lib/useScele'
@@ -34,6 +34,8 @@ interface Props {
   onHeight?: (h: number) => void
   /** opens Today, when the build has it */
   onToday?: () => void
+  /** a character beside the greeting (Lumi, in the Universitas Indonesia build) */
+  mascot?: ReactNode
 }
 
 const H = 3600_000
@@ -166,7 +168,7 @@ export function needsYou(now: number, meetings: Meeting[], sceleDue: SceleDeadli
  * - New: what came in (announcements, materials, grades, the timer) and who wrote, one line each.
  * Every row is something real (a held alert, an unread chat, a class, a deadline), each shown once.
  */
-export function CatchUpCard({ digest, name, now, unread, meetings, sceleDue, ownDue, todos, onGo, onChat, onClose, onHeight, onToday }: Props) {
+export function CatchUpCard({ digest, name, now, unread, meetings, sceleDue, ownDue, todos, onGo, onChat, onClose, onHeight, onToday, mascot }: Props) {
   const hello = digest.kind === 'hello'
   // picked once, when the card opens
   const [backLine] = useState(pickBackLine)
@@ -253,7 +255,8 @@ export function CatchUpCard({ digest, name, now, unread, meetings, sceleDue, own
   const nothing = !needs.length && !fresh.length
   return (
     <div ref={root} className="whatsnew catchup" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
-      <header className="cu-head">
+      <header className={`cu-head ${mascot ? 'has-lumi' : ''}`}>
+        {mascot && <span className="cu-lumi">{mascot}</span>}
         <b className="cu-title">{title}</b>
         <p className="cu-sum">
           {away}

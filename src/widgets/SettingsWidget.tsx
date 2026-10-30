@@ -1153,6 +1153,46 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           </div>
           <Toggle on={settings.catchUp} onChange={(v) => update({ catchUp: v })} />
         </div>
+        {CAMPUS && (
+          <>
+            <div className="row">
+              <div className="row-text">
+                <span>Lumi</span>
+                <small>The little eyes in the resting pill. She reacts to classes, deadlines and your wins</small>
+              </div>
+              <Toggle on={settings.lumi} onChange={(v) => update({ lumi: v })} />
+            </div>
+            {settings.lumi && (
+              <>
+                <div className="row">
+                  <div className="row-text">
+                    <span>Let Lumi speak up</span>
+                    <small>Good morning, a sip of water, a stretch, a word when it's late. Off: she only reacts to what's already happening</small>
+                  </div>
+                  <Toggle on={settings.lumiNudges} onChange={(v) => update({ lumiNudges: v })} />
+                </div>
+                <div className="row">
+                  <div className="row-text">
+                    <span>Show the time beside her</span>
+                    <small>The time next to Lumi's eyes in the resting pill</small>
+                  </div>
+                  <Toggle on={settings.lumiClock} onChange={(v) => update({ lumiClock: v })} />
+                </div>
+                <div className="row">
+                  <div className="row-text">
+                    <span>Calm mode</span>
+                    <small>Gentler moments: no explosions, shaking or flashes, and quieter sounds. Always on if your system asks for less motion</small>
+                  </div>
+                  <Toggle on={settings.lumiCalm} onChange={(v) => update({ lumiCalm: v })} />
+                </div>
+                <div className="row">
+                  <span>What Lumi calls you</span>
+                  <input className="set-input" value={settings.callMe} maxLength={24} placeholder="Your name" spellCheck={false} onChange={(e) => update({ callMe: e.target.value })} />
+                </div>
+              </>
+            )}
+          </>
+        )}
         <div className="row">
           <span>Hide in fullscreen apps</span>
           <Toggle on={settings.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
