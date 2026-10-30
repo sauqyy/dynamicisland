@@ -8627,3 +8627,623 @@ button.cu-new:not(:disabled):hover {
   transform-origin: center;
   will-change: transform;
 }
+
+/* ---------- Lumi: the Universitas Indonesia mascot ---------- */
+.idle-lumi {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.idle-lumi .dot {
+  flex: none;
+}
+.lumi-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 18px 0 8px;
+  overflow: hidden;
+}
+.lumi-card::before {
+  content: '';
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  width: 150px;
+  height: 120px;
+  margin-top: -60px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--lc, #fff) 30%, transparent), transparent);
+  pointer-events: none;
+}
+.lc-face {
+  position: relative;
+  flex: none;
+  width: 108px;
+  display: grid;
+  place-items: center;
+}
+.lc-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lc-title {
+  font-size: var(--fs-body, 13.5px);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-sub {
+  min-height: 1.3em;
+  font-size: var(--fs-meta, 12px);
+  line-height: 1.3;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lc-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -2px;
+  background: var(--lc, #fff);
+  animation: lc-blink 0.7s steps(1) infinite;
+}
+.lc-acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.lc-btn {
+  padding: 4px 13px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-1);
+  background: rgb(var(--fg-rgb) / 0.12);
+  transition: transform 0.15s, background 0.15s;
+}
+.lc-btn:hover {
+  transform: translateY(-1px);
+  background: rgb(var(--fg-rgb) / 0.2);
+}
+.lc-btn.primary {
+  color: #0b0b12;
+  background: var(--lc, #fff);
+}
+.lc-life {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--lc, #fff);
+  opacity: 0.5;
+  transform-origin: left center;
+  animation: lc-life linear forwards;
+}
+.content-clip:hover .lc-life {
+  animation-play-state: paused;
+}
+@keyframes lc-life {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes lc-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.lumi-intro .lumi-page {
+  gap: 8px;
+}
+.lumi-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 190px;
+  height: 100px;
+}
+.lumi-hero.small {
+  height: 66px;
+}
+.lumi-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(138 180 255 / 0.32), transparent);
+  animation: lumi-breathe 3.4s ease-in-out infinite;
+}
+@keyframes lumi-breathe {
+  50% {
+    transform: scale(1.14);
+    opacity: 0.7;
+  }
+}
+.lumi-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lumi-name {
+  width: 220px;
+  padding: 9px 14px;
+  border-radius: 99px;
+  border: 1px solid rgb(var(--fg-rgb) / 0.16);
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.lumi-name:focus {
+  border-color: #8ab4ff;
+  box-shadow: 0 0 0 3px rgb(138 180 255 / 0.22);
+}
+.lumi-grid {
+  gap: 6px;
+}
+.lumi-skill {
+  padding: 6px 8px;
+  gap: 6px;
+}
+.lumi-skill-face {
+  flex: none;
+  width: 50px;
+  display: grid;
+  place-items: center;
+}
+.lumi-skill em {
+  font-style: normal;
+}
+.lumi-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 8px;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lumi-switch input {
+  accent-color: #8ab4ff;
+}
+.lumi-switch small {
+  flex-basis: 100%;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.5;
+}
+.astra-next:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.lumi-go {
+  color: #0b0b12;
+  background: #8ab4ff;
+}
+.lumi-go:hover {
+  background: #a5c4ff;
+}
+
+.cu-head.has-lumi {
+  position: relative;
+  padding-right: 96px;
+}
+.cu-lumi {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+}
+
+.lumi-slide {
+  animation: lumi-slide 0.26s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes lumi-slide {
+  from {
+    opacity: 0.01;
+    transform: translateX(28px);
+  }
+}
+
+/* with music playing she bobs to the beat, in place of the equalizer */
+.lumi-vibe {
+  display: flex;
+  animation: lumi-vibe 0.7s ease-in-out infinite;
+}
+@keyframes lumi-vibe {
+  50% {
+    transform: translateY(-1.6px) rotate(-3deg);
+  }
+}
+
+.lumi-hero {
+  width: 210px;
+  height: 120px;
+}
+.lumi-hero.small {
+  height: 90px;
+}
+
+/* ---------- "time to lock in.": the deadline reminders at three hours and one ---------- */
+.lk-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.lk-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.lk-title {
+  position: absolute;
+  left: 18px;
+  top: 6px;
+  font-family: 'Times New Roman', Times, 'Liberation Serif', serif;
+  font-weight: 900;
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #0b0b0b;
+  white-space: nowrap;
+  transform: scale(0.82, 1.22);
+  transform-origin: left top;
+  text-shadow: 0 0 8px rgb(255 230 170 / 0.55);
+}
+.lk-lumi {
+  position: absolute;
+  right: 34px;
+  bottom: -26px;
+}
+.lk-cap {
+  position: absolute;
+  left: 16px;
+  bottom: 10px;
+  max-width: 225px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8), 0 0 8px rgb(0 0 0 / 0.5);
+}
+.lk-cap b {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lk-cap span {
+  font-size: 11px;
+  opacity: 0.92;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lk-life {
+  background: #fff;
+  z-index: 2;
+}
+
+/* ---------- the six-hour reminder: the cat with its paw at its chin ---------- */
+.th-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(120% 140% at 62% 40%, #ffffff 0%, #f6f4f1 55%, #e9e7ea 100%);
+  color: #22222c;
+}
+.th-glow {
+  position: absolute;
+  left: 40px;
+  top: -30px;
+  width: 260px;
+  height: 230px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #fff, rgb(255 255 255 / 0));
+}
+.th-lumi {
+  position: absolute;
+  left: 44px;
+  bottom: -14px;
+}
+.th-arm {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.th-cap {
+  position: absolute;
+  left: 236px;
+  right: 16px;
+  top: 38px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.th-cap b {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #1c1c26;
+}
+.th-cap span {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: #6b6b7a;
+}
+.th-life {
+  background: #8a8aa0;
+  z-index: 2;
+}
+
+/* ---------- Lumi's ambient motion: CSS, so it runs without redrawing anything ---------- */
+.lm-tw {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lm-tw 2.8s ease-in-out infinite;
+}
+@keyframes lm-tw {
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  0%,
+  100% {
+    opacity: 0.92;
+  }
+}
+.lm-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lm-pulse 2.6s ease-in-out infinite;
+}
+@keyframes lm-pulse {
+  50% {
+    transform: scale(1.08);
+  }
+}
+.lm-d1 {
+  animation: lm-d1 7s ease-in-out infinite;
+}
+.lm-d2 {
+  animation: lm-d2 5.6s ease-in-out infinite;
+}
+.lm-d3 {
+  animation: lm-d3 8.4s ease-in-out infinite;
+}
+@keyframes lm-d1 {
+  50% {
+    transform: translateX(14px);
+  }
+}
+@keyframes lm-d2 {
+  50% {
+    transform: translateX(-18px);
+  }
+}
+@keyframes lm-d3 {
+  50% {
+    transform: translateX(16px);
+  }
+}
+.lm-gloss {
+  animation: lm-gloss 6s ease-in-out infinite;
+}
+@keyframes lm-gloss {
+  0%,
+  60% {
+    transform: translateX(0);
+  }
+  85%,
+  100% {
+    transform: translateX(110px);
+  }
+}
+.lm-talk {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: lm-talk 0.8s ease-in-out infinite;
+}
+@keyframes lm-talk {
+  0%,
+  100% {
+    transform: scaleY(0.5);
+  }
+  25% {
+    transform: scaleY(1.3);
+  }
+  50% {
+    transform: scaleY(0.65);
+  }
+  75% {
+    transform: scaleY(1.1);
+  }
+}
+.lm-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: lm-spark 2.3s ease-out infinite;
+}
+@keyframes lm-spark {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-40deg);
+  }
+  24% {
+    opacity: 1;
+    transform: scale(1.25) rotate(0deg);
+  }
+  48%,
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(50deg);
+  }
+}
+.lk-lobe {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lk-lobe 3.2s ease-in-out infinite;
+}
+@keyframes lk-lobe {
+  25% {
+    transform: scale(1.07) translateY(-2px);
+  }
+  50% {
+    transform: scale(0.97) translateY(1px);
+  }
+  75% {
+    transform: scale(1.04) translateY(-1px);
+  }
+}
+.lk-corepulse {
+  animation: lk-corepulse 1.6s ease-in-out infinite;
+}
+@keyframes lk-corepulse {
+  50% {
+    opacity: 0.8;
+  }
+}
+.lk-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: lk-ring 2.2s ease-out infinite;
+}
+@keyframes lk-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(5.5);
+  }
+}
+.lk-ember {
+  opacity: 0;
+  animation: lk-ember 3.4s ease-out infinite;
+}
+@keyframes lk-ember {
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-92px);
+  }
+}
+
+/* ---------- Lumi's badges ---------- */
+.lm-bob {
+  animation: lm-bob 2.4s ease-in-out infinite;
+}
+@keyframes lm-bob {
+  50% {
+    transform: translateY(-1.8px);
+  }
+}
+.lm-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 12%;
+  animation: lm-bsway 1.1s ease-in-out infinite;
+}
+@keyframes lm-bsway {
+  25% {
+    transform: rotate(-16deg);
+  }
+  75% {
+    transform: rotate(14deg);
+  }
+}
+.lm-minute,
+.lm-hour {
+  animation: lm-hand 1.8s linear infinite;
+}
+.lm-hour {
+  animation-duration: 21.6s;
+}
+@keyframes lm-hand {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- the two meme cards, redrawn in her style ---------- */
+.lk-title {
+  font-family: var(--font-ui, 'Geist Variable', system-ui, sans-serif);
+  font-weight: 800;
+  font-size: 40px;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: #fff;
+  transform: none;
+  text-shadow: none;
+  -webkit-text-stroke: 7px #15172b;
+  paint-order: stroke fill;
+}
+.lk-cap {
+  text-shadow: 0 1px 2px rgb(10 10 25 / 0.9);
+}
+.th-card {
+  background: radial-gradient(90% 130% at 24% 58%, #3d4172 0%, #1b1d38 58%, #0e0f1d 100%);
+  color: #f2f2f7;
+}
+.th-glow {
+  left: 0;
+  top: 6px;
+  width: 230px;
+  height: 200px;
+  background: radial-gradient(closest-side, rgb(235 238 255 / 0.55), rgb(235 238 255 / 0));
+}
+.th-cap b {
+  color: #fff;
+}
+.th-cap span {
+  color: #a9abc4;
+}
+.th-life {
+  background: #c9c4ff;
+}
+
+.idle-time {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
