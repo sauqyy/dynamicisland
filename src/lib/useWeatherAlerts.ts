@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { SoundName } from 'cuelume'
 import type { IslandAlert } from '../types'
-import { detectPlace, kmBetween } from './location'
+import { detectPlace, isPlaceholderName, kmBetween } from './location'
 import { fetchWeather } from './weather'
 import { planAlerts } from './weatherOutlook'
 import type { Settings } from './settings'
@@ -81,9 +81,9 @@ export function useWeatherAlerts({ enabled, city, lat, lon, fahrenheit, push, ne
  * While the user has asked the weather to follow them, find out where they are now and then, and move the city
  * (and with it the forecast and the alerts) when they have really moved.
  */
-export function useFollowLocation({ enabled, lat, lon, update }: { enabled: boolean; lat: number | null; lon: number | null; update: (patch: Partial<Settings>) => void }) {
-  const here = useRef({ lat, lon })
-  here.current = { lat, lon }
+export function useFollowLocation({ enabled, city, lat, lon, update }: { enabled: boolean; city: string; lat: number | null; lon: number | null; update: (patch: Partial<Settings>) => void }) {
+  const here = useRef({ city, lat, lon })
+  here.current = { city, lat, lon }
   useEffect(() => {
     if (!enabled) return
     let alive = true
@@ -92,7 +92,7 @@ export function useFollowLocation({ enabled, lat, lon, update }: { enabled: bool
         const p = await detectPlace({ allowNetwork: true })
         if (!alive) return
         const was = here.current
-        if (was.lat == null || was.lon == null || kmBetween({ lat: was.lat, lon: was.lon }, p) > MOVED_KM) update({ city: p.name, cityLat: p.lat, cityLon: p.lon })
+        if (was.lat == null || was.lon == null || kmBetween({ lat: was.lat, lon: was.lon }, p) > MOVED_KM || (isPlaceholderName(was.city) && !isPlaceholderName(p.name))) update({ city: p.name, cityLat: p.lat, cityLon: p.lon })
       } catch {
         /* no fix this time */
       }
