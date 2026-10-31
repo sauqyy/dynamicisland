@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, Reorder, motion, useDragControls } from 'motion/react'
 import { play } from 'cuelume'
 import { invoke } from '@tauri-apps/api/core'
-import { CalendarClock, Check, ChevronDown, FileText, Folder, Link2, ListChecks, Paperclip } from 'lucide-react'
-import type { Todo, TodoAttachment } from '../types'
+import { CalendarClock, Check, ChevronDown, ChevronRight, FileText, Folder, FolderPlus, Link2, ListChecks, Paperclip, Plus, Trash2 } from 'lucide-react'
+import type { Todo, TodoAttachment, TodoGroup } from '../types'
 import { fmtSize, openPath } from '../lib/files'
 import { dueLabel } from '../lib/deadlines'
 import { DuePicker, whenText } from './DuePicker'
@@ -17,6 +17,30 @@ interface Props {
 }
 
 const H = 3600_000
+type DropTarget = { kind: 'todo'; id: number } | { kind: 'group'; id: string } | { kind: 'out'; id: '' }
+const GROUPS_KEY = 'di.todoGroups'
+
+function loadGroups(): TodoGroup[] {
+  try {
+    const g = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? '[]')
+    return Array.isArray(g) ? g : []
+  } catch {
+    return []
+  }
+}
+
+/** the groups, kept on this computer next to the to-dos */
+function useGroups() {
+  const [groups, setGroups] = useState<TodoGroup[]>(loadGroups)
+  useEffect(() => {
+    try {
+      localStorage.setItem(GROUPS_KEY, JSON.stringify(groups))
+    } catch {
+      /* ignore */
+    }
+  }, [groups])
+  return [groups, setGroups] as const
+}
 
 /** "scele.cs.ui.ac.id/course" as https://scele.cs.ui.ac.id/course; null when it isn't a web address. */
 function asUrl(text: string): string | null {
@@ -72,7 +96,7 @@ function Note({ value, onChange, placeholder, onKeyDown }: { value: string; onCh
  * Adding a task is a small form: the title alone is enough (Enter adds it), and as soon as you
  * click in or start typing, a description and a due date open up under it.
  */
-function NewTodo({ onAdd }: { onAdd: (t: Omit<Todo, 'id' | 'done'>) => void }) {
+function NewTodo({ onAdd, groups, group, setGroup }: { onAdd: (t: Omit<Todo, 'id' | 'done'>) => void; groups: TodoGroup[]; group: string; setGroup: (g: string) => void }) {
   const [text, setText] = useState('')
   const [note, setNote] = useState('')
   const [due, setDue] = useState<number | undefined>(undefined)
@@ -84,7 +108,7 @@ function NewTodo({ onAdd }: { onAdd: (t: Omit<Todo, 'id' | 'done'>) => void }) {
     const title = text.trim()
     if (!title) return
     play('tap')
-    onAdd({ text: title, note: note.trim() || undefined, due })
+    onAdd({ text: title, note: note.trim() || undefined, due, group: groups.some((g) => g.id === group) ? group : undefined })
     setText('')
     setNote('')
     setDue(undefined)
@@ -120,6 +144,7 @@ function NewTodo({ onAdd }: { onAdd: (t: Omit<Todo, 'id' | 'done'>) => void }) {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) add()
             }}
           />
+          {groups.length > 0 && <GroupPick groups={groups} value={group} onPick={setGroup} />}
           <DuePicker
             value={due}
             onChange={setDue}
@@ -135,10 +160,30 @@ function NewTodo({ onAdd }: { onAdd: (t: Omit<Todo, 'id' | 'done'>) => void }) {
   )
 }
 
+/** Which group a task goes in: a row of chips, "None" first. */
+function GroupPick({ groups, value, onPick }: { groups: TodoGroup[]; value: string; onPick: (g: string) => void }) {
+  return (
+    <div className="todo-group-pick" role="radiogroup" aria-label="Group">
+      <Folder size={12} aria-hidden />
+      {[{ id: '', name: 'None' }, ...groups].map((g) => (
+        <button key={g.id} role="radio" aria-checked={value === g.id} className={`todo-group-chip ${value === g.id ? 'on' : ''}`} data-cuelume-select onClick={() => onPick(g.id)}>
+          {g.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function TodoWidget({ todos, setTodos, onOpen }: Props) {
   // one to-do's details open at a time
   const [open, setOpen] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const [groups, setGroups] = useGroups()
+  // the group new tasks go in: the last one picked, or the one whose + was pressed
+  const [addTo, setAddTo] = useState('')
+  // a group that was just made: its name is ready to type
+  const [naming, setNaming] = useState<string | null>(null)
+  const newRef = useRef<HTMLDivElement>(null)
 
   // braces, not an expression: an effect may only return its clean-up
   useEffect(() => {
@@ -157,34 +202,257 @@ export function TodoWidget({ todos, setTodos, onOpen }: Props) {
   }, [])
 
   const patch = (id: number, p: Partial<Todo>) => setTodos(todos.map((x) => (x.id === id ? { ...x, ...p } : x)))
+  const known = new Set(groups.map((g) => g.id))
+  // a task whose group is gone counts as loose
+  const groupOf = (t: Todo) => (t.group && known.has(t.group) ? t.group : '')
+  const patchGroup = (id: string, p: Partial<TodoGroup>) => setGroups((all) => all.map((g) => (g.id === id ? { ...g, ...p } : g)))
+  const newGroup = () => {
+    play('tap')
+    const g = { id: `g${Date.now()}`, name: 'New group' }
+    setGroups([...groups, g])
+    setNaming(g.id)
+  }
+  // dragging a task onto the middle of another one (or onto a group's name) files them together
+  const [dropOn, setDropOn] = useState<DropTarget | null>(null)
+  const dropRef = useRef<DropTarget | null>(null)
+  const aim = (d: DropTarget | null) => {
+    if (d?.kind === dropRef.current?.kind && d?.id === dropRef.current?.id) return
+    dropRef.current = d
+    setDropOn(d)
+  }
+  // the order only changes once the pointer is well past the middle of the task it is moving over: without this
+  // the list swapped them as soon as they touched, and the task slid away before it could be dropped on
+  const mayReorder = useRef(false)
+  const dragAt = (self: number, x: number, y: number) => {
+    mayReorder.current = false
+    for (const el of document.elementsFromPoint(x, y)) {
+      if ((el as HTMLElement).closest('[data-ungroup]')) return aim({ kind: 'out', id: '' })
+      const head = (el as HTMLElement).closest<HTMLElement>('[data-group-head]')
+      if (head) return aim({ kind: 'group', id: head.dataset.groupHead! })
+      const item = (el as HTMLElement).closest<HTMLElement>('[data-todo-id]')
+      if (!item || Number(item.dataset.todoId) === self) continue
+      const id = Number(item.dataset.todoId)
+      const r = item.getBoundingClientRect()
+      // how far through it the pointer is, counted from the side the drag came in from
+      const below = todos.findIndex((t) => t.id === id) > todos.findIndex((t) => t.id === self)
+      const through = below ? (y - r.top) / r.height : (r.bottom - y) / r.height
+      // the first fifth: nothing yet; most of it: group together; the far quarter: move past it
+      if (through > 0.75) {
+        mayReorder.current = true
+        return aim(null)
+      }
+      return aim(through > 0.2 ? { kind: 'todo', id } : null)
+    }
+    // over empty space (above or below the list): just ordering
+    mayReorder.current = true
+    aim(null)
+  }
+  // the task being dragged, when it is in a group: the place to drop it out of the group shows while it is
+  const [draggingOut, setDraggingOut] = useState(false)
+  // what the list was before the last drag-to-group, for a few seconds, so it can be taken back
+  const [undo, setUndo] = useState<{ text: string; todos: Todo[]; groups: TodoGroup[] } | null>(null)
+  useEffect(() => {
+    if (!undo) return
+    const t = window.setTimeout(() => setUndo(null), 6000)
+    return () => window.clearTimeout(t)
+  }, [undo])
+
+  const dropped = (self: number) => {
+    const d = dropRef.current
+    aim(null)
+    setDraggingOut(false)
+    if (!d) return
+    const before = { todos, groups }
+    const into = (group: string | undefined) => setTodos(todos.map((t) => (t.id === self ? { ...t, group } : t)))
+    const nameOf = (id: string) => groups.find((g) => g.id === id)?.name || 'the group'
+    if (d.kind === 'out') {
+      into(undefined)
+      setUndo({ text: 'Taken out of the group', ...before })
+      return
+    }
+    if (d.kind === 'group') {
+      into(d.id)
+      patchGroup(d.id, { collapsed: false })
+      setUndo({ text: `Moved to ${nameOf(d.id)}`, ...before })
+      return
+    }
+    const target = todos.find((t) => t.id === d.id)
+    if (!target) return
+    const g = groupOf(target)
+    if (g) {
+      into(g)
+      setUndo({ text: `Moved to ${nameOf(g)}`, ...before })
+      return
+    }
+    // two loose tasks: a new group with both, its name ready to type
+    play('tap')
+    const made = { id: `g${Date.now()}`, name: 'New group' }
+    setGroups([...groups, made])
+    setTodos(todos.map((t) => (t.id === self || t.id === target.id ? { ...t, group: made.id } : t)))
+    setNaming(made.id)
+    setUndo({ text: 'Grouped', ...before })
+  }
+
+  const removeGroup = (g: TodoGroup) => {
+    // its tasks are kept: they go back to the loose ones
+    setGroups(groups.filter((x) => x.id !== g.id))
+    setTodos(todos.map((t) => (t.group === g.id ? { ...t, group: undefined } : t)))
+    if (addTo === g.id) setAddTo('')
+  }
+
+  const rows = (list: Todo[], sectionId: string) => (
+    <Reorder.Group
+      axis="y"
+      values={list}
+      // only this section's order changed: the others keep theirs
+      // aimed at another task to group with, or not yet past it: hold the order still, or the target would slide away
+      onReorder={(next) => mayReorder.current && !dropRef.current && setTodos([...todos.filter((t) => groupOf(t) !== sectionId), ...next])}
+      className="todo-list"
+    >
+      <AnimatePresence initial={false}>
+        {list.map((t) => (
+          <TodoRow
+            key={t.id}
+            t={t}
+            now={now}
+            groups={groups}
+            target={dropOn?.kind === 'todo' && dropOn.id === t.id}
+            onDragAt={(x, y) => dragAt(t.id, x, y)}
+            onDropped={() => dropped(t.id)}
+            onPickedUp={() => setDraggingOut(Boolean(groupOf(t)))}
+            open={open === t.id}
+            onOpenChange={(on) => setOpen(on ? t.id : null)}
+            onPatch={(p) => patch(t.id, p)}
+            onDelete={() => {
+              if (open === t.id) setOpen(null)
+              setTodos(todos.filter((x) => x.id !== t.id))
+            }}
+          />
+        ))}
+      </AnimatePresence>
+    </Reorder.Group>
+  )
+
+  const loose = todos.filter((t) => !groupOf(t))
 
   return (
     <div className="todo" onClick={(e) => e.stopPropagation()}>
-      <NewTodo onAdd={(t) => setTodos([...todos, { id: Date.now(), done: false, ...t }])} />
-      <Reorder.Group axis="y" values={todos} onReorder={setTodos} className="todo-list">
-        <AnimatePresence initial={false}>
-          {todos.map((t) => (
-            <TodoRow
-              key={t.id}
-              t={t}
-              now={now}
-              open={open === t.id}
-              onOpenChange={(on) => setOpen(on ? t.id : null)}
-              onPatch={(p) => patch(t.id, p)}
-              onDelete={() => {
-                if (open === t.id) setOpen(null)
-                setTodos(todos.filter((x) => x.id !== t.id))
+      <div ref={newRef}>
+        <NewTodo
+          groups={groups}
+          group={addTo}
+          setGroup={setAddTo}
+          onAdd={(t) => {
+            setTodos([...todos, { id: Date.now(), done: false, ...t }])
+            // the group it went into opens, so the new task is seen
+            if (t.group) patchGroup(t.group, { collapsed: false })
+          }}
+        />
+      </div>
+      {rows(loose, '')}
+      {draggingOut && (
+        <div className={`todo-ungroup-zone ${dropOn?.kind === 'out' ? 'drop-target' : ''}`} data-ungroup>
+          Drop here to take it out of the group
+        </div>
+      )}
+      {groups.map((g) => {
+        const list = todos.filter((t) => groupOf(t) === g.id)
+        const finished = list.filter((t) => t.done).length
+        return (
+          <section key={g.id} className={`todo-group ${g.collapsed ? 'collapsed' : ''}`}>
+            <div className={`todo-group-head ${dropOn?.kind === 'group' && dropOn.id === g.id ? 'drop-target' : ''}`} data-group-head={g.id}>
+              <button
+                className="todo-group-fold"
+                aria-expanded={!g.collapsed}
+                aria-label={g.collapsed ? `Show ${g.name}` : `Hide ${g.name}`}
+                data-cuelume-open
+                data-cuelume-emphasis="subtle"
+                onClick={() => patchGroup(g.id, { collapsed: !g.collapsed })}
+              >
+                <ChevronRight size={14} aria-hidden />
+              </button>
+              <input
+                className="todo-group-name"
+                value={g.name}
+                aria-label="Group name"
+                autoFocus={naming === g.id}
+                onFocus={(e) => naming === g.id && e.target.select()}
+                onBlur={() => {
+                  setNaming(null)
+                  if (!g.name.trim()) patchGroup(g.id, { name: 'Untitled' })
+                }}
+                maxLength={40}
+                spellCheck={false}
+                data-cuelume-type
+                onChange={(e) => patchGroup(g.id, { name: e.target.value })}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+                }}
+              />
+              {list.length > 0 && (
+                <span className="todo-group-count" title={`${finished} of ${list.length} done`}>
+                  {finished}/{list.length}
+                </span>
+              )}
+              <button
+                className="todo-group-btn"
+                title={`Add a task to ${g.name}`}
+                aria-label={`Add a task to ${g.name}`}
+                data-cuelume-tap
+                data-cuelume-emphasis="subtle"
+                onClick={() => {
+                  setAddTo(g.id)
+                  newRef.current?.querySelector<HTMLInputElement>('.todo-new-title')?.focus()
+                }}
+              >
+                <Plus size={13} aria-hidden />
+              </button>
+              <button
+                className="todo-group-btn"
+                title={list.length ? 'Remove the group (its tasks are kept)' : 'Remove the group'}
+                aria-label={`Remove ${g.name}`}
+                data-cuelume-close
+                data-cuelume-emphasis="subtle"
+                onClick={() => removeGroup(g)}
+              >
+                <Trash2 size={12} aria-hidden />
+              </button>
+            </div>
+            {/* folded with CSS, like a task's details */}
+            <div className="todo-fold" inert={g.collapsed}>
+              <div className="todo-fold-in">{list.length ? rows(list, g.id) : <small className="todo-group-empty">No tasks yet. Press + to add one</small>}</div>
+            </div>
+          </section>
+        )
+      })}
+      {!todos.length && !groups.length && (
+        <div className="empty">
+          <ListChecks size={20} strokeWidth={1.7} aria-hidden />
+          Nothing to do
+        </div>
+      )}
+      <AnimatePresence>
+        {undo && (
+          <motion.div className="todo-undo" role="status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>
+            <span>{undo.text}</span>
+            <button
+              data-cuelume-tap
+              onClick={() => {
+                setTodos(undo.todos)
+                setGroups(undo.groups)
+                setNaming(null)
+                setUndo(null)
               }}
-            />
-          ))}
-        </AnimatePresence>
-        {!todos.length && (
-          <div className="empty">
-            <ListChecks size={20} strokeWidth={1.7} aria-hidden />
-            Nothing to do
-          </div>
+            >
+              Undo
+            </button>
+          </motion.div>
         )}
-      </Reorder.Group>
+      </AnimatePresence>
+      <button className="todo-group-new" data-cuelume-tap data-cuelume-emphasis="subtle" onClick={newGroup}>
+        <FolderPlus size={13} aria-hidden /> New group
+      </button>
     </div>
   )
 }
@@ -194,7 +462,28 @@ export function TodoWidget({ todos, setTodos, onOpen }: Props) {
  * wasn't the end of a drag) ticks it off, and the arrow opens its details: description, due date,
  * links and files. Open, the row and its details read as one card.
  */
-function TodoRow({ t, now, open, onOpenChange, onPatch, onDelete }: { t: Todo; now: number; open: boolean; onOpenChange: (on: boolean) => void; onPatch: (p: Partial<Todo>) => void; onDelete: () => void }) {
+function TodoRow({
+  t,
+  now,
+  groups,
+  target,
+  onDragAt,
+  onDropped,
+  onPickedUp,
+  open,
+  onOpenChange,
+  onPatch,
+  onDelete,
+}: {
+  t: Todo
+  now: number
+  groups: TodoGroup[]
+  /** another task is being dragged onto this one */
+  target: boolean
+  onDragAt: (x: number, y: number) => void
+  onDropped: () => void
+  onPickedUp: () => void
+  open: boolean; onOpenChange: (on: boolean) => void; onPatch: (p: Partial<Todo>) => void; onDelete: () => void }) {
   const controls = useDragControls()
   // a drag ends with a click on whatever it started on: that click doesn't tick the to-do off
   const dragged = useRef(false)
@@ -223,9 +512,17 @@ function TodoRow({ t, now, open, onOpenChange, onPatch, onDelete }: { t: Todo; n
       layout="position"
       dragListener={false}
       dragControls={controls}
-      onDragStart={() => (dragged.current = true)}
-      onDragEnd={() => setTimeout(() => (dragged.current = false), 0)}
-      className={`todo-item ${t.done ? 'done' : ''} ${open ? 'open' : ''}`}
+      onDragStart={() => {
+        dragged.current = true
+        onPickedUp()
+      }}
+      onDrag={(e) => onDragAt((e as PointerEvent).clientX, (e as PointerEvent).clientY)}
+      onDragEnd={() => {
+        onDropped()
+        setTimeout(() => (dragged.current = false), 0)
+      }}
+      data-todo-id={t.id}
+      className={`todo-item ${t.done ? 'done' : ''} ${open ? 'open' : ''} ${target ? 'drop-target' : ''}`}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
@@ -302,6 +599,7 @@ function TodoRow({ t, now, open, onOpenChange, onPatch, onDelete }: { t: Todo; n
         <div className="todo-fold-in todo-more">
           <Note value={t.note ?? ''} onChange={(v) => onPatch({ note: v })} placeholder="Add a description" />
           <DuePicker value={t.due} onChange={(due) => onPatch({ due })} />
+          {groups.length > 0 && <GroupPick groups={groups} value={t.group && groups.some((g) => g.id === t.group) ? t.group : ''} onPick={(g) => onPatch({ group: g || undefined })} />}
           {files.length > 0 && (
             <ul className="todo-files">
               {files.map((a) => (
