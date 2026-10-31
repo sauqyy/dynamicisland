@@ -8,7 +8,15 @@ export const BODY = { x: 0, y: -17, w: 64, h: 64, r: 32 }
  * Everything soft is a gradient and everything that moves is a CSS animation: nothing here is a blur over moving
  * things, which is what makes an animated SVG slow. The glow is kept low on purpose: it is a mood, not a halo.
  */
-export function LumiBody({ uid, tint, glow, asleep }: { uid: string; tint: string; glow: number; asleep: boolean }) {
+/** a colour a share of the way to black, for the shaded bottom of her body */
+function shade(hex: string, by: number) {
+  const n = parseInt(hex.replace('#', ''), 16)
+  if (Number.isNaN(n)) return hex
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v * (1 - by)))
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+export function LumiBody({ uid, tint, glow, asleep, color = '#262843' }: { uid: string; tint: string; glow: number; asleep: boolean; color?: string }) {
   const { x, y, w, h, r } = BODY
   const soft = (id: string, c: string) => (
     <radialGradient id={`${uid}${id}`}>
@@ -21,8 +29,8 @@ export function LumiBody({ uid, tint, glow, asleep }: { uid: string; tint: strin
     <g>
       <defs>
         <linearGradient id={`${uid}g`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#262843" />
-          <stop offset="1" stopColor="#0d0e1c" />
+          <stop offset="0" stopColor={color} />
+          <stop offset="1" stopColor={shade(color, 0.62)} />
         </linearGradient>
         <linearGradient id={`${uid}r`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#fff" stopOpacity="0.55" />

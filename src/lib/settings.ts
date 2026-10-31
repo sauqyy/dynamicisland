@@ -75,6 +75,8 @@ export interface Settings {
   lumiCalm: boolean
   /** the time, beside Lumi's eyes in the resting pill */
   lumiClock: boolean
+  /** how Lumi's eyes look and where they sit in the resting pill (the Lumi page) */
+  lumiLook: LumiLook
   /** tell the user about the weather that matters: rain on its way, when it stops, a rainy day, storms, strong sun, heat */
   weatherAlerts: boolean
   /** the weather follows the user: the city is found from where they are, and updated as they move */
@@ -190,6 +192,37 @@ export const CLOUD_VOICES = ['coral', 'nova', 'shimmer', 'alloy', 'sage', 'ash',
 export const CLOUD_MODEL = 'gpt-4o-mini-tts'
 
 export type TalkMode = 'hold' | 'toggle'
+export type LumiEyeShape = 'spirit' | 'soft' | 'round' | 'dot' | 'star'
+export type LumiFollow = 'stare' | 'glance' | 'off'
+export type LumiLively = 'chill' | 'normal' | 'playful'
+export interface LumiLook {
+  shape: LumiEyeShape
+  /** hex; the mood colours still take over for their moments */
+  color: string
+  /** 1 is her usual size */
+  size: number
+  /** extra space between the eyes, in her own units (negative: closer) */
+  gap: number
+  /** degrees; positive lowers the inner ends */
+  tilt: number
+  /** how bright the light behind her is, 1 is usual */
+  glow: number
+  /** where she sits in the resting pill, in px from her usual place */
+  x: number
+  y: number
+  /** what she does with the cursor */
+  follow: LumiFollow
+  /** her body's colour (the top of it; it shades darker towards the bottom) */
+  body: string
+  /** how often she does something on her own while resting */
+  lively: LumiLively
+  /** she drifts about the pill on her own */
+  wander: boolean
+  /** her own little sounds (the app's other sounds are in Settings) */
+  sounds: boolean
+}
+export const LUMI_LOOK_DEFAULT: LumiLook = { shape: 'spirit', color: '#ffffff', size: 1, gap: 0, tilt: 14, glow: 1, x: 0, y: 0, follow: 'glance', body: '#262843', lively: 'normal', wander: true, sounds: true }
+
 export type MascotAccessory = 'bow' | 'headphones' | 'glasses' | 'shades' | 'hat' | 'crown' | 'catEars' | 'halo' | 'topHat' | 'scarf' | 'bowtie'
 /** a missing entry keeps the accessory's own colour */
 export type AccessoryColors = Partial<Record<MascotAccessory, string>>
@@ -346,6 +379,7 @@ const DEFAULTS: Settings = {
   callMe: '',
   lumiCalm: false,
   lumiClock: true,
+  lumiLook: LUMI_LOOK_DEFAULT,
   weatherAlerts: true,
   weatherAuto: false,
   uiSounds: true,
@@ -447,6 +481,7 @@ function load(): Settings {
     // "Pip" was the mascot's name before Astra, so anyone still on it never picked it
     if (merged.mascotName === 'Pip') merged.mascotName = DEFAULTS.mascotName
     normalizeOutfit(merged)
+    merged.lumiLook = { ...LUMI_LOOK_DEFAULT, ...(merged.lumiLook ?? {}) }
     return merged
   } catch {
     return DEFAULTS
@@ -476,6 +511,7 @@ export function useSettings() {
       // an older device may still send the single shared accessory colour
       if (remote.mascotAccessoryColor) next.mascotAccessoryColor = remote.mascotAccessoryColor
       normalizeOutfit(next)
+      next.lumiLook = { ...LUMI_LOOK_DEFAULT, ...(next.lumiLook ?? {}) }
       return next
     })
   }, [])

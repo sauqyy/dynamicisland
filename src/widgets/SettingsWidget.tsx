@@ -54,7 +54,7 @@ const SYS_CATS: { id: string; label: string; color: string; Icon: ComponentType<
 /** the entry being shown in full-screen settings; null shows every card in one list */
 const SysCat = createContext<string | null>(null)
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button className={`toggle ${on ? 'on' : ''}`} onClick={() => onChange(!on)} role="switch" aria-checked={on} data-cuelume-toggle>
       <span />
@@ -68,7 +68,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
  */
 const relative = (base: number) => (v: number) => (Math.abs(v - base) < 1e-9 ? 'Default' : `${Math.round((v / base) * 100)}%`)
 
-function Slider({
+export function Slider({
   label,
   value,
   format,
@@ -100,7 +100,7 @@ function Slider({
 }
 
 /** A row of mutually exclusive choices. */
-function Segmented<T extends string | number>({ options, value, onPick }: { options: [T, string][]; value: T; onPick: (v: T) => void }) {
+export function Segmented<T extends string | number>({ options, value, onPick }: { options: [T, string][]; value: T; onPick: (v: T) => void }) {
   return (
     <div className="segmented small">
       {options.map(([v, label]) => (
