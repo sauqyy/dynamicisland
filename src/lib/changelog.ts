@@ -11,6 +11,19 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.14',
+    campus: true,
+    title: 'Make Lumi yours',
+    items: [
+      'A new Lumi page after Weather: pick a preset or choose her eyes, eye and body colour, size and glow, how lively she is, what she does with your cursor, and where she sits in the pill. She can also be turned off there.',
+      'By default she now glances at your cursor and looks away, instead of watching it the whole time.',
+      'To-do groups: drag a task onto another to group them, onto a group to move it, or out to take it back. Every move can be undone.',
+      'Notes: keep as many as you like, each with its own label, folding open and shut.',
+      'Weather finds where you are more precisely and always names the place, never just "My location".',
+      "The tick in a to-do's circle is centred.",
+    ],
+  },
+  {
     version: '0.7.13',
     campus: true,
     title: 'Meet Lumi',
