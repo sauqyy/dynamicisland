@@ -210,6 +210,8 @@ function Welcome({ name, sceleConnected, onGo, onClose }: { name: string; sceleC
 
 /** The open card's height follows its page, within these bounds (design px). */
 const CARD_MIN = 200
+/** the welcome back is only as tall as what it says: a greeting alone is short */
+const CATCHUP_MIN = 118
 const CARD_MAX = STAGE.h - 14
 /** Date and time row above the page, and the page's bottom padding plus the rail row below it. */
 const CARD_TOP = 40
@@ -880,7 +882,7 @@ export default function App() {
     if (wasSilent.current && !silent && missed.current > 0) {
       const n = missed.current
       // after the "break time" / "class over" alert has had its moment
-      setTimeout(() => pushAlert({ icon: '💬', text: `${n} while you were away`, sub: n === 1 ? '1 message or call' : `${n} messages and calls` }), 2800)
+      setTimeout(() => pushAlert({ icon: '💬', text: n === 1 ? 'Someone was thinking of you' : `${n} people were thinking of you`, sub: n === 1 ? '1 message or call while you were away' : `${n} messages and calls while you were away` }), 2800)
     }
     if (!silent) missed.current = 0
     wasSilent.current = silent
@@ -1402,7 +1404,7 @@ export default function App() {
   const expandedHeight = notes || astraIntro || lumiIntro || welcome
     ? CARD_MAX
     : catchUp.digest
-      ? Math.min(CARD_MAX, Math.max(CARD_MIN, catchUpH || CARD_MAX))
+      ? Math.min(CARD_MAX, Math.max(CATCHUP_MIN, catchUpH || CARD_MAX))
     : settings.cardFit
       ? Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
       : Math.min(CARD_MAX, settings.cardH)
