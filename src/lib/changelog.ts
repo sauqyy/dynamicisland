@@ -21,6 +21,7 @@ export const CHANGELOG: Release[] = [
       'Notes: keep as many as you like, each with its own label, folding open and shut.',
       'Weather finds where you are more precisely and always names the place, never just "My location".',
       "The tick in a to-do's circle is centred.",
+      'Welcome backs are warmer and the card is only as tall as what it says, with no empty space under a short greeting.',
     ],
   },
   {
