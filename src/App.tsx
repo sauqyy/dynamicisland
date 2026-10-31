@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { listen } from '@tauri-apps/api/event'
@@ -28,6 +28,7 @@ import { classState, nextClassLabel, useSchedule } from './lib/schedule'
 import { DEFAULT_LABEL, studyActivity, useStudyBoard, useStudyLog, type StudySession } from './lib/study'
 import { useStudyRoom, type StudyRoom } from './lib/useStudyRoom'
 import { WeatherWidget } from './widgets/WeatherWidget'
+import { LumiWidget } from './widgets/LumiWidget'
 import { SceleWidget } from './widgets/SceleWidget'
 import { TodayWidget } from './widgets/TodayWidget'
 import { CatchUpCard, needsYou, type UnreadFrom } from './widgets/CatchUpCard'
@@ -57,6 +58,7 @@ import { useClipboard } from './lib/useClipboard'
 import { Rail } from './island/Rail'
 import { MascotEyes } from './mascot/MascotEyes'
 import { LumiFace } from './mascot/lumi/LumiFace'
+import { setLumiLook } from './mascot/lumi/lumiLook'
 import { LumiCard, lumiShape } from './mascot/lumi/LumiCard'
 import { LumiIntro } from './mascot/lumi/LumiIntro'
 import { useLumiRoutines, type ExamRef } from './mascot/lumi/useLumi'
@@ -361,9 +363,11 @@ export default function App() {
   const lumiOn = CAMPUS && settings.lumi
   const lumiOnRef = useRef(lumiOn)
   useEffect(() => {
-    configureLumiSound({ on: settings.uiSounds, volume: settings.soundVolume, calm: settings.lumiCalm })
-  }, [settings.uiSounds, settings.soundVolume, settings.lumiCalm])
+    configureLumiSound({ on: settings.uiSounds && settings.lumiLook.sounds, volume: settings.soundVolume, calm: settings.lumiCalm })
+  }, [settings.uiSounds, settings.lumiLook.sounds, settings.soundVolume, settings.lumiCalm])
   lumiOnRef.current = lumiOn
+  // her look reaches every place she is drawn
+  useLayoutEffect(() => setLumiLook(settings.lumiLook), [settings.lumiLook])
   /** the demo panel: one of her moments, as if it had just happened */
   const lumiDemo = (mood: LumiMood, extra: Partial<IslandAlert> = {}) => {
     const s = say(mood, settings.callMe.trim() || 'Zhillan')
@@ -1911,6 +1915,7 @@ export default function App() {
               <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} own={{ deadlines, setDeadlines }} />
             )}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
+            {CAMPUS && tab === 'lumi' && <LumiWidget settings={settings} update={update} />}
             {tab === 'clipboard' && (
               <ClipboardWidget
                 items={clipboard.items}

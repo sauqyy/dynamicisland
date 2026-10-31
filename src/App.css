@@ -9270,6 +9270,132 @@ button.cu-new:not(:disabled):hover {
 .wx-rain .wx-bars {
   flex-basis: 100%;
 }
+
+/* ---------- the Lumi page: the preview on top, one short section under it ---------- */
+.lumi-page {
+  gap: 10px;
+}
+/* the section switcher sits in the middle, like the one on Timer */
+.lumi-page > .segmented {
+  flex: none;
+}
+.lumi-page .segmented.small button {
+  text-transform: none;
+}
+.lumi-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lumi-preview {
+  flex: 1;
+  height: 38px;
+  border-radius: 19px;
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.lumi-stage {
+  flex: none;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 48px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.lumi-stage:hover {
+  background: rgb(var(--fg-rgb) / 0.06);
+}
+.lumi-power {
+  flex: none;
+  display: flex;
+}
+.lumi-off {
+  margin: 4px 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+/* a row of chips: presets on Look, habits on Behaviour */
+.settings2 .set-card > .row.lumi-chips {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0;
+}
+.lumi-chips .todo-group-chip,
+.lumi-habit {
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.lumi-habit {
+  border-radius: 999px;
+  color: var(--text-2);
+  background: rgb(var(--fg-rgb) / 0.06);
+  transition: background 0.15s, color 0.15s;
+}
+.lumi-habit.on {
+  background: color-mix(in srgb, var(--accent, #4ade80) 22%, transparent);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--accent, #4ade80);
+}
+.lumi-more {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent, #4ade80);
+}
+.lumi-section .set-input {
+  width: 140px;
+}
+.lumi-section {
+  display: flex;
+  flex-direction: column;
+}
+.lumi-reset {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.lumi-reset:hover {
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: var(--fg);
+}
+.lumi-swatches {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.lumi-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.15);
+  cursor: pointer;
+}
+.lumi-swatch.on {
+  border-color: var(--accent, #0a84ff);
+}
+.lumi-swatch.custom {
+  background: none;
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+}
+
 /* ---------- to-do groups ---------- */
 .todo-group:not(.collapsed) > .todo-fold {
   grid-template-rows: 1fr;
