@@ -6,6 +6,7 @@ export type Tab =
   | 'today'
   | 'media'
   | 'weather'
+  | 'lumi'
   | 'timer'
   | 'todo'
   | 'notes'
@@ -33,7 +34,7 @@ type Group = { id: string; title: string; icon: string; pages: Tab[] }
  * don't need start hidden (see settings.ts).
  */
 const CAMPUS_GROUPS: Group[] = [
-  { id: 'home', title: 'Today', icon: '🏠', pages: ['today', 'media', 'weather'] },
+  { id: 'home', title: 'Today', icon: '🏠', pages: ['today', 'media', 'weather', 'lumi'] },
   { id: 'campus', title: 'Campus', icon: '🎓', pages: ['classes', 'deadlines', 'inbox'] },
   { id: 'focus', title: 'Focus', icon: '🎯', pages: ['todo', 'timer', 'notes', 'clipboard', 'deadlist', 'schedule', 'prompter'] },
   { id: 'social', title: 'People', icon: '👥', pages: ['friends', 'groups', 'profile'] },
@@ -60,6 +61,7 @@ const TITLES: Record<Tab, string> = {
   today: 'Today',
   media: 'Now Playing',
   weather: 'Weather',
+  lumi: 'Lumi',
   timer: 'Timer',
   todo: 'To-do',
   notes: 'Notes',
@@ -88,6 +90,7 @@ export const SHORT: Record<Tab, string> = {
   today: 'Today',
   media: 'Playing',
   weather: 'Weather',
+  lumi: 'Lumi',
   timer: 'Timer',
   todo: 'To-do',
   notes: 'Notes',
