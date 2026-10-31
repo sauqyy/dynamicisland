@@ -9270,3 +9270,181 @@ button.cu-new:not(:disabled):hover {
 .wx-rain .wx-bars {
   flex-basis: 100%;
 }
+/* ---------- to-do groups ---------- */
+.todo-group:not(.collapsed) > .todo-fold {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.todo-group > .todo-fold > .todo-fold-in > :last-child {
+  margin-bottom: 4px;
+}
+.todo-group-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 2px 4px;
+  border-radius: 10px;
+}
+.todo-group-head:hover {
+  background: rgb(var(--fg-rgb) / 0.04);
+}
+.todo-group-fold,
+.todo-group-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-2);
+  transition: background 0.15s, transform 0.2s, opacity 0.15s;
+}
+.todo-group-fold:hover,
+.todo-group-btn:hover {
+  background: var(--raised);
+}
+.todo-group:not(.collapsed) .todo-group-fold {
+  transform: rotate(90deg);
+}
+/* the add and remove buttons only show on the group being pointed at, so the list stays quiet */
+.todo-group-btn {
+  opacity: 0;
+}
+.todo-group-head:hover .todo-group-btn,
+.todo-group-btn:focus-visible {
+  opacity: 1;
+}
+.todo-group-name {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.todo-group-name:focus {
+  background: rgb(var(--fg-rgb) / 0.08);
+  text-transform: none;
+}
+.todo-group-count {
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.todo-group-empty {
+  padding: 4px 0 4px 34px;
+  color: var(--text-2);
+}
+.todo-group-new {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 4px 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-2);
+  transition: background 0.15s, color 0.15s;
+}
+.todo-group-new:hover {
+  background: rgb(var(--fg-rgb) / 0.08);
+  color: var(--fg);
+}
+.todo-group-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-2);
+}
+.todo-group-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-2);
+  background: rgb(var(--fg-rgb) / 0.06);
+  transition: background 0.15s, color 0.15s;
+}
+.todo-group-chip.on {
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+}
+
+/* a task dragged onto another one: they will be grouped when it is let go */
+.todo-item.drop-target,
+.todo-group-head.drop-target {
+  position: relative;
+  background: color-mix(in srgb, var(--accent, #4ade80) 14%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--accent, #4ade80);
+}
+.todo-item.drop-target::after,
+.todo-group-head.drop-target::after {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+  pointer-events: none;
+}
+.todo-item.drop-target::after {
+  content: 'Group together';
+}
+.todo-group-head.drop-target::after {
+  content: 'Move here';
+}
+
+/* while a task from a group is dragged: drop it here to take it out */
+.todo-ungroup-zone {
+  margin: 6px 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px dashed rgb(var(--fg-rgb) / 0.3);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.todo-ungroup-zone.drop-target {
+  border-style: solid;
+  border-color: var(--accent, #4ade80);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent, #4ade80) 14%, transparent);
+}
+/* after a drag-to-group: what happened, and a way to take it back */
+.todo-undo {
+  position: sticky;
+  bottom: 4px;
+  z-index: 2;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--raised, #2a2a2e);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+}
+.todo-undo button {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--accent, #4ade80);
+}
+.todo-undo button:hover {
+  background: rgb(var(--fg-rgb) / 0.08);
+}

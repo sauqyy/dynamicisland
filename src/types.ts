@@ -180,6 +180,15 @@ export interface Todo {
   note?: string  /** when it's due, ms; none for most to-dos */
   due?: number
   attachments?: TodoAttachment[]
+  /** the group it is filed under (TodoGroup id); none: the loose tasks at the top */
+  group?: string
+}
+
+export interface TodoGroup {
+  id: string
+  name: string
+  /** folded shut in the list */
+  collapsed?: boolean
 }
 
 export type PomoPhase = 'focus' | 'break' | 'long'
