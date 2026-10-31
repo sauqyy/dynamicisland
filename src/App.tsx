@@ -1353,7 +1353,7 @@ export default function App() {
     push: alertOrHold,
     nextClass: cls.next && cls.startsIn !== undefined ? { title: cls.next.title, start: now + cls.startsIn * 60_000 } : undefined,
   })
-  useFollowLocation({ enabled: settings.weatherAuto, lat: settings.cityLat, lon: settings.cityLon, update })
+  useFollowLocation({ enabled: settings.weatherAuto, city: settings.city, lat: settings.cityLat, lon: settings.cityLon, update })
   const { rest: lumiRest } = useLumiRoutines({
     enabled: lumiOn,
     nudges: settings.lumiNudges,
