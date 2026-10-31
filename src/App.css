@@ -273,8 +273,8 @@
 /* the row: picked up anywhere to reorder, ticked off by a click on the circle or the text */
 .todo-row {
   display: flex;
-  /* the circle, arrow and × line up with the task's first line, not the middle of task + due date */
-  align-items: flex-start;
+  /* the circle, arrow and × sit in the middle of the row, across the task and its due date */
+  align-items: center;
   gap: 10px;
   padding: 6px 8px;
   cursor: grab;
@@ -283,9 +283,6 @@
 /* one 20px line: the circle's height */
 .todo-row .todo-text {
   line-height: 20px;
-}
-.todo-row > .todo-more-btn {
-  margin-top: -1px;
 }
 .todo-row > .x {
   flex: none;
@@ -298,6 +295,9 @@
   height: 20px;
   border-radius: 50%;
   border: 2px solid rgb(var(--fg-rgb) / 0.45);
+  /* a button's own side padding leaves a 20px circle 4px of room, and the tick spills off to the right */
+  padding: 0;
+  box-sizing: border-box;
   font-size: 12px;
   line-height: 1;
   display: grid;
