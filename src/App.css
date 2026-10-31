@@ -5347,8 +5347,8 @@ button.sc-row:disabled:hover {
 .whatsnew.catchup {
   justify-content: flex-start;
   align-items: stretch;
-  gap: 16px;
-  padding: 22px 22px 14px;
+  gap: 12px;
+  padding: 18px 22px 14px;
   text-align: left;
 }
 .cu-head {
@@ -5367,6 +5367,7 @@ button.sc-row:disabled:hover {
 .cu-sum {
   margin: 0;
   font-size: 13px;
+  line-height: 1.4;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
