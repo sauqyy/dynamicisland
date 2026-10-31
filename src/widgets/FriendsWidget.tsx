@@ -68,7 +68,13 @@ export function dayLabel(iso: string) {
 
 export function noteText() {
   try {
-    return (localStorage.getItem('di.notes') ?? '').trim()
+    // several notes now: each one under its label, the open ones first
+    const list = JSON.parse(localStorage.getItem('di.notesList') ?? 'null') as { title: string; text: string; open?: boolean }[] | null
+    if (!Array.isArray(list)) return (localStorage.getItem('di.notes') ?? '').trim()
+    return [...list.filter((n) => n.open), ...list.filter((n) => !n.open)]
+      .filter((n) => n.text.trim())
+      .map((n) => (n.title.trim() ? `${n.title.trim()}\n${n.text.trim()}` : n.text.trim()))
+      .join('\n\n')
   } catch {
     return ''
   }

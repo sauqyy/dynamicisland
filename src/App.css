@@ -9379,6 +9379,84 @@ button.cu-new:not(:disabled):hover {
   color: var(--on-accent, #000);
 }
 
+/* ---------- several notes ---------- */
+.notes-list {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.note-card {
+  flex: none;
+  border-radius: 14px;
+  background: rgb(var(--fg-rgb) / 0.06);
+  transition: background 0.15s;
+}
+.note-card.open {
+  background: rgb(var(--fg-rgb) / 0.1);
+}
+.note-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+}
+.note-head .todo-group-btn {
+  opacity: 1;
+}
+.note-card.open .note-fold {
+  transform: rotate(90deg);
+}
+.note-title {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.note-title:focus {
+  background: rgb(var(--fg-rgb) / 0.08);
+}
+.note-peek {
+  flex: 0 1 40%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.note-card.open > .todo-fold {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.note-body {
+  width: 100%;
+  min-height: 110px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  padding: 0 14px 10px 36px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.note-body::placeholder {
+  color: rgb(var(--fg-rgb) / 0.4);
+}
+
 /* a task dragged onto another one: they will be grouped when it is let go */
 .todo-item.drop-target,
 .todo-group-head.drop-target {
