@@ -43,13 +43,13 @@ const H = 3600_000
 const NEEDS_MAX = 3
 const NEW_MAX = 4
 
-/** "Good morning" by the clock, and something kinder than "good night" for whoever is still up. */
+/** "Good morning" by the clock, and something warmer than "good night" for whoever is still up late. */
 function greeting(t: number) {
   const h = new Date(t).getHours()
   if (h >= 4 && h < 11) return 'Good morning'
   if (h >= 11 && h < 18) return 'Good afternoon'
   if (h >= 18 && h < 22) return 'Good evening'
-  return 'Still up'
+  return 'Late one tonight'
 }
 
 /** "Back to it, Demo." or, without a name, "Back to it." */
@@ -57,13 +57,13 @@ const named = (line: string, name: string, after = '') => `${line}${name ? `, ${
 
 /** Welcome backs after time away from the keyboard: one of these, a different one from last time. */
 const BACK_LINES = [
-  'Hope the break was a good one',
-  'Ready when you are',
-  'Back to it',
-  'Good to see you',
+  'Welcome back',
+  'So good to see you',
   'There you are',
-  'Picking up where you left off',
-  'The work kept you a seat',
+  'Hope that break was a good one',
+  'Missed you',
+  'Ready when you are',
+  'Right where you left off',
 ]
 const LAST_LINE_KEY = 'di.catchup.lastLine'
 /** A welcome back line, never the one shown last time. */
@@ -93,11 +93,11 @@ const DAY = 24 * 3600_000
  * things stand" on the first morning after, else the greeting the time of day calls for.
  */
 function titleFor(digest: CatchUpDigest, name: string, now: number, quiet: boolean, backLine: string) {
-  if (digest.kind === 'back') return quiet ? named('All quiet while you were away', name) : named(backLine, name)
-  if (now - digest.since >= 2 * DAY) return named("It's been a few days", name, "Let's catch you up.")
+  if (digest.kind === 'back') return quiet ? named('All calm while you were away', name) : named(backLine, name)
+  if (now - digest.since >= 2 * DAY) return named('Welcome back', name, "It's been a few days, so here's what you missed.")
   const morning = new Date(now).getHours() >= 4 && new Date(now).getHours() < 11
   const newDay = new Date(digest.since).toDateString() !== new Date(now).toDateString()
-  if (morning && newDay) return named('Good morning', name, "Here's where things stand.")
+  if (morning && newDay) return named('Good morning', name, "Hope you slept well. Here's your day.")
   return named(greeting(now), name)
 }
 
@@ -201,7 +201,10 @@ export function CatchUpCard({ digest, name, now, unread, meetings, sceleDue, own
   const title = titleFor(digest, name, now, fresh.length === 0, backLine)
 
   // the whole catch-up at a glance: how long, how much needs the user, how much is new
-  const away = hello ? `Last here ${when(digest.since, now)}` : `${span(digest.until - digest.since)} away`
+  const away = hello ? `Last here ${when(digest.since, now)}` : `Away for ${span(digest.until - digest.since)}`
+  // nothing came in and nothing is due: say so kindly, not as an empty report
+  const allClear = hello ? "Nothing new and nothing due today, so take it easy." : "Nothing new and nothing due today. You're all caught up."
+
 
   // a fade at the bottom when there's more than fits, so it's clear the list scrolls
   const body = useRef<HTMLDivElement>(null)
@@ -260,13 +263,14 @@ export function CatchUpCard({ digest, name, now, unread, meetings, sceleDue, own
         <b className="cu-title">{title}</b>
         <p className="cu-sum">
           {away}
+          {nothing && '. '}
+          {nothing && allClear}
           {counts.map((c, i) => (
             <span key={i}>
               {' · '}
               {c}
             </span>
           ))}
-          {nothing && ' · nothing new, nothing due today'}
         </p>
       </header>
 

@@ -28,10 +28,11 @@ export const SAY: Partial<Record<LumiMood, (n: string) => Say[]>> = {
     { title: 'Time to wind down', sub: 'Tomorrow will still have its deadlines. Rest.' },
   ],
   welcomeBack: (n) => [
-    { title: `Welcome back${hi(n)}!`, sub: 'I kept an eye on things for you.' },
-    { title: `There you are${hi(n)}`, sub: 'I missed you. Let me catch you up.' },
+    { title: `Welcome back${hi(n)}!`, sub: 'I looked after everything while you were gone.' },
+    { title: `There you are${hi(n)}`, sub: "I missed you. Let me tell you what's new." },
+    { title: `Hi${hi(n)}, you're back!`, sub: 'I hope you rested well. Ready when you are.' },
   ],
-  updated: () => [{ title: "I've got something new", sub: "A few things changed while you were away. Take a look." }],
+  updated: () => [{ title: "I've got something new for you", sub: 'A few things changed while you were away. Come and see!' }],
 
   class1h: () => [{ title: 'Class in 1 hour', sub: 'Pemrograman Web · Room 2.2301' }],
   class10m: () => [{ title: 'Class in 10 minutes', sub: 'Pemrograman Web · Room 2.2301. Time to head over.' }],
