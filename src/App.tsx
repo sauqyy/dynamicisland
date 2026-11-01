@@ -1119,8 +1119,12 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Escape steps back one level at a time: out of fullscreen, then out of an open chat (back to the list, the
+      // island still open), and only then closes the island
       if (e.key === 'Escape') {
+        const inChat = (tabRef.current === 'friends' || tabRef.current === 'groups') && Boolean(openChatRef.current.friend || openChatRef.current.group)
         if (fsRef.current) exitFullscreen()
+        else if (inChat && expandedRef.current) setOpenChat({ friend: null, group: null })
         else setExpanded(false)
       }
       if (!fsRef.current && !document.querySelector('.chat') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
@@ -1492,6 +1496,8 @@ export default function App() {
   const isSocial = (t: Tab) => t === 'friends' || t === 'groups'
   const chatSwitch = useRef(false)
   chatSwitch.current = Boolean(openChat.friend || openChat.group)
+  const openChatRef = useRef(openChat)
+  openChatRef.current = openChat
   const soundState = useRef({ expanded, tab })
   useEffect(() => {
     const was = soundState.current
