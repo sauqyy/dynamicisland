@@ -4,7 +4,7 @@ import type { LumiMood } from '../mascot/lumi/moods'
 /** the forecast is read in quarter-hours */
 const STEP = 15 * 60_000
 /** millimetres in a quarter-hour: below this it is not worth mentioning */
-const WET = 0.12
+export const WET = 0.12
 
 export const isRainCode = (code: number) => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95
 
@@ -26,7 +26,7 @@ export interface RainEvent {
 }
 
 /** the location's own clock: Open-Meteo gives times in the place's time zone, and we keep that offset */
-const offsetOf = (w: Weather) => w.utcOffset ?? -new Date().getTimezoneOffset() * 60
+export const offsetOf = (w: Weather) => w.utcOffset ?? -new Date().getTimezoneOffset() * 60
 const hourAt = (w: Weather, ms: number) => new Date(ms + offsetOf(w) * 1000).getUTCHours()
 const dateAt = (w: Weather, ms: number) => new Date(ms + offsetOf(w) * 1000).toISOString().slice(0, 10)
 /** "14:30", in the place's own time */
@@ -94,6 +94,40 @@ export function nextRain(w: Weather, now: number): RainEvent | null {
   }
   const next = runs.find((r) => r.start > now)
   return next ? mk(next, false) : null
+}
+
+/** Lumi's advice on the rain chart: when to head out, and the window on the chart it means. */
+export interface GoAdvice {
+  mood: 'rainSoon' | 'rainNow' | 'rainEnds'
+  text: string
+  /** the dry window to go in (shaded on the chart), or null when there is none in the next three hours */
+  from: number | null
+  to: number | null
+}
+
+/**
+ * Not the forecast again, but what to do with it: go now while it's dry, wait for it to pass, or take the
+ * umbrella because there's no dry spell worth waiting for. Looks three hours ahead, like the chart.
+ */
+export function goAdvice(w: Weather, ev: RainEvent | null, now: number): GoAdvice | null {
+  if (!ev) return null
+  const horizon = now + 3 * 3600_000
+  // when the next rain after `t` begins, or the end of the window
+  const dryUntil = (t: number) => slotsOf(w).find((s) => s.at >= t && s.at < horizon && s.mm >= WET)?.at ?? horizon
+  // "25 min", "about an hour", "about 2 hours"
+  const mins = (ms: number) => inWords((ms - now) / 60_000).replace(/^in /, '').replace(/ minutes$/, ' min')
+  if (ev.now) {
+    if (ev.end && ev.end < horizon) {
+      const wait = (ev.end - now) / 60_000
+      return wait <= 45
+        ? { mood: 'rainEnds', text: `Worth waiting: dry from ${clockAt(w, ev.end)}, in ${mins(ev.end)}`, from: ev.end, to: dryUntil(ev.end) }
+        : { mood: 'rainNow', text: `Take the umbrella if you go now. Dry from ${clockAt(w, ev.end)}`, from: ev.end, to: dryUntil(ev.end) }
+    }
+    return { mood: 'rainNow', text: 'No dry spell in the next 3 hours: take the umbrella', from: null, to: null }
+  }
+  if (ev.start - now >= 15 * 60_000) return { mood: 'rainSoon', text: `Go before ${clockAt(w, ev.start)}: dry for ${mins(ev.start)}`, from: now, to: ev.start }
+  if (ev.end && ev.end < horizon) return { mood: 'rainSoon', text: `Too close to beat it: wait until ${clockAt(w, ev.end)}, or take the umbrella`, from: ev.end, to: dryUntil(ev.end) }
+  return { mood: 'rainNow', text: 'It sets in for hours: take the umbrella', from: null, to: null }
 }
 
 /** today's rain, hour by hour, from now: is it a rainy day? */
