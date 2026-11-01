@@ -202,6 +202,8 @@ const PREFS_KEY = 'di.scele.prefs'
 const LEAD_KEY = 'di.scele.lead'
 /** what has been seen or alerted already, so a restart does not repeat it */
 const SEEN_KEY = 'di.scele.seen'
+/** the newest SCELE notification the user has looked at on the Inbox page: it and everything before it count as read */
+const INBOX_KEY = 'di.scele.inboxRead'
 
 /**
  * Deadlines, notifications and what changed on this term's course pages are checked this often,
@@ -475,6 +477,12 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
   /** reading SLCM: how far it has got; null when not reading */
   const [slcmStage, setSlcmStage] = useState<SlcmStage | null>(null)
   const seen = useRef<Seen>(read(SEEN_KEY, noSeen()))
+  // SCELE is only ever read from (see scele.rs), so it can't be told a notification was seen: the island keeps that
+  const [inboxRead, setInboxRead] = useState<number>(() => read(INBOX_KEY, 0))
+  const forgetInboxRead = () => {
+    setInboxRead(0)
+    write(INBOX_KEY, 0)
+  }
   const alertRef = useRef(onAlert)
   alertRef.current = onAlert
   const prefsRef = useRef(prefs)
@@ -504,6 +512,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
       setPrefs(NO_PREFS)
       seen.current = noSeen()
       write(SEEN_KEY, seen.current)
+      forgetInboxRead()
       setSlcm(null)
       return
     }
@@ -958,6 +967,7 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     sceleLogout().catch(() => {})
     seen.current = noSeen()
     write(SEEN_KEY, seen.current)
+    forgetInboxRead()
     signedOut()
   }, [signedOut])
 
@@ -1022,10 +1032,24 @@ export function useScele(onAlert: Alert, enabled: boolean | undefined) {
     setSlcm(null)
   }, [])
 
+  // notifications already looked at on the Inbox page are read, whatever SCELE says
+  const notices = useMemo(() => data.notices.map((n) => (n.read || n.id > inboxRead ? n : { ...n, read: true })), [data.notices, inboxRead])
+  /** the Inbox page has been looked at: every notification on it now counts as read (later ones won't) */
+  const markInboxRead = useCallback(() => {
+    const newest = data.notices.reduce((m, n) => Math.max(m, n.id), 0)
+    setInboxRead((was) => {
+      const next = Math.max(was, newest)
+      write(INBOX_KEY, next)
+      return next
+    })
+  }, [data.notices])
+
   const tuned = prefs.dismissed.length > 0 || Object.keys(prefs.choice).length > 0 || Object.keys(prefs.primary).length > 0 || Object.keys(prefs.teaching).length > 0 || prefs.hidden.length > 0
   return {
     account,
     ...data,
+    notices,
+    markInboxRead,
     slots,
     duplicates,
     unsure,

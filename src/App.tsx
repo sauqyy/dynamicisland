@@ -710,6 +710,13 @@ export default function App() {
     return scele.deadlines.filter((d) => d.due > now && d.due < midnight && d.submission !== 'submitted').length
   }, [scele.deadlines, now])
   const sceleUnreadCount = scele.notices.filter((n) => !n.read).length
+  // looking at the Inbox page for a second reads it: its count goes (a glance passing through doesn't)
+  const markInboxRead = scele.markInboxRead
+  useEffect(() => {
+    if (!expanded || tab !== 'inbox' || !sceleUnreadCount || !markInboxRead) return
+    const t = setTimeout(markInboxRead, 1000)
+    return () => clearTimeout(t)
+  }, [expanded, tab, sceleUnreadCount, markInboxRead])
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
