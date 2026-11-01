@@ -55,7 +55,7 @@ import { useGroupRing } from './lib/useGroupRing'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { playJoin, playLeave } from './lib/callSounds'
 import { useClipboard } from './lib/useClipboard'
-import { Rail } from './island/Rail'
+import { Rail, type PageCounts } from './island/Rail'
 import { MascotEyes } from './mascot/MascotEyes'
 import { LumiFace } from './mascot/lumi/LumiFace'
 import { setLumiLook } from './mascot/lumi/lumiLook'
@@ -709,7 +709,7 @@ export default function App() {
     const midnight = new Date(now).setHours(24, 0, 0, 0)
     return scele.deadlines.filter((d) => d.due > now && d.due < midnight && d.submission !== 'submitted').length
   }, [scele.deadlines, now])
-  const sceleUnread = scele.notices.some((n) => !n.read)
+  const sceleUnreadCount = scele.notices.filter((n) => !n.read).length
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
@@ -1203,6 +1203,19 @@ export default function App() {
     Object.values(social.unread).reduce((a, b) => a + b, 0) +
     (DEMO_SOCIAL ? 0 : Object.values(groupChats.unread).reduce((a, b) => a + b, 0) + groupChats.invites.length)
   // who wrote while the user was away, for the catch-up: friends, then groups
+  // what is new on each page, for the rail: the page says how many, and its group adds them up
+  const friendMsgs = Object.values(social.unread).reduce((a, b) => a + b, 0)
+  const groupMsgs = DEMO_SOCIAL ? 0 : Object.values(groupChats.unread).reduce((a, b) => a + b, 0)
+  const groupInvites = DEMO_SOCIAL ? 0 : groupChats.invites.length
+  const pageCounts = useMemo<PageCounts>(() => {
+    const c: PageCounts = {}
+    const say = (n: number, one: string, many: string) => (n ? [`${n} ${n === 1 ? one : many}`] : [])
+    const friends = friendMsgs + social.incoming.length
+    if (friends) c.friends = { n: friends, label: [...say(friendMsgs, 'unread message', 'unread messages'), ...say(social.incoming.length, 'friend request', 'friend requests')].join(', ') }
+    if (groupMsgs + groupInvites) c.groups = { n: groupMsgs + groupInvites, label: [...say(groupMsgs, 'unread message', 'unread messages'), ...say(groupInvites, 'group invite', 'group invites')].join(', ') }
+    if (sceleUnreadCount) c.inbox = { n: sceleUnreadCount, label: say(sceleUnreadCount, 'new SCELE notification', 'new SCELE notifications')[0] }
+    return c
+  }, [friendMsgs, groupMsgs, groupInvites, social.incoming.length, sceleUnreadCount])
   const unreadFrom = useMemo<UnreadFrom[]>(
     () => [
       ...social.friends
@@ -2016,7 +2029,8 @@ export default function App() {
                 const g = groups.find((x) => x.id === id)!
                 setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
               }}
-              dots={[...(unreadCount > 0 ? ['social'] : []), ...(sceleUnread ? ['campus'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+              dots={[...(updater.state.s === 'available' ? ['settings'] : [])]}
+              counts={pageCounts}
             />
         </div>
         {astraIntro && (
