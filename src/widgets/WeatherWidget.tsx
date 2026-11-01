@@ -10,6 +10,7 @@ import { agreement, clockAt, goAdvice, inWords, isSure, nextRain, offsetOf } fro
 import { CAMPUS } from '../lib/campus'
 import { LumiFace } from '../mascot/lumi/LumiFace'
 import { RainTimeline } from './RainTimeline'
+import { Toggle } from './SettingsWidget'
 import { WeatherIcon, isNight } from './WeatherIcon'
 
 interface Props {
@@ -192,6 +193,7 @@ export function WeatherWidget({ settings, update }: Props) {
           {weather.city} · {unit}
         </button>
       </div>
+      {!settings.weatherAsked && <NotifyAsk lumi={lumi} onAnswer={(yes) => update({ weatherAlerts: yes, weatherAsked: true })} />}
       {(rainLine || rainText) && (
         <div className="wx-rain">
           {/* Lumi says what to do about it (go now, wait, or take the umbrella); her mood is the situation at a glance */}
@@ -215,6 +217,45 @@ export function WeatherWidget({ settings, update }: Props) {
         </div>
       )}
       <TempCurve hours={weather.hourly} now={start} />
+      {/* the answer to the question above, to change any time (it is in Settings too) */}
+      {settings.weatherAsked && (
+        <div className="row wx-notify">
+          <div className="row-text">
+            <span>{lumi ? 'Weather heads-ups from Lumi' : 'Weather alerts'}</span>
+            <small>Rain on its way and when it stops, storms, strong sun, heat</small>
+          </div>
+          <Toggle on={settings.weatherAlerts} onChange={(v) => update({ weatherAlerts: v })} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Asked once, the first time the Weather page is opened: weather alerts are off until the user says yes. */
+function NotifyAsk({ lumi, onAnswer }: { lumi: boolean; onAnswer: (yes: boolean) => void }) {
+  return (
+    <div className="wx-ask" role="group" aria-label="Weather alerts">
+      {lumi ? (
+        <span className="wx-ask-lumi">
+          <LumiFace mood="rainSoon" height={40} body still follow={false} />
+        </span>
+      ) : (
+        <CloudRain size={18} aria-hidden />
+      )}
+      <span className="wx-ask-text">
+        <b>{lumi ? 'Want Lumi to keep you posted on the weather?' : 'Get alerts about the weather?'}</b>
+        <small>
+          {lumi ? "She'll tell you" : "You'll hear"} when rain is on its way and when it stops, and about storms, strong sun and heat. You can change this here any time.
+        </small>
+        <span className="wx-ask-acts">
+          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => onAnswer(false)}>
+            Not now
+          </button>
+          <button className="chip on" data-cuelume-open onClick={() => onAnswer(true)}>
+            {lumi ? 'Yes, keep me posted' : 'Yes, alert me'}
+          </button>
+        </span>
+      </span>
     </div>
   )
 }

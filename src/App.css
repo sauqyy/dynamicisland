@@ -9312,6 +9312,68 @@ button.cu-new:not(:disabled):hover {
 .wx-rain .rt {
   flex-basis: 100%;
 }
+/* the one-time question: weather alerts are off until the user says yes */
+.wx-ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-tile);
+  background: color-mix(in srgb, var(--accent, #4ade80) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent, #4ade80) 30%, transparent);
+}
+.wx-ask > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--info);
+}
+.wx-ask-lumi {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  margin: -2px -2px 0 -4px;
+}
+.wx-ask-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: var(--fs-body);
+}
+.wx-ask-text small {
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+}
+.wx-ask-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* the answer, to change any time: laid out like a row in Settings */
+.wx-notify {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.wx-notify .row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wx-notify .row-text small {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
 /* which forecasts it is the middle of: the full list on hover */
 .wx-src {
   flex-basis: 100%;
