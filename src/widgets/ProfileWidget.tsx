@@ -56,11 +56,11 @@ function KeptList({ kept, onDisconnect }: { kept: Kept; onDisconnect: () => void
       <ul>
         <li>
           <span>SSO UI</span>
-          <small>Your name, NPM and study programme, in the island's settings folder</small>
+          <small>Your name, NPM and study programme, in the island's settings folder (encrypted with your Windows account)</small>
         </li>
         <li>
           <span>SCELE</span>
-          <small>{kept.scele ? `A sign-in token for ${kept.scele}, in your system's credential store (Windows Credential Manager)` : 'Nothing: not connected'}</small>
+          <small>{kept.scele ? `A sign-in token for ${kept.scele}, in your system's credential store (on Windows, programs running as you can read it there)` : 'Nothing: not connected'}</small>
         </li>
         <li>
           <span>SLCM</span>
@@ -81,7 +81,7 @@ function KeptList({ kept, onDisconnect }: { kept: Kept; onDisconnect: () => void
       </ul>
       {asking ? (
         <div className="kept-confirm">
-          <small>This signs you out of SSO UI, SCELE and SLCM here and deletes everything above. Campus locks until you verify again.</small>
+          <small>This signs you out of SSO UI, SCELE and SLCM here and deletes everything above. Campus locks until you verify again. SCELE's Security keys page then opens in your browser: delete the “Moodle mobile web service” key there too, so the token stops working everywhere.</small>
           <span className="kept-acts">
             <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAsking(false)}>
               Cancel

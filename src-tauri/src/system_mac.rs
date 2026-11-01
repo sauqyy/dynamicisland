@@ -5,6 +5,13 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
+/// macOS password managers mark what they copy as concealed on the pasteboard; that isn't read here
+/// yet, so the shelf relies on its look-alike filter (`looksSecret` in useClipboard.ts) there.
+#[tauri::command]
+pub fn clipboard_private() -> bool {
+    false
+}
+
 #[derive(Serialize, Clone, PartialEq)]
 struct Battery {
     /// 0–100

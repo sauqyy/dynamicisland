@@ -19,8 +19,15 @@ const fileName = (url: string) => `${url.replace(/^https?:\/\//, '').replace(/[^
 
 const folder = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('models', { create: true })
 
+/**
+ * The ONNX runtime's script and wasm come with the app (see vite.config.ts), not from a CDN: nothing from
+ * outside the app may run in it (the Content-Security-Policy in tauri.conf.json enforces that too).
+ */
+export const ORT_PATH = new URL('/ort/', self.location.href).href
+
 /** Call once at the top of each worker that loads a model. */
 export function useDiskCache() {
+  if (env.backends.onnx.wasm) env.backends.onnx.wasm.wasmPaths = ORT_PATH
   env.useCustomCache = true
   env.customCache = {
     async match(request: string) {

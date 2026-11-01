@@ -25,10 +25,12 @@ fn encode_png(rgba: &[u8], w: u32, h: u32) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// Describes files dropped onto the island; only granted paths (see grants.rs) are looked at.
 #[tauri::command(async)]
-pub fn file_info(paths: Vec<String>) -> Vec<FileInfo> {
+pub fn file_info(app: tauri::AppHandle, paths: Vec<String>) -> Vec<FileInfo> {
     paths
         .into_iter()
+        .filter(|p| crate::grants::is_granted(&app, p))
         .map(|path| {
             let meta = std::fs::metadata(&path).ok();
             FileInfo {
@@ -45,15 +47,27 @@ pub fn file_info(paths: Vec<String>) -> Vec<FileInfo> {
         .collect()
 }
 
-/// Opens a file, folder or app with its default handler.
+/// Opens a file, folder or app with its default handler: one the user dropped or allowed before,
+/// or else once they say yes in the system's own dialog (see grants.rs).
 #[tauri::command]
-pub fn open_path(path: String) {
-    let _ = Command::new("open").arg(path).spawn();
+pub async fn open_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // absolute, so a path can never be read as one of open's options
+        if !path.starts_with('/') || !crate::grants::may_open(&app, &path) {
+            return Err("Not opened".to_string());
+        }
+        Command::new("open").arg(&path).spawn().map(|_| ()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn reveal_path(path: String) {
-    let _ = Command::new("open").args(["-R", &path]).spawn();
+pub fn reveal_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    if !path.starts_with('/') || !(crate::grants::is_granted(&app, &path) || crate::grants::plain(&path)) {
+        return Err("Not shown".into());
+    }
+    Command::new("open").args(["-R", &path]).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 /// A small translucent square used as the ghost image while dragging a file out of the shelf.

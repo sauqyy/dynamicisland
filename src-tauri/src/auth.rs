@@ -46,7 +46,7 @@ pub async fn oauth_wait() -> Result<String, String> {
             let body = if find("code").is_some() { DONE_PAGE } else { "<!doctype html><title>Astra Isle</title>Waiting…" };
             let _ = write!(
                 stream,
-                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'none'; style-src 'unsafe-inline'\r\nConnection: close\r\n\r\n{}",
                 body.len(),
                 body
             );

@@ -11,8 +11,21 @@ use tauri::{AppHandle, Manager};
 
 const CAS: &str = "https://sso.ui.ac.id/cas2";
 const PORT: u16 = 53683;
-/// Must be the same string for the login and the ticket check.
-const SERVICE: &str = "http://127.0.0.1:53683/sso";
+
+/// A fresh, unguessable code for one sign-in, put in the CAS service address. CAS issues a ticket
+/// for exactly that address and checks it again on validation, so a ticket from anyone else's
+/// sign-in (a page sending the browser here with an attacker's own ticket) can't be passed off as
+/// this one: the island would otherwise "verify" the user as the attacker.
+fn nonce() -> Result<String, String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).map_err(|_| "no secure random numbers on this computer".to_string())?;
+    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
+}
+
+/// The CAS service address for one sign-in; the same string for the login and the ticket check.
+fn service(nonce: &str) -> String {
+    format!("http://127.0.0.1:{PORT}/sso?s={nonce}")
+}
 
 const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Dynamic Island</title>\
 <body style=\"font-family:Segoe UI,sans-serif;background:#111;color:#fff;display:grid;place-items:center;height:100vh;margin:0\">\
@@ -56,7 +69,7 @@ pub struct Student {
 }
 
 pub fn save(app: &AppHandle, s: &Student) -> Result<(), String> {
-    std::fs::write(path(app)?, serde_json::to_string(s).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+    crate::seal::write(&path(app)?, &serde_json::to_string(s).map_err(|e| e.to_string())?)
 }
 
 fn path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -67,7 +80,7 @@ fn path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 
 /// The verified student saved on this computer, if any.
 pub fn saved(app: &AppHandle) -> Option<Student> {
-    serde_json::from_str(&std::fs::read_to_string(path(app).ok()?).ok()?).ok()
+    serde_json::from_str(&crate::seal::read(&path(app).ok()?)?).ok()
 }
 
 fn unescape(s: &str) -> String {
@@ -123,8 +136,9 @@ fn attributes(xml: &str) -> Vec<(String, String)> {
     out
 }
 
-/// Waits (up to 3 minutes) for CAS to send the browser back here and returns the service ticket.
-fn wait_for_ticket(listener: &TcpListener) -> Result<String, String> {
+/// Waits (up to 3 minutes) for CAS to send the browser back here, for this sign-in's `nonce`, and
+/// returns the service ticket.
+fn wait_for_ticket(listener: &TcpListener, nonce: &str) -> Result<String, String> {
     let started = Instant::now();
     loop {
         if started.elapsed() > Duration::from_secs(180) {
@@ -143,14 +157,13 @@ fn wait_for_ticket(listener: &TcpListener) -> Result<String, String> {
         let n = stream.read(&mut buf).unwrap_or(0);
         let req = String::from_utf8_lossy(&buf[..n]);
         let target = req.lines().next().and_then(|l| l.split_whitespace().nth(1)).unwrap_or("");
-        let ticket = target
-            .strip_prefix("/sso?")
-            .and_then(|q| q.split('&').find_map(|kv| kv.strip_prefix("ticket=")))
-            .map(str::to_string);
+        let query = target.strip_prefix("/sso?").unwrap_or("");
+        let ours = query.split('&').any(|kv| kv.strip_prefix("s=") == Some(nonce));
+        let ticket = query.split('&').find_map(|kv| kv.strip_prefix("ticket=")).filter(|_| ours).map(str::to_string);
         let body = if ticket.is_some() { DONE_PAGE } else { "<!doctype html><title>Dynamic Island</title>Waiting…" };
         let _ = write!(
             stream,
-            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'none'; style-src 'unsafe-inline'\r\nConnection: close\r\n\r\n{}",
             body.len(),
             body
         );
@@ -161,13 +174,13 @@ fn wait_for_ticket(listener: &TcpListener) -> Result<String, String> {
     }
 }
 
-fn check_ticket(ticket: &str) -> Result<Student, String> {
+fn check_ticket(ticket: &str, service: &str) -> Result<Student, String> {
     if !ticket.starts_with("ST-") || ticket.contains(['&', '#', ' ']) {
         return Err("SSO sent an unexpected ticket".into());
     }
     let xml = ureq::get(&format!("{CAS}/serviceValidate"))
         .query("ticket", ticket)
-        .query("service", SERVICE)
+        .query("service", service)
         .timeout(Duration::from_secs(20))
         .call()
         .map_err(|_| "SSO UI is unreachable".to_string())?
@@ -226,9 +239,11 @@ pub async fn sso_verify(app: AppHandle) -> Result<Student, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let listener = TcpListener::bind(("127.0.0.1", PORT)).map_err(|e| format!("port {PORT} is busy: {e}"))?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
-        crate::auth::open_url(format!("{CAS}/login?service=http%3A%2F%2F127.0.0.1%3A{PORT}%2Fsso"))?;
-        let ticket = wait_for_ticket(&listener)?;
-        let student = check_ticket(&ticket)?;
+        let nonce = nonce()?;
+        let service = service(&nonce);
+        crate::auth::open_url(format!("{CAS}/login?service=http%3A%2F%2F127.0.0.1%3A{PORT}%2Fsso%3Fs%3D{nonce}"))?;
+        let ticket = wait_for_ticket(&listener, &nonce)?;
+        let student = check_ticket(&ticket, &service)?;
         // someone else signed in than the student verified before: nothing of theirs carries over
         // (SCELE token, SLCM timetable, UI sessions)
         if saved(&app).is_some_and(|before| before.username != student.username) {
@@ -258,7 +273,7 @@ pub async fn sso_forget(app: AppHandle) {
     if let Ok(p) = path(&app) {
         let _ = std::fs::remove_file(p);
     }
-    crate::scele::forget_token(&app);
+    crate::scele::disconnect(&app);
     crate::slcm::forget(&app);
     forget_ui_sessions(&app);
 }
