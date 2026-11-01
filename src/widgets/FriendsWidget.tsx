@@ -15,6 +15,7 @@ import { ChatInput } from './ChatInput'
 import { ProfileAvatar, ProfileOpener, ProfileView } from './ProfileView'
 import { play } from 'cuelume'
 import { disclosureCue } from '../lib/sound'
+import { useChatDraft, useStickToBottom } from '../lib/chatUi'
 
 export interface OpenChat {
   friend: string | null
@@ -106,7 +107,8 @@ function Bubble({ m, mine }: { m: Message; mine: boolean }) {
 }
 
 function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; call?: Call; voiceBusy?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
-  const [draft, setDraft] = useState('')
+  // what is typed stays with this chat when the user goes to another page and comes back
+  const [draft, setDraft] = useChatDraft(`${me}:f:${friend.profile.id}`)
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const end = useRef<HTMLDivElement>(null)
@@ -120,11 +122,9 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
     }
   }, [friend.profile.id, open])
 
-  useEffect(() => {
-    // scroll the list itself; scrollIntoView would also scroll the page and push the chat header under the date bar
-    const el = end.current?.parentElement
-    if (el) el.scrollTop = el.scrollHeight
-  }, [list?.length])
+  // the list itself scrolls (scrollIntoView would also scroll the page and push the chat header under the date bar),
+  // and stays at the latest message when the card goes fullscreen and back
+  useStickToBottom(end, [list?.length])
 
   // a new message from them while the chat is open
   const lastId = useRef<number | null>(null)
