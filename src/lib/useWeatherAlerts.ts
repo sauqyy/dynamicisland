@@ -92,7 +92,11 @@ export function useFollowLocation({ enabled, city, lat, lon, update }: { enabled
         const p = await detectPlace({ allowNetwork: true })
         if (!alive) return
         const was = here.current
-        if (was.lat == null || was.lon == null || kmBetween({ lat: was.lat, lon: was.lon }, p) > MOVED_KM || (isPlaceholderName(was.city) && !isPlaceholderName(p.name))) update({ city: p.name, cityLat: p.lat, cityLon: p.lon })
+        const moved = was.lat == null || was.lon == null || kmBetween({ lat: was.lat, lon: was.lon }, p) > MOVED_KM
+        // the device's own fix names the place more closely (the kelurahan, where an older version saved the
+        // kecamatan): take its name, and its point, even without a move; a guess from the network never replaces it
+        const closer = p.how === 'device' && p.name !== was.city && !isPlaceholderName(p.name)
+        if (moved || closer || (isPlaceholderName(was.city) && !isPlaceholderName(p.name))) update({ city: p.name, cityLat: p.lat, cityLon: p.lon })
       } catch {
         /* no fix this time */
       }

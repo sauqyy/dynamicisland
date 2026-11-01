@@ -61,20 +61,25 @@ const getJson = async <T,>(url: string): Promise<T> => {
   if (!res.ok) throw new Error(`${res.status}`)
   return (await res.json()) as T
 }
-/** the services that can name a point, tried in turn: if one is down or blocked, the next one answers */
+/**
+ * The services that can name a point, tried in turn: if one is down or blocked, the next one answers. The most
+ * local name wins: the kelurahan or desa ("Rempoa"), not the kecamatan around it ("Ciputat Timur"), which is what
+ * a phone shows too. OpenStreetMap knows the kelurahan; BigDataCloud stops at the kecamatan, so it comes second.
+ * (Smaller still, an RW or RT, is a number, not a place anyone would recognise.)
+ */
 const NAMERS: Namer[] = [
+  async (lat, lon) => {
+    const r = await getJson<{ address?: Record<string, string> }>(
+      `https://nominatim.openstreetmap.org/reverse?${new URLSearchParams({ lat: String(lat), lon: String(lon), format: 'jsonv2', zoom: '14', 'accept-language': 'id,en' })}`,
+    )
+    const a = r.address ?? {}
+    return a.village || a.suburb || a.quarter || a.hamlet || a.city_district || a.town || a.city || a.county || a.state
+  },
   async (lat, lon) => {
     const r = await getJson<{ city?: string; locality?: string; principalSubdivision?: string }>(
       `https://api.bigdatacloud.net/data/reverse-geocode-client?${new URLSearchParams({ latitude: String(lat), longitude: String(lon), localityLanguage: 'en' })}`,
     )
     return r.locality || r.city || r.principalSubdivision
-  },
-  async (lat, lon) => {
-    const r = await getJson<{ address?: Record<string, string> }>(
-      `https://nominatim.openstreetmap.org/reverse?${new URLSearchParams({ lat: String(lat), lon: String(lon), format: 'jsonv2', zoom: '14', 'accept-language': 'en' })}`,
-    )
-    const a = r.address ?? {}
-    return a.suburb || a.city_district || a.village || a.town || a.city || a.county || a.state
   },
 ]
 
