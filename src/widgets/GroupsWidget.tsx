@@ -13,6 +13,7 @@ import { ChatInput } from './ChatInput'
 import { HeadphonesIcon } from './CallBar'
 import { VoiceBar } from './VoiceBar'
 import { dayLabel, dayStart, noteText, Ticks, timeLabel } from './FriendsWidget'
+import { useChatDraft, useStickToBottom } from '../lib/chatUi'
 
 const ICONS = ['👥', '📚', '🎮', '🎧', '🎨', '💻', '⚽', '🍕', '🎬', '✈️', '🏠', '💼', '🔥', '🌙', '🚀', '🐱']
 
@@ -228,7 +229,7 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
 }
 
 export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText, onBack, fullscreen, onFullscreen }: { group: Group; me: string; groups: Groups; voice?: GroupVoice; voiceBlocked?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useChatDraft(`${me}:g:${group.id}`)
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const [info, setInfo] = useState(false)
@@ -248,11 +249,9 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
     }
   }, [group.id, open])
 
-  useEffect(() => {
-    // scroll the list itself; scrollIntoView would also scroll the page and push the chat header under the date bar
-    const el = end.current?.parentElement
-    if (el) el.scrollTop = el.scrollHeight
-  }, [list?.length, info])
+  // the list itself scrolls (scrollIntoView would also scroll the page and push the chat header under the date bar),
+  // and stays at the latest message when the card goes fullscreen and back
+  useStickToBottom(end, [list?.length, info])
 
   const send = async (kind: Message['kind'], body: string) => {
     const e = await groups.send(group.id, kind, body)
