@@ -63,10 +63,12 @@ pub async fn oauth_wait() -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
-/// Opens an https link in the default browser.
+/// Opens an https link in the default browser, or the one Windows settings page the app points people to
+/// (where location is switched on for desktop apps).
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
-    if !url.starts_with("https://") || url.contains(['"', '\'', '`', '\n', '\r', ' ']) {
+    let settings_page = cfg!(windows) && url == "ms-settings:privacy-location";
+    if !settings_page && (!url.starts_with("https://") || url.contains(['"', '\'', '`', '\n', '\r', ' '])) {
         return Err("unsupported url".into());
     }
     #[cfg(windows)]
