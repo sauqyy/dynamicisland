@@ -6,7 +6,7 @@ import { CloudRain, Droplets, LocateFixed, MapPin, Wind } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { LocationError, detectPlace, timezoneGuess, type Place } from '../lib/location'
 import { IS_TAURI } from '../lib/useMedia'
-import { clockAt, goAdvice, inWords, nextRain, offsetOf } from '../lib/weatherOutlook'
+import { agreement, clockAt, goAdvice, inWords, isSure, nextRain, offsetOf } from '../lib/weatherOutlook'
 import { CAMPUS } from '../lib/campus'
 import { LumiFace } from '../mascot/lumi/LumiFace'
 import { RainTimeline } from './RainTimeline'
@@ -141,9 +141,13 @@ export function WeatherWidget({ settings, update }: Props) {
     : !ev
       ? 'No rain expected for the next 12 hours'
       : ev.now
-        ? `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}${more}.` : 'It looks like it will last for hours.'}`
+        ? !isSure(ev)
+          ? `${cap(ev.strength)} rain possible now (${agreement(weather, ev)})${ev.end ? `, until about ${clockAt(weather, ev.end)}` : ''}.`
+          : `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}${more}.` : 'It looks like it will last for hours.'}`
         : evMins <= 480
-          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}${more}.`
+          ? isSure(ev)
+            ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}${more}.`
+            : `${cap(ev.strength)} rain possible ${inWords(evMins)} (${agreement(weather, ev)})${ev.end ? `, until about ${clockAt(weather, ev.end)}` : ''}.`
           : 'No rain expected for the next 8 hours'
   // the chart and Lumi's advice cover the next three hours
   const chart = !!weather.rain15 && !!ev && (ev.now || evMins <= 180)
@@ -193,13 +197,20 @@ export function WeatherWidget({ settings, update }: Props) {
             <span>{rainLine || rainText}</span>
             {advice && <b className="wx-go">{advice.text}</b>}
           </span>
-          {chart && <RainTimeline slots={weather.rain15!} event={ev} clock={(ms) => clockAt(weather, ms)} utcOffset={offsetOf(weather)} go={advice} />}
+          {chart && <RainTimeline slots={weather.rain15!} event={ev} clock={(ms) => clockAt(weather, ms)} utcOffset={offsetOf(weather)} go={advice} sources={weather.sources?.length} />}
+          {chart && weather.sources && weather.sources.length > 1 && (
+            <span className="wx-src" title={weather.sources.join(' · ')}>
+              The middle of {weather.sources.length} forecasts{weather.sources.some((s) => s.startsWith('BMKG')) ? `, including ${weather.sources.find((s) => s.startsWith('BMKG'))}` : ''}
+            </span>
+          )}
         </div>
       )}
       <TempCurve hours={weather.hourly} now={start} />
     </div>
   )
 }
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 /** Hours the rain heads-up looks ahead, and hours visible at once in the curve. */
 const HOURS = 8

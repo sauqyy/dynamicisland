@@ -23,6 +23,17 @@ export interface RainEvent {
   total: number
   now: boolean
   strength: Strength
+  /** the share of the forecasts that have it raining, over the whole of it (0..1) */
+  chance: number
+}
+
+/** at least this share of the forecasts agreeing is "rain"; fewer is "rain possible", said as such and not alerted */
+export const SURE = 0.7
+export const isSure = (ev: RainEvent) => ev.chance >= SURE
+/** "4 of 7 forecasts" */
+export function agreement(w: Weather, ev: RainEvent): string {
+  const n = w.sources?.length ?? 1
+  return `${Math.max(1, Math.round(ev.chance * n))} of ${n} forecast${n === 1 ? '' : 's'}`
 }
 
 /** the location's own clock: Open-Meteo gives times in the place's time zone, and we keep that offset */
@@ -42,13 +53,13 @@ export function inWords(min: number): string {
 }
 
 /** the quarter-hours of rain we have: the minute-by-minute forecast, or the hourly one spread out when that is all there is */
-function slotsOf(w: Weather): { at: number; mm: number }[] {
+function slotsOf(w: Weather): { at: number; mm: number; chance?: number }[] {
   if (w.rain15?.length) return w.rain15
   if (!w.dayStart) return []
   return w.hourly.flatMap((h, i) => {
     const at = w.dayStart! + i * 3600_000
     const mm = h.mm ?? (isRainCode(h.code) ? 0.8 : 0)
-    return [0, 1, 2, 3].map((q) => ({ at: at + q * STEP, mm: mm / 4 }))
+    return [0, 1, 2, 3].map((q) => ({ at: at + q * STEP, mm: mm / 4, chance: h.chance }))
   })
 }
 
@@ -58,14 +69,18 @@ function slotsOf(w: Weather): { at: number; mm: number }[] {
  */
 export function nextRain(w: Weather, now: number): RainEvent | null {
   const slots = slotsOf(w).filter((s) => s.at + STEP > now - STEP)
-  const runs: { start: number; end: number; peak: number; total: number }[] = []
-  let cur: { start: number; end: number; peak: number; total: number; dry: number } | null = null
+  type Run = { start: number; end: number; peak: number; total: number; agree: number; wet: number }
+  const runs: Run[] = []
+  let cur: (Run & { dry: number }) | null = null
   for (const s of slots) {
     if (s.mm >= WET) {
-      if (!cur) cur = { start: s.at, end: s.at + STEP, peak: 0, total: 0, dry: 0 }
+      if (!cur) cur = { start: s.at, end: s.at + STEP, peak: 0, total: 0, agree: 0, wet: 0, dry: 0 }
       cur.end = s.at + STEP
       cur.peak = Math.max(cur.peak, s.mm * 4)
       cur.total += s.mm
+      // (a forecast from before the consensus has no share: it is taken as it is)
+      cur.agree += s.chance ?? 1
+      cur.wet++
       cur.dry = 0
     } else if (cur) {
       cur.dry++
@@ -77,13 +92,14 @@ export function nextRain(w: Weather, now: number): RainEvent | null {
   }
   if (cur) runs.push(cur)
   const horizon = slots.length ? slots[slots.length - 1].at + STEP : now
-  const mk = (r: { start: number; end: number; peak: number; total: number }, isNow: boolean): RainEvent => ({
+  const mk = (r: Run, isNow: boolean): RainEvent => ({
     start: r.start,
     end: r.end >= horizon - STEP ? null : r.end,
     peak: r.peak,
     total: r.total,
     now: isNow,
     strength: strength(r.peak),
+    chance: r.wet ? r.agree / r.wet : 1,
   })
   // "raining now" only when the rain it shows has begun: the same quarter-hours the chart and the hour strip are
   // drawn from (see reconcile in weather.ts), never a guess at the present that they don't show
@@ -109,6 +125,12 @@ export interface GoAdvice {
 export function goAdvice(w: Weather, ev: RainEvent | null, now: number): GoAdvice | null {
   if (!ev) return null
   const horizon = now + 3 * 3600_000
+  // the forecasts don't agree on it: no umbrella orders, just what is known
+  if (!isSure(ev)) {
+    return ev.now
+      ? { mood: 'rainSoon', text: `Only ${agreement(w, ev)} have rain now: fine to go, an umbrella just in case`, from: null, to: null }
+      : { mood: 'rainSoon', text: `Dry until at least ${clockAt(w, ev.start)}. Rain after that is only possible`, from: now, to: ev.start }
+  }
   // when the next rain after `t` begins, or the end of the window
   const dryUntil = (t: number) => slotsOf(w).find((s) => s.at >= t && s.at < horizon && s.mm >= WET)?.at ?? horizon
   // "25 min", "about an hour", "about 2 hours"
@@ -176,7 +198,8 @@ export function planAlerts(w: Weather, now: number, ctx: Context = {}): PlannedA
   const catchesClass = Boolean(ev && cls && ev.start <= cls.start + 3600_000 && (ev.end === null || ev.end > cls.start - 30 * 60_000))
   const className = cls?.title.replace(/\s*\(.*\)\s*$/, '')
 
-  if (ev && hour >= 6 && hour < 23) {
+  // (rain only some of the forecasts have is shown on the weather page, not sent as an alert)
+  if (ev && isSure(ev) && hour >= 6 && hour < 23) {
     const mins = (ev.start - now) / 60_000
     const until = ev.end ? `, easing around ${clockAt(w, ev.end)}` : ', and it may last a while'
     const nap = catchesClass ? `Bring an umbrella to ${className}` : ev.strength === 'light' ? 'A light jacket will do' : 'Bring an umbrella'

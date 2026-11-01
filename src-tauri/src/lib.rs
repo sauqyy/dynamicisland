@@ -7,6 +7,7 @@ mod assistant;
 mod auth;
 mod claude;
 mod grants;
+mod public_data;
 mod llm;
 mod llm_core;
 #[cfg(feature = "campus")]
@@ -492,6 +493,7 @@ pub fn run() {
             set_dragging,
             auth::oauth_wait,
             auth::open_url,
+            public_data::public_json,
             #[cfg(feature = "campus")]
             scele::scele_login,
             #[cfg(feature = "campus")]
