@@ -1,5 +1,7 @@
 //! Now-playing data from the Windows media session (Spotify, browsers, VLC, ...).
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use serde::Serialize;
@@ -108,6 +110,19 @@ fn read_art(props: &Props) -> Option<String> {
     Some(format!("data:{mime};base64,{b64}"))
 }
 
+fn hash_of(s: &str) -> u64 {
+    let mut h = DefaultHasher::new();
+    s.hash(&mut h);
+    h.finish()
+}
+
+/// How long after a song change the cover is looked at again. Browsers (YouTube Music, ...) change the title
+/// first and the picture a moment later, so the first picture read after a change is often still the last song's.
+const ART_WATCH: Duration = Duration::from_secs(20);
+/// A picture the same as the last song's is held back this long before it is believed, in case it is only the
+/// old one on its way out (two songs from one album really do share a cover).
+const ART_SAME_AS_LAST: Duration = Duration::from_secs(6);
+
 pub fn spawn(app: AppHandle) {
     std::thread::spawn(move || {
         unsafe {
@@ -115,7 +130,13 @@ pub fn spawn(app: AppHandle) {
         }
         let mut last: Option<MediaInfo> = None;
         let mut art_id = String::new();
-        let mut art_tries = 0;
+        let mut art_since = Instant::now();
+        // the picture sent for the song before this one, and for this one
+        let mut art_prev: Option<u64> = None;
+        let mut art_sent: Option<u64> = None;
+        // the album of this song and of the one before: the same album means the same cover is expected
+        let mut album = String::new();
+        let mut same_album = false;
         let mut ticks = 0u32;
         loop {
             std::thread::sleep(Duration::from_millis(500));
@@ -148,13 +169,21 @@ pub fn spawn(app: AppHandle) {
             if let (Some(i), Some(p)) = (&info, &props) {
                 if art_id != i.id {
                     art_id = i.id.clone();
-                    art_tries = 0;
+                    art_since = Instant::now();
+                    art_prev = art_sent.take().or(art_prev);
+                    same_album = !i.album.is_empty() && i.album == album;
+                    album = i.album.clone();
                 }
-                if art_tries < 8 {
-                    art_tries += 1;
+                // looked at for a while after the song changes, and again whenever it differs from what was sent
+                let waited = art_since.elapsed();
+                if waited < ART_WATCH && ticks % 2 == 0 {
                     if let Some(data_url) = read_art(p) {
-                        art_tries = 99;
-                        let _ = app.emit("media-art", MediaArt { id: i.id.clone(), data_url });
+                        let h = hash_of(&data_url);
+                        let stale = art_prev == Some(h) && !same_album && waited < ART_SAME_AS_LAST;
+                        if !stale && art_sent != Some(h) {
+                            art_sent = Some(h);
+                            let _ = app.emit("media-art", MediaArt { id: i.id.clone(), data_url });
+                        }
                     }
                 }
             }

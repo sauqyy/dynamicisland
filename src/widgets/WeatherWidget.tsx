@@ -3,7 +3,9 @@ import { play } from 'cuelume'
 import { cachedWeather, describe, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
 import type { Settings } from '../lib/settings'
 import { CloudRain, Droplets, LocateFixed, MapPin, Wind } from 'lucide-react'
-import { detectPlace } from '../lib/location'
+import { invoke } from '@tauri-apps/api/core'
+import { LocationError, detectPlace, timezoneGuess, type Place } from '../lib/location'
+import { IS_TAURI } from '../lib/useMedia'
 import { clockAt, inWords, nextRain } from '../lib/weatherOutlook'
 import { WeatherIcon, isNight } from './WeatherIcon'
 
@@ -21,18 +23,28 @@ export function WeatherWidget({ settings, update }: Props) {
   const [draft, setDraft] = useState(city)
   const [locating, setLocating] = useState(false)
   const [locError, setLocError] = useState<string | null>(null)
+  // when nothing can place the user: their time zone's main city, offered to accept (never applied on its own)
+  const [suggest, setSuggest] = useState<Place | null>(null)
+  const [denied, setDenied] = useState(false)
 
   /** find where the user is and follow it; `network` allows the (city-level) lookup by connection when the device cannot say */
-  const locate = async (network: boolean) => {
+  const locate = async (network: boolean, quiet = false) => {
     setLocating(true)
     setLocError(null)
+    setSuggest(null)
+    setDenied(false)
     try {
       const p = await detectPlace({ allowNetwork: network })
       update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: true })
       setWeather(null)
       setEditing(false)
     } catch (e) {
-      setLocError((e as Error).message)
+      // the try made on its own when the page first opens: no blame, just what to press next
+      setLocError(quiet ? 'Press Use my location to find where you are' : (e as Error).message)
+      if (!quiet) {
+        setDenied(e instanceof LocationError && e.denied)
+        void timezoneGuess().then(setSuggest)
+      }
     } finally {
       setLocating(false)
     }
@@ -42,7 +54,7 @@ export function WeatherWidget({ settings, update }: Props) {
   useEffect(() => {
     if (city || asked.current) return
     asked.current = true
-    void locate(false)
+    void locate(false, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -83,6 +95,14 @@ export function WeatherWidget({ settings, update }: Props) {
         onLocate={() => void locate(true)}
         locating={locating}
         locError={locError}
+        denied={denied}
+        suggest={suggest}
+        onSuggest={(p) => {
+          // a guess from the time zone is a city picked by hand: the weather does not follow the user from it
+          update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: false })
+          setWeather(null)
+          setEditing(false)
+        }}
       />
     )
   }
@@ -325,6 +345,9 @@ function CityPicker({
   onLocate,
   locating,
   locError,
+  denied,
+  suggest,
+  onSuggest,
 }: {
   initial: string
   canCancel: boolean
@@ -333,6 +356,10 @@ function CityPicker({
   onLocate: () => void
   locating: boolean
   locError: string | null
+  /** the device is refusing (Windows has location off for it) */
+  denied: boolean
+  suggest: Place | null
+  onSuggest: (p: Place) => void
 }) {
   const [query, setQuery] = useState(initial)
   const [hits, setHits] = useState<CityHit[]>([])
@@ -374,7 +401,18 @@ function CityPicker({
         <LocateFixed size={14} aria-hidden style={{ marginRight: 6, verticalAlign: -2 }} />
         {locating ? 'Finding you…' : 'Use my location'}
       </button>
-      {locError && <div className="city-note">{locError}. You can search for a city instead.</div>}
+      {locError && <div className="city-note">{locError.replace(/[.]$/, '')}. You can also search for a city below.</div>}
+      {locError && denied && IS_TAURI && (
+        <button className="chip" data-cuelume-open onClick={() => invoke('open_url', { url: 'ms-settings:privacy-location' }).catch(() => {})}>
+          Open Windows location settings
+        </button>
+      )}
+      {suggest && (
+        <button className="chip" data-cuelume-tap onClick={() => onSuggest(suggest)} title="Guessed from your computer's time zone, so it can be a whole region off">
+          <MapPin size={12} aria-hidden style={{ marginRight: 4, verticalAlign: -1 }} />
+          Use {suggest.name} (from your time zone)
+        </button>
+      )}
       <div className="city-box">
         <input
           className="todo-input"

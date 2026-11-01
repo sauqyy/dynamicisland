@@ -34,12 +34,12 @@ type Group = { id: string; title: string; icon: string; pages: Tab[] }
  * don't need start hidden (see settings.ts).
  */
 const CAMPUS_GROUPS: Group[] = [
-  { id: 'home', title: 'Today', icon: '🏠', pages: ['today', 'media', 'weather', 'lumi'] },
+  { id: 'home', title: 'Today', icon: '🏠', pages: ['today', 'media', 'weather'] },
   { id: 'campus', title: 'Campus', icon: '🎓', pages: ['classes', 'deadlines', 'inbox'] },
   { id: 'focus', title: 'Focus', icon: '🎯', pages: ['todo', 'timer', 'notes', 'clipboard', 'deadlist', 'schedule', 'prompter'] },
   { id: 'social', title: 'People', icon: '👥', pages: ['friends', 'groups', 'profile'] },
   { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps'] },
-  { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
+  { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['lumi', 'settings'] },
 ]
 
 /** Pages are grouped so the card has 5 places to go instead of 11 pages in a row. */

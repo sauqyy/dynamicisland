@@ -1,17 +1,34 @@
 /**
- * Where the user is, for the weather. Two ways, the better one first:
+ * Where the user is, for the weather. Three ways, the better one first:
  *  - the device's own position (GPS, or Wi-Fi where there is no GPS), which asks the user's permission and is
  *    accurate to a street or two, which is what rain timing needs;
  *  - failing that, and only when the caller allows it, the network's idea of where the connection is, which is
- *    good to about a city: it sends the connection's address to a lookup service, so it is never done silently.
+ *    good to about a city: it sends the connection's address to a lookup service, so it is never done silently;
+ *  - and when even that fails (a network that blocks those services, a VPN), the main city of the computer's time
+ *    zone, which is only ever offered as a suggestion for the user to accept, never applied on its own.
  */
+import { searchCities } from './weather'
+
 export interface Place {
   name: string
   lat: number
   lon: number
-  /** where it came from: the device, or the network */
-  how: 'device' | 'network'
+  /** where it came from: the device, the network, or the time zone */
+  how: 'device' | 'network' | 'timezone'
 }
+
+/** why the device could not say, so the user is told the thing they can fix */
+export class LocationError extends Error {
+  /** the device refused (Windows or the app has location switched off) */
+  denied: boolean
+  constructor(message: string, denied = false) {
+    super(message)
+    this.denied = denied
+  }
+}
+
+const DENIED = 'Location is switched off for this app. Turn it on in Windows: Settings > Privacy & security > Location, including "Let desktop apps access your location"'
+const NO_FIX = 'Could not find your location'
 
 const timeout = (ms: number) => AbortSignal.timeout(ms)
 
@@ -24,15 +41,15 @@ function readPosition(high: boolean, wait: number): Promise<GeolocationPosition>
  * The device's position. It asks for the precise fix first (GPS or Wi-Fi), and only settles for the rough one
  * when that does not come in time: the rough one alone was often a whole district off.
  */
-export async function deviceLocation(wait = 9000): Promise<{ lat: number; lon: number; accuracy: number }> {
-  if (!('geolocation' in navigator)) throw new Error('This computer cannot tell where it is')
+export async function deviceLocation(wait = 8000): Promise<{ lat: number; lon: number; accuracy: number }> {
+  if (!('geolocation' in navigator)) throw new LocationError('This computer cannot tell where it is')
   let p: GeolocationPosition
   try {
     p = await readPosition(true, wait)
   } catch (e) {
-    if ((e as GeolocationPositionError).code === 1) throw new Error('Location is switched off for this app')
-    p = await readPosition(false, wait).catch(() => {
-      throw new Error('Could not find your location')
+    if ((e as GeolocationPositionError).code === 1) throw new LocationError(DENIED, true)
+    p = await readPosition(false, wait).catch((e2: GeolocationPositionError) => {
+      throw e2?.code === 1 ? new LocationError(DENIED, true) : new LocationError(NO_FIX)
     })
   }
   return { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy }
@@ -41,7 +58,7 @@ export async function deviceLocation(wait = 9000): Promise<{ lat: number; lon: n
 type Namer = (lat: number, lon: number) => Promise<string | undefined>
 const getJson = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url, { signal: timeout(6000) })
-  if (!res.ok) throw new Error('no name')
+  if (!res.ok) throw new Error(`${res.status}`)
   return (await res.json()) as T
 }
 /** the services that can name a point, tried in turn: if one is down or blocked, the next one answers */
@@ -70,28 +87,100 @@ async function nameFor(lat: number, lon: number): Promise<string> {
   return `${lat.toFixed(3)}, ${lon.toFixed(3)}`
 }
 
+type Guess = { lat?: number; lon?: number; city?: string; region?: string }
+/**
+ * The services that can place a connection. Asked all at once (a blocked one only has to time out, not hold up the
+ * rest), and the first real answer wins: one that is down, busy or blocked on this network is not the end of it.
+ */
+const GUESSERS: (() => Promise<Guess>)[] = [
+  async () => {
+    const r = await getJson<{ success?: boolean; latitude?: number; longitude?: number; city?: string; region?: string }>('https://ipwho.is/')
+    if (!r.success) throw new Error('no fix')
+    return { lat: r.latitude, lon: r.longitude, city: r.city, region: r.region }
+  },
+  async () => {
+    const r = await getJson<{ latitude?: number; longitude?: number; city?: string; region?: string; error?: boolean }>('https://ipapi.co/json/')
+    if (r.error) throw new Error('no fix')
+    return { lat: r.latitude, lon: r.longitude, city: r.city, region: r.region }
+  },
+  async () => {
+    const r = await getJson<{ latitude?: number; longitude?: number; cityName?: string; regionName?: string }>('https://freeipapi.com/api/json')
+    return { lat: r.latitude, lon: r.longitude, city: r.cityName, region: r.regionName }
+  },
+  async () => {
+    const r = await getJson<{ loc?: string; city?: string; region?: string }>('https://ipinfo.io/json')
+    const [lat, lon] = (r.loc ?? '').split(',').map(Number)
+    return { lat, lon, city: r.city, region: r.region }
+  },
+  async () => {
+    const r = await getJson<{ latitude?: string; longitude?: string; city?: string; region?: string }>('https://get.geojs.io/v1/ip/geo.json')
+    return { lat: Number(r.latitude), lon: Number(r.longitude), city: r.city, region: r.region }
+  },
+]
+
+/** the first of these to come back with a real point (not 0, 0: some services answer that when they do not know) */
+function firstGuess(): Promise<{ lat: number; lon: number; city?: string; region?: string }> {
+  return new Promise((resolve, reject) => {
+    let left = GUESSERS.length
+    for (const guess of GUESSERS) {
+      guess()
+        .then((r) => {
+          const ok = Number.isFinite(r.lat) && Number.isFinite(r.lon) && Math.abs(r.lat as number) <= 90 && Math.abs(r.lon as number) <= 180 && !(r.lat === 0 && r.lon === 0)
+          if (ok) resolve({ lat: r.lat as number, lon: r.lon as number, city: r.city, region: r.region })
+          else throw new Error('no fix')
+        })
+        .catch(() => {
+          if (--left === 0) reject(new LocationError('Could not work out where you are from your connection. A VPN, or a network that blocks location lookups, can cause this'))
+        })
+    }
+  })
+}
+
 /** the network's idea of where the connection is, good to about a city */
 async function networkLocation(): Promise<{ lat: number; lon: number; name: string }> {
-  const res = await fetch('https://ipwho.is/', { signal: timeout(7000) })
-  if (!res.ok) throw new Error('Could not find your location')
-  const r = (await res.json()) as { success?: boolean; latitude?: number; longitude?: number; city?: string; region?: string }
-  if (!r.success || r.latitude == null || r.longitude == null) throw new Error('Could not find your location')
-  return { lat: r.latitude, lon: r.longitude, name: r.city || r.region || (await nameFor(r.latitude, r.longitude)) }
+  const r = await firstGuess()
+  return { lat: r.lat, lon: r.lon, name: r.city || r.region || (await nameFor(r.lat, r.lon)) }
+}
+
+/**
+ * The main city of the computer's time zone ("Asia/Jakarta" gives Jakarta), looked up like any city the user would
+ * type. It can be a whole region away from the user, so it is only a suggestion; null when the time zone names no city.
+ */
+export async function timezoneGuess(): Promise<Place | null> {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const city = zone.split('/').pop()?.replace(/_/g, ' ')
+    if (!city || /^(utc|gmt|etc|local)/i.test(city)) return null
+    const hits = await searchCities(city)
+    const hit = hits[0]
+    return hit ? { name: hit.name, lat: hit.latitude, lon: hit.longitude, how: 'timezone' } : null
+  } catch {
+    return null
+  }
 }
 
 /** names that earlier versions saved when they could not name the place: worth replacing */
 export const isPlaceholderName = (name: string) => !name.trim() || name === 'My location' || /^-?\d+\.\d+, -?\d+\.\d+$/.test(name)
 
 export async function detectPlace({ allowNetwork }: { allowNetwork: boolean }): Promise<Place> {
+  let device: { lat: number; lon: number; accuracy: number } | null = null
+  let failed: Error | null = null
   try {
-    const p = await deviceLocation()
-    // a fix this rough (several km: the computer guessed from the connection) is no better than the network's, so
-    // it only counts when there is nothing else to go on
-    if (!(allowNetwork && p.accuracy > 5000)) return { lat: p.lat, lon: p.lon, name: await nameFor(p.lat, p.lon), how: 'device' }
+    device = await deviceLocation()
   } catch (e) {
     if (!allowNetwork) throw e
+    failed = e as Error
   }
-  return { ...(await networkLocation()), how: 'network' }
+  // a fix this rough (several km: the computer guessed from the connection) is no better than the network's, so
+  // it only counts when the network cannot say either
+  if (device && !(allowNetwork && device.accuracy > 5000)) return { lat: device.lat, lon: device.lon, name: await nameFor(device.lat, device.lon), how: 'device' }
+  try {
+    return { ...(await networkLocation()), how: 'network' }
+  } catch (e) {
+    if (device) return { lat: device.lat, lon: device.lon, name: await nameFor(device.lat, device.lon), how: 'device' }
+    // the device being switched off is the thing the user can fix, so that is what they are told
+    throw failed instanceof LocationError && failed.denied ? failed : e
+  }
 }
 
 /** straight-line distance, in km */
