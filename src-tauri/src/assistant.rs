@@ -74,14 +74,28 @@ pub async fn assistant_tts(text: String, voice: String, model: String) -> Result
     .map_err(|e| e.to_string())?
 }
 
-/// Appends a line to a small log in the temp folder, so a problem with the microphone or the voice can be
-/// looked at afterwards (the webview's console is not easy to reach in the installed app).
+/// Largest the log grows before it starts over.
+const LOG_LIMIT: u64 = 256 * 1024;
+
+/// Appends a line to a small log in the app's own data folder (not the shared temp folder: it can hold
+/// what was said to the assistant), so a problem with the microphone or the voice can be looked at
+/// afterwards (the webview's console is not easy to reach in the installed app). It starts over past
+/// LOG_LIMIT, so old conversations don't pile up.
 #[tauri::command]
-pub fn assistant_log(line: String) {
+pub fn assistant_log(app: tauri::AppHandle, line: String) {
     use std::io::Write;
-    let path = std::env::temp_dir().join("dynamic-island-assistant.log");
+    use tauri::Manager;
+    let Ok(dir) = app.path().app_log_dir() else { return };
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("assistant.log");
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > LOG_LIMIT) {
+        let _ = std::fs::remove_file(&path);
+    }
+    // the old log in the temp folder, from before it moved
+    let _ = std::fs::remove_file(std::env::temp_dir().join("dynamic-island-assistant.log"));
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-        let _ = writeln!(f, "[{}] {}", secs % 100_000, line.chars().take(400).collect::<String>());
+        let line: String = line.chars().take(400).map(|c| if c.is_control() { ' ' } else { c }).collect();
+        let _ = writeln!(f, "[{}] {}", secs % 100_000, line);
     }
 }

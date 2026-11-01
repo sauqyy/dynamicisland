@@ -6,6 +6,7 @@ mod actions;
 mod assistant;
 mod auth;
 mod claude;
+mod grants;
 mod llm;
 mod llm_core;
 #[cfg(feature = "campus")]
@@ -14,6 +15,8 @@ mod scele;
 mod slcm;
 #[cfg(feature = "campus")]
 mod sso;
+#[cfg(feature = "campus")]
+mod seal;
 #[cfg(windows)]
 mod files;
 #[cfg(windows)]
@@ -171,53 +174,129 @@ struct UpdateProgress {
     percent: u32,
 }
 
-fn download_installer(app: &AppHandle, url: &str, dest: &std::path::Path) -> Result<(), String> {
-    use std::io::{Read, Write};
-    let resp = ureq::get(url).call().map_err(|e| e.to_string())?;
+/// The public half of the key every release is signed with (made with `npx tauri signer generate`;
+/// see SECURITY.md). The private half exists only with the maintainer and in the CI secret
+/// TAURI_SIGNING_PRIVATE_KEY, so a release anyone else attaches, or one swapped on the way, is refused.
+const UPDATE_PUBKEY: &str = include_str!("../updater.pub");
+
+/// Largest installer accepted.
+const UPDATE_LIMIT: u64 = 1024 * 1024 * 1024;
+
+/// "1.2.3" -> [1, 2, 3], so versions compare the way people expect.
+fn version_key(v: &str) -> Vec<u64> {
+    v.split('.').map(|p| p.parse().unwrap_or(0)).collect()
+}
+
+/// An installer attached to one of this project's own GitHub releases, newer than this app, with
+/// the file type this platform installs: its file name (e.g. "AstraIsle_0.9.0_x64-setup.exe").
+/// The address is parsed (so "../" can't climb out to another repository), not just prefix-checked.
+fn release_file(app: &AppHandle, url: &str, ext: &str) -> Result<String, String> {
+    let bad = || "unexpected update url".to_string();
+    let u = tauri::Url::parse(url).map_err(|_| bad())?;
+    if u.scheme() != "https" || u.host_str() != Some("github.com") || u.port().is_some() || !u.username().is_empty() || u.query().is_some() || u.fragment().is_some() {
+        return Err(bad());
+    }
+    let segs: Vec<&str> = u.path_segments().map(|s| s.collect()).unwrap_or_default();
+    if segs.len() != 6 || segs[..4] != ["sauqyy", "dynamicisland", "releases", "download"] || segs.iter().any(|s| s.is_empty() || s.contains('%')) {
+        return Err(bad());
+    }
+    let name = segs[5];
+    if !name.ends_with(ext) {
+        return Err(bad());
+    }
+    // never an older (or the same) version: a signed but outdated installer could bring back an old bug
+    let version = name.split('_').nth(1).ok_or_else(bad)?;
+    if version_key(version) <= version_key(&app.package_info().version.to_string()) {
+        return Err("that update isn't newer than this version".into());
+    }
+    Ok(name.to_string())
+}
+
+/// Reads the whole download into memory, reporting progress.
+fn download(app: &AppHandle, url: &str, progress: bool) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    let resp = ureq::get(url).timeout(Duration::from_secs(600)).call().map_err(|e| e.to_string())?;
     let total: u64 = resp.header("Content-Length").and_then(|v| v.parse().ok()).unwrap_or(0);
-    let mut reader = resp.into_reader();
-    let mut file = std::fs::File::create(dest).map_err(|e| e.to_string())?;
+    if total > UPDATE_LIMIT {
+        return Err("the update is too large".into());
+    }
+    let mut reader = resp.into_reader().take(UPDATE_LIMIT + 1);
+    let mut bytes = Vec::with_capacity(total as usize);
     let mut buf = [0u8; 64 * 1024];
-    let (mut done, mut last) = (0u64, u32::MAX);
+    let mut last = u32::MAX;
     loop {
         let n = reader.read(&mut buf).map_err(|e| e.to_string())?;
         if n == 0 {
             break;
         }
-        file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
-        done += n as u64;
-        let percent = if total > 0 { (done * 100 / total).min(100) as u32 } else { 0 };
-        if percent != last {
+        bytes.extend_from_slice(&buf[..n]);
+        let percent = if total > 0 { (bytes.len() as u64 * 100 / total).min(100) as u32 } else { 0 };
+        if progress && percent != last {
             last = percent;
             let _ = app.emit("update-progress", UpdateProgress { stage: "downloading", percent });
         }
     }
-    if done == 0 || (total > 0 && done != total) {
+    if bytes.is_empty() || bytes.len() as u64 > UPDATE_LIMIT || (total > 0 && bytes.len() as u64 != total) {
         return Err("download incomplete".into());
+    }
+    Ok(bytes)
+}
+
+/// Checks the release's signature (the `.sig` beside it, made by `tauri signer sign`) against the key
+/// built into this app, and that it was made for exactly this file name.
+fn verify_update(bytes: &[u8], sig: &[u8], name: &str) -> Result<(), String> {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let unsigned = || "the update isn't signed with this app's key, so it wasn't installed".to_string();
+    let no_key = || "this build has no update key".to_string();
+    let key_text = b64.decode(UPDATE_PUBKEY.trim()).ok().and_then(|k| String::from_utf8(k).ok()).ok_or_else(no_key)?;
+    let key = minisign_verify::PublicKey::decode(&key_text).map_err(|_| no_key())?;
+    let sig_text = std::str::from_utf8(sig).ok().and_then(|s| b64.decode(s.trim()).ok()).and_then(|s| String::from_utf8(s).ok()).ok_or_else(unsigned)?;
+    let signature = minisign_verify::Signature::decode(&sig_text).map_err(|_| unsigned())?;
+    key.verify(bytes, &signature, true).map_err(|_| unsigned())?;
+    // the trusted comment is covered by the signature: "timestamp:…<tab>file:<name>"
+    let signed_for = signature.trusted_comment().split('\t').find_map(|p| p.strip_prefix("file:")).unwrap_or("");
+    if signed_for != name {
+        return Err(unsigned());
     }
     Ok(())
 }
 
+/// Downloads a release file and its signature and verifies them, then writes the file into a folder
+/// of the app's own (not the shared temp folder, where another program could swap it first).
+fn fetch_verified(app: &AppHandle, url: &str, name: &str) -> Result<std::path::PathBuf, String> {
+    let sig = download(app, &format!("{url}.sig"), false).map_err(|_| "the update has no signature, so it wasn't installed".to_string())?;
+    let bytes = download(app, url, true)?;
+    verify_update(&bytes, &sig, name)?;
+    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("updates");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let dest = dir.join(name);
+    std::fs::write(&dest, &bytes).map_err(|e| e.to_string())?;
+    Ok(dest)
+}
+
 /// Downloads the installer from a GitHub release of this project (reporting progress to the
-/// island), then runs it silently as an in-place upgrade; the new version starts by itself.
+/// island), verifies its signature, then runs it silently as an in-place upgrade; the new version
+/// starts by itself.
 #[cfg(windows)]
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
-    if !url.starts_with("https://github.com/sauqyy/dynamicisland/releases/download/") || url.contains('\'') {
-        return Err("unexpected update url".into());
-    }
-    let dest = std::env::temp_dir().join("dynamic-island-update.exe");
+    let name = release_file(&app, &url, ".exe")?;
     let _ = app.emit("update-progress", UpdateProgress { stage: "downloading", percent: 0 });
-    let (app2, dest2) = (app.clone(), dest.clone());
-    let result = tauri::async_runtime::spawn_blocking(move || download_installer(&app2, &url, &dest2))
+    let app2 = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || fetch_verified(&app2, &url, &name))
         .await
         .map_err(|e| e.to_string())
         .and_then(|r| r);
-    if let Err(e) = result {
-        let _ = app.emit("update-progress", UpdateProgress { stage: "failed", percent: 0 });
-        return Err(e);
-    }
+    let dest = match result {
+        Ok(d) => d,
+        Err(e) => {
+            let _ = app.emit("update-progress", UpdateProgress { stage: "failed", percent: 0 });
+            return Err(e);
+        }
+    };
     let _ = app.emit("update-progress", UpdateProgress { stage: "installing", percent: 100 });
     // /S = no windows, /UPDATE = upgrade in place and relaunch the app afterwards
     // (DETACHED_PROCESS | CREATE_NO_WINDOW so the installer outlives this process)
@@ -234,21 +313,19 @@ async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
     Ok(())
 }
 
-/// macOS: downloads the disk image and opens it, so the user can drag the new app over the old one.
+/// macOS: downloads the disk image, verifies its signature and opens it, so the user can drag the
+/// new app over the old one.
 #[cfg(target_os = "macos")]
 #[tauri::command]
 async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
-    if !url.starts_with("https://github.com/sauqyy/dynamicisland/releases/download/") || !url.ends_with(".dmg") {
-        return Err("unexpected update url".into());
-    }
-    let dest = std::env::temp_dir().join("dynamic-island-update.dmg");
+    let name = release_file(&app, &url, ".dmg")?;
     let _ = app.emit("update-progress", UpdateProgress { stage: "downloading", percent: 0 });
-    let (app2, dest2) = (app.clone(), dest.clone());
-    let result = tauri::async_runtime::spawn_blocking(move || download_installer(&app2, &url, &dest2))
+    let app2 = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || fetch_verified(&app2, &url, &name))
         .await
         .map_err(|e| e.to_string())
         .and_then(|r| r);
-    let result = result.and_then(|_| std::process::Command::new("open").arg(&dest).spawn().map(|_| ()).map_err(|e| e.to_string()));
+    let result = result.and_then(|dest| std::process::Command::new("open").arg(&dest).spawn().map(|_| ()).map_err(|e| e.to_string()));
     match result {
         Ok(()) => {
             let _ = app.emit("update-progress", UpdateProgress { stage: "installing", percent: 100 });
@@ -450,6 +527,7 @@ pub fn run() {
             files::open_path,
             files::reveal_path,
             files::drag_icon,
+            system::clipboard_private,
             media::media_toggle,
             media::media_next,
             media::media_prev,
@@ -479,7 +557,19 @@ pub fn run() {
             actions::power_cancel
         ])
         .manage(HitArea(Mutex::new((130.0, 34.0))))
+        // files dropped onto the island are the user's choice: only those may be read or opened
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                grants::dropped(window.app_handle(), paths);
+            }
+        })
+        .on_webview_event(|webview, event| {
+            if let tauri::WebviewEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                grants::dropped(webview.app_handle(), paths);
+            }
+        })
         .setup(|app| {
+            grants::restore(app.handle());
             let window = app.get_webview_window("main").expect("main window");
             #[cfg(target_os = "macos")]
             macos::float_above_menu_bar(&window);

@@ -11,6 +11,10 @@ permissions:
 env:
   VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
   VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+  # every file the app updates itself from is signed with this key; the app checks the signature
+  # against src-tauri/updater.pub before it runs anything (see SECURITY.md)
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
 jobs:
   release:
@@ -27,20 +31,28 @@ jobs:
     if: always() && !startsWith(github.ref, 'refs/tags/ui-v') && (needs.release.result == 'success' || needs.release.result == 'skipped')
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
+          toolchain: stable
           targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri
+      - name: Refuse to build without the update signing key
+        shell: bash
+        run: |
+          if grep -q REPLACE src-tauri/updater.pub || [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Set src-tauri/updater.pub and the TAURI_SIGNING_PRIVATE_KEY secret first (see SECURITY.md)"
+            exit 1
+          fi
       - run: npm ci
       - run: npx tauri build --target universal-apple-darwin --bundles app,dmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: astra-isle-macos
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
@@ -48,22 +60,35 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.ref_name }}" src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg --clobber
+        run: |
+          out="AstraIsle_${GITHUB_REF_NAME#v}_universal.dmg"
+          cp "$(ls src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | head -1)" "$out"
+          npx tauri signer sign "$out"
+          gh release upload "$GITHUB_REF_NAME" "$out" "$out.sig" --clobber
 
   windows:
     needs: [release]
     if: always() && (needs.release.result == 'success' || needs.release.result == 'skipped')
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: src-tauri
+      - name: Refuse to build without the update signing key
+        shell: bash
+        run: |
+          if grep -q REPLACE src-tauri/updater.pub || [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::Set src-tauri/updater.pub and the TAURI_SIGNING_PRIVATE_KEY secret first (see SECURITY.md)"
+            exit 1
+          fi
       - run: npm ci
       - name: Build the installer
         if: ${{ !startsWith(github.ref, 'refs/tags/ui-v') }}
@@ -71,7 +96,7 @@ jobs:
       - name: Build the Universitas Indonesia installer
         if: ${{ startsWith(github.ref, 'refs/tags/ui-v') }}
         run: npm run tauri:build:ui
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: astra-isle-windows
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
@@ -87,7 +112,8 @@ jobs:
             *) out="AstraIsle_${GITHUB_REF_NAME#v}_x64-setup.exe" ;;
           esac
           cp "$f" "$out"
-          gh release upload "$GITHUB_REF_NAME" "$out" --clobber
+          npx tauri signer sign "$out"
+          gh release upload "$GITHUB_REF_NAME" "$out" "$out.sig" --clobber
       - name: Build the custom Setup
         if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/ui-v')
         shell: bash
