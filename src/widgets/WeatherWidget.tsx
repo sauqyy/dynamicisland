@@ -133,14 +133,17 @@ export function WeatherWidget({ settings, update }: Props) {
   // what the rain is doing: from the minute-by-minute forecast when we have it
   const ev = weather.rain15 ? nextRain(weather, Date.now()) : null
   const evMins = ev ? (ev.start - Date.now()) / 60_000 : 0
+  // another shower soon after this one: said too, so the sentence never says "it stops" while more is on the way
+  const then = ev?.end ? nextRain(weather, ev.end) : null
+  const more = then && then.start - Date.now() < 6 * 3600_000 ? `, then again ${clockAt(weather, then.start)}${then.end ? `–${clockAt(weather, then.end)}` : ''}` : ''
   const rainLine = !weather.rain15
     ? ''
     : !ev
       ? 'No rain expected for the next 12 hours'
       : ev.now
-        ? `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}.` : 'It looks like it will last for hours.'}`
+        ? `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}${more}.` : 'It looks like it will last for hours.'}`
         : evMins <= 480
-          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}.`
+          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}${more}.`
           : 'No rain expected for the next 8 hours'
   // the chart and Lumi's advice cover the next three hours
   const chart = !!weather.rain15 && !!ev && (ev.now || evMins <= 180)

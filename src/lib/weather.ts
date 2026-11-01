@@ -1,3 +1,5 @@
+import { isRainCode, WET } from './weatherOutlook'
+
 export interface Weather {
   city: string
   fahrenheit: boolean
@@ -20,7 +22,8 @@ export interface Weather {
   fetchedAt: number
 }
 
-const CACHE_KEY = 'di.weather'
+// .2: the rain is lined up with the time it falls (see reconcile); forecasts kept before that are fetched again
+const CACHE_KEY = 'di.weather.2'
 const MAX_AGE = 20 * 60_000
 
 /** WMO weather codes, as returned by Open-Meteo. */
@@ -37,6 +40,39 @@ export function describe(code: number): { icon: string; label: string } {
   if (code === 85 || code === 86) return { icon: '🌨️', label: 'Snow showers' }
   if (code >= 95) return { icon: '⛈️', label: 'Thunderstorm' }
   return { icon: '🌡️', label: 'Unknown' }
+}
+
+const HOUR = 3600_000
+const QUARTER = 15 * 60_000
+/** mm in an hour below which it isn't rain worth an umbrella: the quarter-hour threshold, four times */
+const WET_HOUR = WET * 4
+
+/**
+ * One account of the rain for everything that shows it. Open-Meteo's weather codes call any trace of drizzle "rain"
+ * while its quarter-hour amounts say how much really falls, so the hour strip, the sentence and Lumi could disagree:
+ * rain icons until evening under a sentence saying it stops at two, or "raining now" on a hot dry afternoon. Here the
+ * quarter-hour amounts decide (and the hourly amounts past their twelve hours): an hour or the present moment shows
+ * rain only if enough falls, and then with a code as strong as the amount.
+ */
+export function reconcile(w: Weather) {
+  const slots = w.rain15 ?? []
+  const covered = (from: number, to: number) => slots.length > 0 && slots[0].at <= from && slots[slots.length - 1].at + QUARTER >= to
+  const sum = (from: number, to: number) => slots.filter((s) => s.at >= from && s.at < to).reduce((a, s) => a + s.mm, 0)
+  const rainCode = (mmPerHour: number, was: number) =>
+    was >= 95 ? was : mmPerHour >= 7.5 ? 65 : mmPerHour >= 2.5 ? 63 : isRainCode(was) && was >= 80 ? was : 61
+  /** a code that agrees with the amount: rain only if it is wet, never rain if it is dry */
+  // (dry: a rain code becomes the cloud it would fall from, a thunderstorm with no rain to speak of too)
+  const agree = (code: number, mmPerHour: number) => (mmPerHour >= WET_HOUR ? rainCode(mmPerHour, code) : isRainCode(code) ? 3 : code)
+  if (w.dayStart != null) {
+    w.hourly.forEach((h, i) => {
+      const from = w.dayStart! + i * HOUR
+      if (covered(from, from + HOUR)) h.mm = Math.round(sum(from, from + HOUR) * 10) / 10
+      if (h.mm != null) h.code = agree(h.code, h.mm)
+    })
+  }
+  // the present: the quarter-hour under way
+  const now = slots.find((s) => s.at <= w.fetchedAt && s.at + QUARTER > w.fetchedAt)
+  if (now) w.code = agree(w.code, now.mm * 4)
 }
 
 export function cachedWeather(city: string, fahrenheit: boolean): Weather | null {
@@ -124,12 +160,14 @@ export async function fetchWeather(
   // Open-Meteo's times are the place's own clock, with no offset written: the offset says what instant they are
   const offset = f.utc_offset_seconds ?? 0
   const instant = (t: string) => Date.parse(`${t.length === 16 ? t : t.slice(0, 16)}:00Z`) - offset * 1000
+  // Open-Meteo's precipitation is what fell in the period *before* the time it is listed at: the hour listed
+  // 14:00 holds the rain from 13:00 to 14:00. Each hour here holds the rain that falls during it.
   const hourly = f.hourly.time.slice(first, first + 48).map((t, i) => ({
     hour: t.slice(11, 13),
     temp: Math.round(f.hourly.temperature_2m[first + i]),
     code: f.hourly.weather_code[first + i],
     pop: f.hourly.precipitation_probability?.[first + i],
-    mm: f.hourly.precipitation?.[first + i],
+    mm: f.hourly.precipitation?.[first + i + 1],
     uv: f.hourly.uv_index?.[first + i],
     feels: f.hourly.apparent_temperature?.[first + i] != null ? Math.round(f.hourly.apparent_temperature[first + i]) : undefined,
   }))
@@ -148,9 +186,11 @@ export async function fetchWeather(
     dayStart: instant(f.hourly.time[first]),
     utcOffset: offset,
     precipNow: f.current.precipitation,
-    rain15: f.minutely_15?.time.map((t, i) => ({ at: instant(t), mm: f.minutely_15!.precipitation[i] ?? 0 })),
+    // the same for the quarter-hours: the value listed 13:15 fell from 13:00, so that is where it starts
+    rain15: f.minutely_15?.time.map((t, i) => ({ at: instant(t) - 15 * 60_000, mm: f.minutely_15!.precipitation[i] ?? 0 })),
     fetchedAt: Date.now(),
   }
+  reconcile(w)
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(w))
   } catch {
