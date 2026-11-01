@@ -7,9 +7,10 @@ import './styles/tokens.css'
 import App from './App.tsx'
 import { Showcase } from './mascot/Showcase.tsx'
 import { LumiShowcase } from './mascot/lumi/LumiShowcase.tsx'
+import { RainShowcase } from './widgets/RainShowcase.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {import.meta.env.DEV && location.search.includes('lumi') ? <LumiShowcase /> : import.meta.env.DEV && location.search.includes('mascots') ? <Showcase /> : <App />}
+    {import.meta.env.DEV && location.search.includes('lumi') ? <LumiShowcase /> : import.meta.env.DEV && location.search.includes('mascots') ? <Showcase /> : import.meta.env.DEV && location.search.includes('rain') ? <RainShowcase /> : <App />}
   </StrictMode>,
 )

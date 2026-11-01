@@ -6,7 +6,10 @@ import { CloudRain, Droplets, LocateFixed, MapPin, Wind } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { LocationError, detectPlace, timezoneGuess, type Place } from '../lib/location'
 import { IS_TAURI } from '../lib/useMedia'
-import { clockAt, inWords, nextRain } from '../lib/weatherOutlook'
+import { clockAt, goAdvice, inWords, nextRain, offsetOf } from '../lib/weatherOutlook'
+import { CAMPUS } from '../lib/campus'
+import { LumiFace } from '../mascot/lumi/LumiFace'
+import { RainTimeline } from './RainTimeline'
 import { WeatherIcon, isNight } from './WeatherIcon'
 
 interface Props {
@@ -137,8 +140,12 @@ export function WeatherWidget({ settings, update }: Props) {
       : ev.now
         ? `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}.` : 'It looks like it will last for hours.'}`
         : evMins <= 480
-          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}. Bring an umbrella if you head out.`
+          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}.`
           : 'No rain expected for the next 8 hours'
+  // the chart and Lumi's advice cover the next three hours
+  const chart = !!weather.rain15 && !!ev && (ev.now || evMins <= 180)
+  const advice = chart ? goAdvice(weather, ev, Date.now()) : null
+  const lumi = CAMPUS && settings.lumi
   // (without it: the next rain in the coming hours, or how long the current rain lasts)
   const rainingNow = isRain(weather.code)
   const rainFrom = rainingNow ? -1 : hours.findIndex((h, i) => i > 0 && isRain(h.code))
@@ -171,27 +178,23 @@ export function WeatherWidget({ settings, update }: Props) {
       </div>
       {(rainLine || rainText) && (
         <div className="wx-rain">
-          <CloudRain size={16} aria-hidden />
-          <span>{rainLine || rainText}</span>
-          {weather.rain15 && ev && (ev.now || evMins <= 180) && <RainBars slots={weather.rain15} />}
+          {/* Lumi says what to do about it (go now, wait, or take the umbrella); her mood is the situation at a glance */}
+          {lumi && advice ? (
+            <span className="wx-rain-lumi" title="Lumi's advice">
+              <LumiFace mood={advice.mood} height={44} body still follow={false} />
+            </span>
+          ) : (
+            <CloudRain size={16} aria-hidden />
+          )}
+          <span className="wx-rain-text">
+            <span>{rainLine || rainText}</span>
+            {advice && <b className="wx-go">{advice.text}</b>}
+          </span>
+          {chart && <RainTimeline slots={weather.rain15!} event={ev} clock={(ms) => clockAt(weather, ms)} utcOffset={offsetOf(weather)} go={advice} />}
         </div>
       )}
       <TempCurve hours={weather.hourly} now={start} />
     </div>
-  )
-}
-
-/** The next three hours of rain, a quarter-hour per bar: how much, and when it starts and stops. */
-function RainBars({ slots }: { slots: { at: number; mm: number }[] }) {
-  const now = Date.now()
-  const next = slots.filter((s) => s.at + 15 * 60_000 > now).slice(0, 12)
-  const top = Math.max(0.6, ...next.map((s) => s.mm))
-  return (
-    <span className="wx-bars" aria-label="Rain over the next three hours">
-      {next.map((s) => (
-        <i key={s.at} title={`${s.mm.toFixed(1)} mm`} style={{ height: `${Math.max(8, Math.min(100, (s.mm / top) * 100))}%`, opacity: s.mm >= 0.12 ? 1 : 0.22 }} />
-      ))}
-    </span>
   )
 }
 

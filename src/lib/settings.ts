@@ -349,7 +349,7 @@ export const SIZE_DEFAULTS = { scale: 1, cardW: 440, cardH: 344, cardFit: false 
 /** the pill's standard text size (px), which Settings shows as Default */
 export const TEXT_SIZE_DEFAULT = 15
 
-const DEFAULTS: Settings = {
+export const DEFAULTS: Settings = {
   monitor: 0,
   hideInFullscreen: true,
   smartMode: false,
