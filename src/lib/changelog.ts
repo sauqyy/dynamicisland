@@ -11,6 +11,19 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.16',
+    campus: true,
+    title: 'Rain you can read, and a safer island',
+    items: [
+      'The rain chart has a clock now: Now on the left, the hours along the bottom, a bar per quarter-hour on a light, moderate and heavy scale, and a bracket over the rain the sentence is about. Point at a bar to read it.',
+      "Lumi tells you when to head out: go now while it's dry, wait for the rain to pass, or take the umbrella. The window she means is shaded on the chart.",
+      "The weather tells one story: the sentence, Lumi, the chart and the hour strip now read the same forecast, so it won't say it's raining on a dry afternoon or show rain for hours after it stops.",
+      'Updates are signed and checked before they install.',
+      "Files and programs you didn't drop on the island ask before they open, passwords copied from a password manager stay out of the clipboard shelf, and your campus details on this computer are encrypted.",
+      'Disconnecting SCELE opens its Security keys page, so you can switch the connection off there too.',
+    ],
+  },
+  {
     version: '0.7.15',
     campus: true,
     title: 'Fixes you asked for',
