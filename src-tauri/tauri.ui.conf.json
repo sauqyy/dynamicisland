@@ -1,6 +1,6 @@
 {
   "productName": "Astra Isle UI",
-  "version": "0.7.14",
+  "version": "0.7.15",
   "identifier": "com.dynamicisland.ui",
   "build": {
     "beforeDevCommand": "npm run dev:ui",
