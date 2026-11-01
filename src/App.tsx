@@ -258,6 +258,9 @@ function clockText(d: Date, clock24: boolean) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !clock24 })
 }
 
+/** px kept clear between the island and the left or right side of the screen */
+const SCREEN_EDGE = 8
+
 export default function App() {
   // the playback position is only needed smoothly while the Playing page is open (see below)
   const mediaFast = useRef(false)
@@ -1473,6 +1476,24 @@ export default function App() {
     }
   }, [hitW, shape.h, settings.scale])
 
+  // The island never hangs off the side of the screen. Parked near an edge, anything wider than where it sits (the
+  // open card, mostly) comes in just far enough to fit, and goes back out when it closes: where it was put is kept.
+  const [screenW, setScreenW] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const onResize = () => setScreenW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const reach = Math.max(0, screenW / 2 - (hitW * settings.scale) / 2 - SCREEN_EDGE)
+  const shownX = fs ? pos.x : Math.max(-reach, Math.min(reach, pos.x))
+  const shown = useMemo(() => ({ x: shownX, y: pos.y }), [shownX, pos.y])
+  const shownRef = useRef(shown)
+  shownRef.current = shown
+  // where it is on screen is where clicks land: the window's hit-testing follows the same offset
+  useEffect(() => {
+    if (IS_TAURI) invoke('set_offset', { x: shown.x, y: shown.y }).catch(() => {})
+  }, [shown.x, shown.y])
+
   useEffect(() => {
     if (group) lastInGroup.current[group.id] = tab
   }, [group, tab])
@@ -1655,10 +1676,8 @@ export default function App() {
       m.vel = { x: 0, y: 0 }
     }
     const next = { x: Math.round(m.pos.x), y: Math.max(0, Math.round(m.pos.y)) }
-    if (next.x !== posRef.current.x || next.y !== posRef.current.y) {
-      setPos(next)
-      invoke('set_offset', { x: next.x, y: next.y }).catch(() => {})
-    }
+    // (the window learns the offset from `shown`, which keeps the island on screen)
+    if (next.x !== posRef.current.x || next.y !== posRef.current.y) setPos(next)
     if (moving || m.held) {
       m.raf = requestAnimationFrame(stepSpring)
     } else {
@@ -1704,8 +1723,10 @@ export default function App() {
           if (mode === 'expanded' && !el.closest('.xtop')) return
           // docked, the island's top is wherever its height puts it above the taskbar
           const oy = motionRef.current.magBottom ? Math.round(dockTop()) : posRef.current.y
-          if (oy !== posRef.current.y) setPos((p) => ({ ...p, y: oy }))
-          posRef.current = { ...posRef.current, y: oy }
+          // a card drawn further in than where it was put (near an edge) is moved from where it is seen
+          const ox = shownRef.current.x
+          if (oy !== posRef.current.y || ox !== posRef.current.x) setPos({ x: ox, y: oy })
+          posRef.current = { x: ox, y: oy }
           dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
@@ -2391,7 +2412,7 @@ export default function App() {
         contentKey={contentKey}
         bubble={bubble}
         floating={!docked && pos.y > 2}
-        offset={pos}
+        offset={shown}
         dock={dockAt}
         centered={Boolean(fs)}
         dragHandlers={dragHandlers}
