@@ -9278,6 +9278,12 @@ button.cu-new:not(:disabled):hover {
 .wx-rain .rt {
   flex-basis: 100%;
 }
+/* which forecasts it is the middle of: the full list on hover */
+.wx-src {
+  flex-basis: 100%;
+  font-size: 10.5px;
+  color: var(--text-3);
+}
 .rt {
   position: relative;
   margin-top: 6px;
@@ -9384,6 +9390,9 @@ button.cu-new:not(:disabled):hover {
 }
 .rt-heavy {
   opacity: 1;
+}
+.rt-col.maybe {
+  opacity: 0.35;
 }
 .rt-hovering .rt-col:not(.on) {
   opacity: 0.3;

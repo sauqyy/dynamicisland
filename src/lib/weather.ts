@@ -1,3 +1,4 @@
+import { bmkgForecast, bmkgPlace } from './bmkg'
 import { isRainCode, WET } from './weatherOutlook'
 
 export interface Weather {
@@ -9,21 +10,38 @@ export interface Weather {
   humidity: number
   wind: number
   /** every hour of today and tomorrow, from today's midnight */
-  hourly: { hour: string; temp: number; code: number; /** chance of rain, % */ pop?: number; /** rain that hour, mm */ mm?: number; uv?: number; feels?: number }[]
+  hourly: {
+    hour: string
+    temp: number
+    code: number
+    /** chance of rain, % (the models' own) */
+    pop?: number
+    /** rain that hour, mm: the middle of what the forecasts say */
+    mm?: number
+    uv?: number
+    feels?: number
+    /** the share of the forecasts that have it raining that hour (0..1) */
+    chance?: number
+  }[]
   /** the instant (ms) the first hour of `hourly` starts, and the place's offset from UTC in seconds */
   dayStart?: number
   utcOffset?: number
   /** rain in the last quarter-hour, mm */
   precipNow?: number
-  /** the next twelve hours of rain, a quarter-hour at a time (mm); `at` is the instant it starts */
-  rain15?: { at: number; mm: number }[]
+  /**
+   * the next twelve hours of rain, a quarter-hour at a time: `at` is the instant it starts, `mm` the middle of what
+   * the forecasts say, and `chance` the share of them that have it raining (0..1)
+   */
+  rain15?: { at: number; mm: number; chance?: number }[]
+  /** the forecasts this is the consensus of ("ECMWF", …, "BMKG Rempoa") */
+  sources?: string[]
   /** index in `hourly` of the current hour */
   nowHour?: number
   fetchedAt: number
 }
 
-// .2: the rain is lined up with the time it falls (see reconcile); forecasts kept before that are fetched again
-const CACHE_KEY = 'di.weather.2'
+// .3: a consensus of several forecasts (see fetchWeather); forecasts kept before that are fetched again
+const CACHE_KEY = 'di.weather.3'
 const MAX_AGE = 20 * 60_000
 
 /** WMO weather codes, as returned by Open-Meteo. */
@@ -110,22 +128,45 @@ interface GeoResult {
   results?: { name: string; latitude: number; longitude: number }[]
 }
 
+/**
+ * The forecast models asked together, by the name Open-Meteo gives each. They see the same sky differently (ECMWF,
+ * for one, keeps a light drizzle over the tropics far more often than one falls), so no single one is trusted: every
+ * number is the middle of what they say, and "rain" means most of them agree.
+ */
+const MODELS: [id: string, name: string][] = [
+  ['ecmwf_ifs025', 'ECMWF'],
+  ['gfs_seamless', 'GFS'],
+  ['icon_seamless', 'ICON'],
+  ['ukmo_seamless', 'UK Met Office'],
+  ['jma_seamless', 'JMA'],
+  ['meteofrance_seamless', 'Météo-France'],
+]
+
+type Column = (number | null)[] | undefined
 interface ForecastResult {
-  current: {
-    time: string
-    temperature_2m: number
-    apparent_temperature: number
-    weather_code: number
-    relative_humidity_2m: number
-    wind_speed_10m: number
-    precipitation?: number
-  }
+  current: { time: string }
   utc_offset_seconds?: number
-  hourly: { time: string[]; temperature_2m: number[]; weather_code: number[]; precipitation_probability?: number[]; precipitation?: number[]; uv_index?: number[]; apparent_temperature?: number[] }
-  minutely_15?: { time: string[]; precipitation: number[] }
+  hourly: { time: string[] } & Record<string, Column | string[]>
+  minutely_15?: { time: string[] } & Record<string, Column | string[]>
 }
 
-/** Open-Meteo: free, no API key. */
+/** the middle value, ignoring what a model doesn't give */
+function median(xs: (number | null | undefined)[]): number | undefined {
+  const v = xs.filter((x): x is number => x != null && Number.isFinite(x)).sort((a, b) => a - b)
+  if (!v.length) return undefined
+  const m = v.length >> 1
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2
+}
+
+/** a weather code for an amount of rain (mm an hour) and the sky around it */
+function codeFor(mmPerHour: number, cloud: number | undefined, thunder: boolean, fog: boolean): number {
+  if (mmPerHour >= WET_HOUR) return thunder ? 95 : mmPerHour >= 7.5 ? 65 : mmPerHour >= 2.5 ? 63 : 61
+  if (fog) return 45
+  if (cloud == null) return 3
+  return cloud < 15 ? 0 : cloud < 40 ? 1 : cloud < 75 ? 2 : 3
+}
+
+/** Open-Meteo (free, no API key), several models at once, and BMKG for a place in Indonesia. */
 export async function fetchWeather(
   city: string,
   fahrenheit: boolean,
@@ -142,53 +183,98 @@ export async function fetchWeather(
   const params = new URLSearchParams({
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    current: 'temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m,precipitation',
-    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,uv_index,apparent_temperature',
+    current: 'temperature_2m',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,uv_index,apparent_temperature,cloud_cover,relative_humidity_2m,wind_speed_10m',
     // the rain, a quarter of an hour at a time for the next twelve hours: this is what the rain alerts are built on
     minutely_15: 'precipitation',
     forecast_minutely_15: '48',
     forecast_days: '2',
+    models: MODELS.map(([id]) => id).join(','),
     timezone: 'auto',
     temperature_unit: fahrenheit ? 'fahrenheit' : 'celsius',
   })
+  // BMKG's own forecast for the kelurahan, asked at the same time; the weather never waits on it failing
+  const bmkg = bmkgPlace(place.latitude, place.longitude)
+    .then(async (p) => (p ? { place: p, slots: await bmkgForecast(p.code) } : null))
+    .catch(() => null)
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
   if (!res.ok) throw new Error('Weather service unavailable')
   const f = (await res.json()) as ForecastResult
+  const local = await bmkg
+
+  // a model's column of a variable ("precipitation" from ECMWF), where it gave one
+  const col = (sec: Record<string, Column | string[]>, name: string, id: string) => sec[`${name}_${id}`] as Column
+  const models = MODELS.filter(([id]) => col(f.hourly, 'temperature_2m', id)?.some((v) => v != null))
+  const at = (sec: Record<string, Column | string[]>, name: string, i: number) => models.map(([id]) => col(sec, name, id)?.[i])
 
   const day = f.current.time.slice(0, 10)
   const first = Math.max(0, f.hourly.time.findIndex((t) => t.startsWith(day)))
   // Open-Meteo's times are the place's own clock, with no offset written: the offset says what instant they are
   const offset = f.utc_offset_seconds ?? 0
   const instant = (t: string) => Date.parse(`${t.length === 16 ? t : t.slice(0, 16)}:00Z`) - offset * 1000
+  // BMKG's three-hourly forecast, as the three hours around each of its times
+  const bmkgAt = (t: number) => local?.slots.find((s) => Math.abs(t - s.at) <= 90 * 60_000)
+
   // Open-Meteo's precipitation is what fell in the period *before* the time it is listed at: the hour listed
   // 14:00 holds the rain from 13:00 to 14:00. Each hour here holds the rain that falls during it.
-  const hourly = f.hourly.time.slice(first, first + 48).map((t, i) => ({
-    hour: t.slice(11, 13),
-    temp: Math.round(f.hourly.temperature_2m[first + i]),
-    code: f.hourly.weather_code[first + i],
-    pop: f.hourly.precipitation_probability?.[first + i],
-    mm: f.hourly.precipitation?.[first + i + 1],
-    uv: f.hourly.uv_index?.[first + i],
-    feels: f.hourly.apparent_temperature?.[first + i] != null ? Math.round(f.hourly.apparent_temperature[first + i]) : undefined,
-  }))
+  const hourly = f.hourly.time.slice(first, first + 48).map((t, i) => {
+    const j = first + i
+    const from = instant(t)
+    const b = bmkgAt(from + 30 * 60_000)
+    const mms = [...at(f.hourly, 'precipitation', j + 1), b ? Math.max(b.mm / 3, b.wet ? WET_HOUR : 0) : undefined].filter((x): x is number => x != null)
+    const wet = mms.filter((x) => x >= WET_HOUR).length
+    const codes = at(f.hourly, 'weather_code', j).filter((x): x is number => x != null)
+    const mm = median(mms)
+    const temp = median(at(f.hourly, 'temperature_2m', j))
+    const feels = median(at(f.hourly, 'apparent_temperature', j))
+    return {
+      hour: t.slice(11, 13),
+      temp: Math.round(temp ?? 0),
+      code: codeFor(mm ?? 0, median(at(f.hourly, 'cloud_cover', j)), codes.filter((c) => c >= 95).length * 2 >= codes.length && codes.length > 0, codes.filter((c) => c === 45 || c === 48).length * 2 > codes.length),
+      pop: median(at(f.hourly, 'precipitation_probability', j)),
+      mm: mm == null ? undefined : Math.round(mm * 10) / 10,
+      uv: median(at(f.hourly, 'uv_index', j)),
+      feels: feels == null ? undefined : Math.round(feels),
+      chance: mms.length ? wet / mms.length : undefined,
+    }
+  })
   const nowHour = Math.min(hourly.length - 1, Number(f.current.time.slice(11, 13)))
+
+  // the same for the quarter-hours: the value listed 13:15 fell from 13:00, so that is where it starts
+  const rain15 = f.minutely_15?.time.map((t, k) => {
+    const start = instant(t) - 15 * 60_000
+    const b = bmkgAt(start + 7.5 * 60_000)
+    const mms = [...at(f.minutely_15!, 'precipitation', k), b ? Math.max(b.mm / 12, b.wet ? WET : 0) : undefined].filter((x): x is number => x != null)
+    return { at: start, mm: median(mms) ?? 0, chance: mms.length ? mms.filter((x) => x >= WET).length / mms.length : 0 }
+  })
+
+  // now: the hour under way, eased toward the next one by the minute, and the rain of the quarter-hour under way
+  const j = first + nowHour
+  const minute = Number(f.current.time.slice(14, 16)) / 60
+  const ease = (name: string) => {
+    const a = median(at(f.hourly, name, j))
+    const b = median(at(f.hourly, name, j + 1))
+    return a == null ? undefined : b == null ? a : a + (b - a) * minute
+  }
+  const fetchedAt = Date.now()
+  const slotNow = rain15?.find((s) => s.at <= fetchedAt && s.at + 15 * 60_000 > fetchedAt)
 
   const w: Weather = {
     city: place.name,
     fahrenheit,
-    temp: Math.round(f.current.temperature_2m),
-    feels: Math.round(f.current.apparent_temperature),
-    code: f.current.weather_code,
-    humidity: f.current.relative_humidity_2m,
-    wind: Math.round(f.current.wind_speed_10m),
+    temp: Math.round(ease('temperature_2m') ?? 0),
+    feels: Math.round(ease('apparent_temperature') ?? 0),
+    code: slotNow ? codeFor(slotNow.mm * 4, median(at(f.hourly, 'cloud_cover', j)), (hourly[nowHour]?.code ?? 0) >= 95, hourly[nowHour]?.code === 45) : hourly[nowHour]?.code ?? 3,
+    humidity: Math.round(median(at(f.hourly, 'relative_humidity_2m', j)) ?? 0),
+    wind: Math.round(median(at(f.hourly, 'wind_speed_10m', j)) ?? 0),
     hourly,
     nowHour,
     dayStart: instant(f.hourly.time[first]),
     utcOffset: offset,
-    precipNow: f.current.precipitation,
-    // the same for the quarter-hours: the value listed 13:15 fell from 13:00, so that is where it starts
-    rain15: f.minutely_15?.time.map((t, i) => ({ at: instant(t) - 15 * 60_000, mm: f.minutely_15!.precipitation[i] ?? 0 })),
-    fetchedAt: Date.now(),
+    precipNow: slotNow?.mm,
+    rain15,
+    sources: [...models.map(([, name]) => name), ...(local ? [`BMKG ${local.place.desa}`] : [])],
+    fetchedAt,
   }
   reconcile(w)
   try {

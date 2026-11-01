@@ -30,5 +30,19 @@ export default defineConfig({
     strictPort: true,
     // cargo's build output churns constantly and locks files on Windows
     watch: { ignored: ['**/src-tauri/**'] },
+    // the browser demo's way to BMKG and wilayah.id, which the app reaches from Rust (public_data.rs): neither
+    // answers a page from another site, so the dev server asks for it, as a plain request with no Origin
+    proxy: Object.fromEntries(
+      [['/__bmkg', 'https://api.bmkg.go.id'], ['/__wilayah', 'https://wilayah.id']].map(([from, to]) => [
+        from,
+        {
+          target: to,
+          changeOrigin: true,
+          rewrite: (p: string) => p.slice(from.length),
+          configure: (proxy: { on: (e: 'proxyReq', f: (req: { removeHeader: (h: string) => void }) => void) => void }) =>
+            proxy.on('proxyReq', (req) => (req.removeHeader('origin'), req.removeHeader('referer'))),
+        },
+      ]),
+    ),
   },
 })
