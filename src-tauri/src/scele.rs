@@ -42,7 +42,11 @@ fn private_agent() -> &'static ureq::Agent {
 }
 
 /// Where the SCELE token is kept: the system's credential store (Windows Credential Manager, the
-/// macOS Keychain), which other programs and a copied folder can't read, rather than a file.
+/// macOS Keychain) rather than a file, so it isn't in a copied or synced folder or a backup of it.
+/// On macOS the Keychain also keeps other apps from reading it without asking. Windows has no such
+/// per-app lock: any program running as the same user can read a Credential Manager entry, so
+/// malware on the account is out of reach of any app's protection; that is why disconnecting also
+/// sends the user to revoke the token on SCELE itself (see `disconnect`).
 const VAULT_SERVICE: &str = "com.dynamicisland.ui.scele";
 const VAULT_USER: &str = "token";
 
@@ -60,13 +64,35 @@ fn token(app: &AppHandle) -> Option<String> {
                     o.remove("token");
                 }
                 if let Ok(p) = token_path(app) {
-                    let _ = std::fs::write(p, saved.to_string());
+                    let _ = crate::seal::write(&p, &saved.to_string());
                 }
             }
             return Some(t);
         }
     }
     vault()?.get_password().ok().filter(|t| !t.is_empty())
+}
+
+/// The part after `pluginfile.php/` of a SCELE file address, and its query (without any token),
+/// or None for anything else. The address is parsed rather than prefix-checked, and anything a URL
+/// parser would fold into a step up ("..", "%2e", a backslash) is refused outright: the token is
+/// sent with this request, so it must only ever reach SCELE's file endpoint, never another SCELE page.
+fn scele_file_path(url: &str) -> Option<(String, Vec<(String, String)>)> {
+    let lower = url.to_ascii_lowercase();
+    if lower.contains("..") || lower.contains("%2e") || lower.contains("%2f") || lower.contains("%5c") || url.contains('\\') {
+        return None;
+    }
+    let u = tauri::Url::parse(url).ok()?;
+    if u.scheme() != "https" || u.host_str() != Some("scele.cs.ui.ac.id") || u.port().is_some() || !u.username().is_empty() || u.password().is_some() {
+        return None;
+    }
+    let path = u.path();
+    let rest = path.strip_prefix("/webservice/pluginfile.php/").or_else(|| path.strip_prefix("/pluginfile.php/"))?;
+    if rest.is_empty() {
+        return None;
+    }
+    let query = u.query_pairs().filter(|(k, _)| k != "token" && k != "wstoken").map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
+    Some((rest.to_string(), query))
 }
 
 /// Largest course file read for the class schedule (a syllabus is far smaller).
@@ -78,23 +104,16 @@ const FILE_LIMIT: u64 = 20 * 1024 * 1024;
 pub async fn scele_file(app: AppHandle, url: String) -> Result<String, String> {
     use base64::Engine;
     use std::io::Read;
-    let path = url
-        .strip_prefix(&format!("{BASE}/webservice/pluginfile.php/"))
-        .or_else(|| url.strip_prefix(&format!("{BASE}/pluginfile.php/")))
-        .ok_or_else(|| "not a SCELE file".to_string())?
-        .to_string();
+    let (path, query) = scele_file_path(&url).ok_or_else(|| "not a SCELE file".to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
         if !crate::sso::saved(&app).is_some_and(|s| s.fasilkom) {
             return Err("signed-out".to_string());
         }
         let token = token(&app).ok_or_else(|| "signed-out".to_string())?;
         // the web-service file endpoint takes the token instead of a browser session
-        let (path, query) = path.split_once('?').unwrap_or((path.as_str(), ""));
         let mut req = private_agent().get(&format!("{BASE}/webservice/pluginfile.php/{path}")).timeout(std::time::Duration::from_secs(30));
-        for (k, v) in query.split('&').filter_map(|kv| kv.split_once('=')) {
-            if k != "token" {
-                req = req.query(k, v);
-            }
+        for (k, v) in &query {
+            req = req.query(k, v);
         }
         let resp = req.query("token", &token).call().map_err(|_| "SCELE file unavailable".to_string())?;
         // a redirect isn't followed (it could carry the token elsewhere): it's no file
@@ -197,7 +216,7 @@ fn token_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 }
 
 fn load(app: &AppHandle) -> Option<Value> {
-    let text = std::fs::read_to_string(token_path(app).ok()?).ok()?;
+    let text = crate::seal::read(&token_path(app).ok()?)?;
     serde_json::from_str(&text).ok()
 }
 
@@ -324,7 +343,7 @@ pub async fn scele_login(app: AppHandle, password: String) -> Result<SceleAccoun
             "fullname": info.get("fullname").and_then(Value::as_str).unwrap_or(""),
             "username": info.get("username").and_then(Value::as_str).unwrap_or(""),
         });
-        std::fs::write(token_path(&app)?, saved.to_string()).map_err(|e| e.to_string())?;
+        crate::seal::write(&token_path(&app)?, &saved.to_string())?;
         account_of(&saved).ok_or_else(|| "Sign-in failed".to_string())
     })
     .await
@@ -338,9 +357,23 @@ pub fn scele_account(app: AppHandle) -> Option<SceleAccount> {
     load(&app).as_ref().and_then(account_of)
 }
 
+/// SCELE's page of the user's own security keys, where the island's token can be deleted for good.
+const KEYS_PAGE: &str = "https://scele.cs.ui.ac.id/user/managetoken.php";
+
+/// Forgets the token here and, if there was one, opens SCELE's security keys page in the browser:
+/// Moodle has no web-service call that lets a token revoke itself, and until it is deleted there
+/// (or expires) a copy taken from this computer would still work.
+pub fn disconnect(app: &AppHandle) {
+    let had = token(app).is_some();
+    forget_token(app);
+    if had {
+        let _ = crate::auth::open_url(KEYS_PAGE.to_string());
+    }
+}
+
 #[tauri::command]
 pub fn scele_logout(app: AppHandle) {
-    forget_token(&app);
+    disconnect(&app);
 }
 
 /// Calls one of the allowed web-service functions with the saved token.

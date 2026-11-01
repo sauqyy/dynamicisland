@@ -1031,7 +1031,7 @@ function InboxPage({ scele, now }: { scele: SceleState; now: number }) {
         <span>
           Signed in as <b>{scele.account?.fullname || scele.account?.username}</b>
         </span>
-        <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={scele.logout}>
+        <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={scele.logout} title="Forgets the token here, then opens SCELE's Security keys page so you can delete it there too">
           <LogOut size={11} aria-hidden /> Disconnect
         </button>
       </div>

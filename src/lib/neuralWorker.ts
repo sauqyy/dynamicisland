@@ -1,8 +1,10 @@
 /// Runs the natural voice off the main thread, so loading it and making speech never freezes the island.
-import { KokoroTTS } from 'kokoro-js'
-import { useDiskCache } from './modelCache'
+import { KokoroTTS, env as kokoroEnv } from 'kokoro-js'
+import { ORT_PATH, useDiskCache } from './modelCache'
 
 useDiskCache()
+// kokoro-js carries its own copy of transformers, with its own settings
+kokoroEnv.wasmPaths = ORT_PATH
 
 const MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX'
 const out = self as unknown as Worker

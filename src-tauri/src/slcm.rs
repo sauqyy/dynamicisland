@@ -136,20 +136,30 @@ fn reveal(app: &AppHandle) {
 
 /// Fills UI's login form and submits it. A JSON string is a valid JavaScript string literal.
 fn fill(window: &WebviewWindow, username: &str, password: &str) {
-    let (Ok(u), Ok(p)) = (serde_json::to_string(username), serde_json::to_string(password)) else {
+    let (Ok(u), Ok(mut p)) = (serde_json::to_string(username), serde_json::to_string(password)) else {
         return;
     };
-    let _ = window.eval(&format!(
+    let mut script = format!(
         r#"(() => {{
+  // checked again here, when it runs: the page must still be UI's login over HTTPS, and its form
+  // must send the password back there and nowhere else
+  if (location.protocol !== 'https:' || location.hostname !== 'login.ui.ac.id') return
   const u = document.getElementById('username'), p = document.getElementById('password')
   if (!u || !p || !p.form) return
+  let to
+  try {{ to = new URL(p.form.getAttribute('action') || location.href, location.href) }} catch {{ return }}
+  if (to.protocol !== 'https:' || to.hostname !== 'login.ui.ac.id') return
   u.value = {u}
   p.value = {p}
   for (const el of [u, p]) el.dispatchEvent(new Event('input', {{ bubbles: true }}))
   const b = p.form.querySelector('[name="login"]')
   b ? b.click() : p.form.submit()
 }})()"#
-    ));
+    );
+    p.zeroize();
+    let _ = window.eval(&script);
+    // the script held the password too: wiped once it is handed to the page
+    script.zeroize();
 }
 
 /// A page finished loading in the SLCM window: sign in on UI's login page, once.
@@ -221,7 +231,7 @@ fn handback(app: &AppHandle, data: &str) {
         at: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0),
     };
     if let (Ok(p), Ok(json)) = (path(app), serde_json::to_string(&saved)) {
-        let _ = std::fs::write(p, json);
+        let _ = crate::seal::write(&p, &json);
     }
     let _ = app.emit("slcm", &saved);
     // closed once the navigation handler has returned
@@ -318,7 +328,7 @@ pub fn slcm_cancel(app: AppHandle) {
 /// The schedule last read from SLCM, if any.
 #[tauri::command]
 pub fn slcm_saved(app: AppHandle) -> Option<Saved> {
-    serde_json::from_str(&std::fs::read_to_string(path(&app).ok()?).ok()?).ok()
+    serde_json::from_str(&crate::seal::read(&path(&app).ok()?)?).ok()
 }
 
 #[tauri::command]

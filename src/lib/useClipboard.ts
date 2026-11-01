@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { readImage, readText, writeImage, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { Image } from '@tauri-apps/api/image'
+import { invoke } from '@tauri-apps/api/core'
 import { IS_TAURI } from './useMedia'
 
 const MAX_ITEMS = 10
@@ -70,6 +71,9 @@ export function useClipboard({ paused, autoClearMin, skipSecrets }: ClipOptions)
           : [item, ...cur.filter((c) => c.text !== item.text)].slice(0, MAX_ITEMS),
       )
     const poll = async () => {
+      // something a password manager copied: not read at all, whatever the settings (see system.rs)
+      if (await invoke<boolean>('clipboard_private').catch(() => false)) return
+      if (stopped) return
       let text: string | undefined
       try {
         text = (await readText())?.trim()

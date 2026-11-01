@@ -13,6 +13,26 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_CAPITAL, VK_NU
 use winreg::enums::HKEY_CURRENT_USER;
 use winreg::RegKey;
 
+/// True while the clipboard holds something its owner asked clipboard tools to leave alone: password
+/// managers (Bitwarden, 1Password, KeePass, Windows' own) mark what they copy with these formats. The
+/// clipboard shelf then doesn't even read it, so a copied password never enters the island.
+#[tauri::command]
+pub fn clipboard_private() -> bool {
+    use windows::core::w;
+    use windows::Win32::System::DataExchange::{IsClipboardFormatAvailable, RegisterClipboardFormatW};
+    unsafe {
+        [
+            w!("ExcludeClipboardContentFromMonitorProcessing"),
+            w!("CanIncludeInClipboardHistory"),
+            w!("CanUploadToCloudClipboard"),
+            w!("Clipboard Viewer Ignore"),
+        ]
+        .into_iter()
+        .map(|name| RegisterClipboardFormatW(name))
+        .any(|format| format != 0 && IsClipboardFormatAvailable(format).is_ok())
+    }
+}
+
 #[derive(Serialize, Clone, PartialEq)]
 struct Battery {
     /// 0–100

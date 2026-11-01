@@ -120,8 +120,11 @@ fn icon_data_url(path: &str) -> Option<String> {
     }
 }
 
+/// Describes files dropped onto the island. Only granted paths (see grants.rs) are looked at, so the
+/// webview can't probe the rest of the disk, or a network share, through it.
 #[tauri::command(async)]
-pub fn file_info(paths: Vec<String>) -> Vec<FileInfo> {
+pub fn file_info(app: tauri::AppHandle, paths: Vec<String>) -> Vec<FileInfo> {
+    let paths: Vec<String> = paths.into_iter().filter(|p| crate::grants::is_granted(&app, p)).collect();
     // The shell wants a COM apartment; use a short-lived thread so we don't touch Tauri's.
     std::thread::spawn(move || {
         unsafe {
@@ -148,15 +151,28 @@ pub fn file_info(paths: Vec<String>) -> Vec<FileInfo> {
     .unwrap_or_default()
 }
 
-/// Opens a file, folder or app with its default handler.
+/// Opens a file, folder or app with its default handler: one the user dropped or allowed before,
+/// or else once they say yes in the system's own dialog (see grants.rs).
 #[tauri::command]
-pub fn open_path(path: String) {
-    let _ = Command::new("explorer").arg(path).spawn();
+pub async fn open_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !crate::grants::may_open(&app, &path) {
+            return Err("Not opened".to_string());
+        }
+        Command::new("explorer").arg(&path).spawn().map(|_| ()).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn reveal_path(path: String) {
-    let _ = Command::new("explorer").raw_arg(format!("/select,\"{path}\"")).spawn();
+pub fn reveal_path(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    // the path goes inside quotes on Explorer's command line: one with a quote of its own could
+    // add arguments, so it is refused (Windows file names can't contain one anyway)
+    if path.contains('"') || path.chars().any(char::is_control) || !(crate::grants::is_granted(&app, &path) || crate::grants::plain(&path)) {
+        return Err("Not shown".into());
+    }
+    Command::new("explorer").raw_arg(format!("/select,\"{path}\"")).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
 /// A small translucent square used as the ghost image while dragging a file out of the shelf.
