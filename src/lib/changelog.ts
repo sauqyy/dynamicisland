@@ -11,6 +11,18 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.15',
+    campus: true,
+    title: 'Fixes you asked for',
+    items: [
+      "Use my location works in more places: if your device cannot say where you are, it tries several other ways, tells you when Windows has location switched off (with a button to open that setting), and can suggest your time zone's main city.",
+      "The cover on Now Playing no longer shows the previous song's album when the next song starts.",
+      'Chat stays on the latest message when you go fullscreen and back.',
+      'What you were typing in a chat is kept when you go to another page and come back, for every friend and group.',
+      'The Lumi page now sits beside Settings.',
+    ],
+  },
+  {
     version: '0.7.14',
     campus: true,
     title: 'Make Lumi yours',
