@@ -9249,27 +9249,218 @@ button.cu-new:not(:disabled):hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- the rain for the next three hours ---------- */
-.wx-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 22px;
-  margin-top: 8px;
-}
-.wx-bars i {
-  flex: 1;
-  border-radius: 2px;
-  background: var(--info);
-}
+/* ---------- the rain for the next three hours (RainTimeline.tsx) ---------- */
 .wx-rain {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
+  gap: 4px 10px;
 }
-.wx-rain .wx-bars {
+.wx-rain-lumi {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  margin: -2px -2px -2px -4px;
+}
+.wx-rain-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* the advice: what to do, so it reads first after the facts */
+.wx-go {
+  font-weight: 600;
+  color: var(--text-1);
+}
+.wx-rain .rt {
   flex-basis: 100%;
+}
+.rt {
+  position: relative;
+  margin-top: 6px;
+  outline: none;
+  border-radius: 6px;
+  cursor: default;
+  touch-action: pan-y;
+}
+.rt:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--info) 60%, transparent);
+}
+.rt svg {
+  display: block;
+  overflow: visible;
+}
+.rt text {
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+.rt-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.rt-axis {
+  stroke: rgb(var(--fg-rgb) / 0.18);
+  stroke-width: 1;
+}
+.rt-band {
+  fill: var(--text-3);
+  transition: fill 0.15s;
+}
+.rt-band.on {
+  fill: var(--text-1);
+}
+.rt-tick {
+  fill: var(--text-3);
+}
+.rt-tick.now {
+  fill: var(--text-1);
+  font-weight: 600;
+}
+.rt-now {
+  fill: var(--text-1);
+}
+.rt-now-ring {
+  fill: none;
+  stroke: var(--text-1);
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rt-ping 2.4s ease-out infinite;
+}
+@keyframes rt-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+/* the rain the sentence is about */
+.rt-bracket path {
+  stroke: var(--text-2);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rt-bracket text {
+  fill: var(--text-2);
+  font-weight: 600;
+}
+
+/* Lumi's window to go out in */
+.rt-go rect {
+  fill: color-mix(in srgb, var(--accent, #4ade80) 10%, transparent);
+}
+.rt-go line {
+  stroke: var(--accent, #4ade80);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.rt-go text {
+  fill: var(--text-2);
+  font-weight: 600;
+}
+
+/* the quarter-hours: one hue, stronger as the rain gets heavier (height says it too) */
+.rt-col {
+  fill: var(--info);
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: rt-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  transition: opacity 0.15s;
+}
+.rt-light {
+  opacity: 0.6;
+}
+.rt-moderate {
+  opacity: 0.85;
+}
+.rt-heavy {
+  opacity: 1;
+}
+.rt-hovering .rt-col:not(.on) {
+  opacity: 0.3;
+}
+.rt-col.on {
+  opacity: 1;
+}
+@keyframes rt-rise {
+  from {
+    transform: scaleY(0);
+  }
+}
+.rt-dry {
+  fill: var(--text-3);
+  transition: r 0.15s;
+}
+.rt-dry.on {
+  fill: var(--text-1);
+}
+.rt-cross {
+  stroke: rgb(var(--fg-rgb) / 0.25);
+  stroke-width: 1;
+  pointer-events: none;
+}
+/* rain falling inside each bar */
+.rt-drops line {
+  stroke: rgb(255 255 255 / 0.55);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  animation: rt-fall linear infinite;
+}
+@keyframes rt-fall {
+  from {
+    transform: translateY(-4px);
+  }
+  to {
+    transform: translateY(var(--fall));
+  }
+}
+
+.rt-tip {
+  position: absolute;
+  top: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--island-bg, #111) 92%, rgb(var(--fg-rgb)));
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.35), 0 0 0 1px var(--line);
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--text-2);
+  pointer-events: none;
+  z-index: 2;
+}
+.rt-tip b {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.rt-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rt-col,
+  .rt-now-ring,
+  .rt-drops line {
+    animation: none;
+  }
+  .rt-drops {
+    display: none;
+  }
 }
 
 /* ---------- the Lumi page: the preview on top, one short section under it ---------- */
