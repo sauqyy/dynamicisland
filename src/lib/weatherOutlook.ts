@@ -77,7 +77,6 @@ export function nextRain(w: Weather, now: number): RainEvent | null {
   }
   if (cur) runs.push(cur)
   const horizon = slots.length ? slots[slots.length - 1].at + STEP : now
-  const fallingNow = (w.precipNow ?? 0) >= 0.1 || isRainCode(w.code)
   const mk = (r: { start: number; end: number; peak: number; total: number }, isNow: boolean): RainEvent => ({
     start: r.start,
     end: r.end >= horizon - STEP ? null : r.end,
@@ -86,12 +85,10 @@ export function nextRain(w: Weather, now: number): RainEvent | null {
     now: isNow,
     strength: strength(r.peak),
   })
-  const going = runs.find((r) => r.start <= now + STEP && r.end > now)
-  if (fallingNow || going) {
-    if (going) return mk(going, true)
-    // it says it is raining but the quarter-hours do not: we know nothing about how long
-    return { start: now, end: null, peak: Math.max(0.5, (w.precipNow ?? 0) * 4), total: 0, now: true, strength: strength(Math.max(0.5, (w.precipNow ?? 0) * 4)) }
-  }
+  // "raining now" only when the rain it shows has begun: the same quarter-hours the chart and the hour strip are
+  // drawn from (see reconcile in weather.ts), never a guess at the present that they don't show
+  const going = runs.find((r) => r.start <= now && r.end > now)
+  if (going) return mk(going, true)
   const next = runs.find((r) => r.start > now)
   return next ? mk(next, false) : null
 }
