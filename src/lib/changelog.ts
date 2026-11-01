@@ -11,6 +11,21 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.17',
+    campus: true,
+    title: 'Weather you can trust',
+    items: [
+      'The weather is the middle of seven forecasts, including BMKG for your own kelurahan, so one model can no longer call rain on a dry afternoon. When they disagree it says "possible" and how many agree.',
+      'The weather page names your kelurahan (like Rempoa), not just the kecamatan.',
+      'Weather alerts are now your choice: Lumi asks on the Weather page, and you can change it there any time. They stay off until you say yes.',
+      'Use my location no longer leaves the Weather page blank.',
+      'Escape leaves a chat first, then closes the island.',
+      'The island stays on screen when you open it near the left or right edge.',
+      'Each page shows how many new things it has (Friends 2, Groups 5, Inbox 3), and the group icon adds them up.',
+      'Looking at the Inbox for a second marks its SCELE notifications as read.',
+    ],
+  },
+  {
     version: '0.7.16',
     campus: true,
     title: 'Rain you can read, and a safer island',
