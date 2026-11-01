@@ -7,11 +7,19 @@ interface Props {
   tab: Tab
   onPage: (tab: Tab) => void
   onGroup: (id: string) => void
-  /** group ids that get a dot on their icon (unread messages, an update) */
+  /** group ids that get a plain dot on their icon (something without a number, like an update) */
   dots: string[]
+  /** what is new on each page: its label gets the number, its group's icon the sum of its pages */
+  counts?: PageCounts
   /** Astra's colour: when her page is open the highlight turns into it, icon included, with a glow */
   astraColor: string
 }
+
+/** For each page with something new: how many, and what they are ("2 unread messages, 1 friend request"). */
+export type PageCounts = Partial<Record<Tab, { n: number; label: string }>>
+
+/** "9+" past nine: a count is a nudge, not a ledger */
+const short = (n: number) => (n > 9 ? '9+' : String(n))
 
 /** Dark or light text for sitting on a colour, by its brightness. */
 function inkOn(color: string): string {
@@ -58,7 +66,7 @@ function placeLit(el: HTMLElement, hl: HTMLElement, astra = false) {
  * A group with more labels than the card has room for scrolls them sideways, with the
  * active one kept in view and a fade on the side where there are more.
  */
-export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: Props) {
+export function Rail({ groups, tab, onPage, onGroup, dots, counts = {}, astraColor: color }: Props) {
   const astraColor = color || '#8fa8ff'
   const rail = useRef<HTMLElement>(null)
   const lit = useRef<HTMLSpanElement>(null)
@@ -112,11 +120,16 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
       onClick={(e) => e.stopPropagation()}
     >
       <span className={`rail-lit ${active === 'astra' ? 'is-astra' : ''}`} ref={lit} />
-      {groups.map((g) => (
+      {groups.map((g) => {
+        const news = g.pages.filter((p) => counts[p])
+        const total = news.reduce((a, p) => a + counts[p]!.n, 0)
+        // the icon says where it came from and how much: "People: Friends 2, Groups 1"
+        const what = news.map((p) => `${SHORT[p]} ${counts[p]!.n}`).join(', ')
+        return (
         <div key={g.id} className={`rail-g ${g.id === active ? 'on' : ''} ${g.id === 'astra' ? 'is-astra' : ''}`}>
-          <button className="rail-ic" aria-label={g.title} title={g.title} onClick={() => onGroup(g.id)}>
+          <button className="rail-ic" aria-label={total ? `${g.title}: ${what}` : g.title} title={total ? `${g.title}: ${what}` : g.title} onClick={() => onGroup(g.id)}>
             <GroupIcon id={g.id} size={16} />
-            {dots.includes(g.id) && <i className="rail-dot" />}
+            {total > 0 ? <i className="rail-count">{short(total)}</i> : dots.includes(g.id) && <i className="rail-dot" />}
           </button>
           <span className="rail-pages">
             <span
@@ -128,14 +141,24 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
               }}
             >
               {g.pages.map((p) => (
-                <button key={p} className={`rail-pg ${p === tab ? 'on' : ''}`} aria-current={p === tab ? 'page' : undefined} tabIndex={g.id === active ? 0 : -1} onClick={() => onPage(p)}>
+                <button
+                  key={p}
+                  className={`rail-pg ${p === tab ? 'on' : ''}`}
+                  aria-current={p === tab ? 'page' : undefined}
+                  aria-label={counts[p] ? `${SHORT[p]}: ${counts[p]!.label}` : undefined}
+                  title={counts[p]?.label}
+                  tabIndex={g.id === active ? 0 : -1}
+                  onClick={() => onPage(p)}
+                >
                   {SHORT[p]}
+                  {counts[p] && <i className="rail-pg-count">{short(counts[p]!.n)}</i>}
                 </button>
               ))}
             </span>
           </span>
         </div>
-      ))}
+        )
+      })}
     </nav>
   )
 }

@@ -3185,6 +3185,40 @@ button.ao-text:hover {
 .rail-g.on .rail-ic {
   color: var(--accent);
 }
+/* how many new things a group holds (the sum of its pages), in place of the dot */
+.rail-count {
+  position: absolute;
+  top: -1px;
+  right: -6px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--accent, #4ade80);
+  color: #0b0b10;
+  box-shadow: 0 0 0 2px var(--island-bg);
+  font: 700 8.5px/13px var(--font-ui);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
+}
+/* and on the page it is on: "Friends 2" */
+.rail-pg-count {
+  display: inline-block;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent, #4ade80);
+  color: #0b0b10;
+  font: 700 10px/16px var(--font-ui);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  vertical-align: 1px;
+}
 .rail-dot {
   position: absolute;
   top: 4px;
