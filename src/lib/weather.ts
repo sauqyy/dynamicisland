@@ -3,6 +3,9 @@ import { isRainCode, WET } from './weatherOutlook'
 
 export interface Weather {
   city: string
+  /** the point it is the forecast for */
+  lat?: number
+  lon?: number
   fahrenheit: boolean
   temp: number
   feels: number
@@ -93,10 +96,15 @@ export function reconcile(w: Weather) {
   if (now) w.code = agree(w.code, now.mm * 4)
 }
 
-export function cachedWeather(city: string, fahrenheit: boolean): Weather | null {
+/**
+ * The forecast last fetched, if it is for this place. With a point, it has to be for that point too (within about a
+ * kilometre): two spots can share a name, and a forecast for one is not the other's.
+ */
+export function cachedWeather(city: string, fahrenheit: boolean, at?: { lat: number | null; lon: number | null }): Weather | null {
   try {
     const w = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as Weather | null
-    if (w && w.city.toLowerCase() === city.toLowerCase() && w.fahrenheit === fahrenheit) return w
+    const samePoint = !at || at.lat == null || at.lon == null || w?.lat == null || w.lon == null || (Math.abs(w.lat - at.lat) < 0.01 && Math.abs(w.lon - at.lon) < 0.01)
+    if (w && w.city.toLowerCase() === city.toLowerCase() && w.fahrenheit === fahrenheit && samePoint) return w
   } catch {
     /* ignore */
   }
@@ -261,6 +269,8 @@ export async function fetchWeather(
 
   const w: Weather = {
     city: place.name,
+    lat: place.latitude,
+    lon: place.longitude,
     fahrenheit,
     temp: Math.round(ease('temperature_2m') ?? 0),
     feels: Math.round(ease('apparent_temperature') ?? 0),
