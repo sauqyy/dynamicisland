@@ -1259,7 +1259,7 @@ export default function App() {
   // Re-read when the card closes, which is when the city may have changed.
   const idleWeather = useMemo(() => {
     if (settings.idle === 'weather' && settings.city) {
-      const w = cachedWeather(settings.city, settings.fahrenheit)
+      const w = cachedWeather(settings.city, settings.fahrenheit, { lat: settings.cityLat, lon: settings.cityLon })
       if (w) return { code: w.code, text: `${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` }
     }
     return null

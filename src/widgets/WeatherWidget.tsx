@@ -19,9 +19,12 @@ interface Props {
 
 export function WeatherWidget({ settings, update }: Props) {
   const { city, fahrenheit, cityLat, cityLon } = settings
-  const [weather, setWeather] = useState<Weather | null>(() => (city ? cachedWeather(city, fahrenheit) : null))
+  const [weather, setWeather] = useState<Weather | null>(() => (city ? cachedWeather(city, fahrenheit, { lat: cityLat, lon: cityLon }) : null))
+  // bumped when the user picks a place (their location, a city, a suggestion): the weather is fetched again even if
+  // the place keeps its name, which is what used to leave the page blank after "Use my location" found the same area
+  const [reload, setReload] = useState(0)
+  const seenReload = useRef(0)
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(!city)
   const [draft, setDraft] = useState(city)
   const [locating, setLocating] = useState(false)
@@ -40,6 +43,7 @@ export function WeatherWidget({ settings, update }: Props) {
       const p = await detectPlace({ allowNetwork: network })
       update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: true })
       setWeather(null)
+      setReload((n) => n + 1)
       setEditing(false)
     } catch (e) {
       // the try made on its own when the page first opens: no blame, just what to press next
@@ -63,23 +67,25 @@ export function WeatherWidget({ settings, update }: Props) {
 
   useEffect(() => {
     if (!city) return
-    const cached = cachedWeather(city, fahrenheit)
+    // a place the user just picked is fetched fresh; otherwise a recent forecast for this same point will do
+    const picked = reload !== seenReload.current
+    seenReload.current = reload
+    const cached = picked ? null : cachedWeather(city, fahrenheit, { lat: cityLat, lon: cityLon })
     if (cached && isFresh(cached)) {
       setWeather(cached)
       return
     }
     let cancelled = false
-    setLoading(true)
     setError(null)
     fetchWeather(city, fahrenheit, cityLat != null && cityLon != null ? { lat: cityLat, lon: cityLon } : null)
       .then((w) => !cancelled && setWeather(w))
       .catch((e: Error) => !cancelled && setError(e.message === 'Failed to fetch' ? 'You appear to be offline' : e.message))
-      .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
+    // (the point counts, not just the name: two spots can share one)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, fahrenheit])
+  }, [city, fahrenheit, cityLat, cityLon, reload])
 
   const unit = fahrenheit ? '°F' : '°C'
 
@@ -93,6 +99,7 @@ export function WeatherWidget({ settings, update }: Props) {
           // a city picked by hand stays: the weather stops following the user
           update({ city: hit.name, cityLat: hit.latitude, cityLon: hit.longitude, weatherAuto: false })
           setWeather(null)
+          setReload((n) => n + 1)
           setEditing(false)
         }}
         onLocate={() => void locate(true)}
@@ -104,6 +111,7 @@ export function WeatherWidget({ settings, update }: Props) {
           // a guess from the time zone is a city picked by hand: the weather does not follow the user from it
           update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: false })
           setWeather(null)
+          setReload((n) => n + 1)
           setEditing(false)
         }}
       />
@@ -113,7 +121,8 @@ export function WeatherWidget({ settings, update }: Props) {
   if (!weather) {
     return (
       <div className="weather center" onClick={(e) => e.stopPropagation()}>
-        <div className="timer-label">{error ?? (loading ? 'Loading weather…' : '')}</div>
+        {/* never an empty page: without a forecast or a reason why, one is on its way */}
+        <div className="timer-label">{error ?? 'Loading weather…'}</div>
         {error && (
           <button className="pill-btn" data-cuelume-open onClick={() => setEditing(true)}>
             Change city
