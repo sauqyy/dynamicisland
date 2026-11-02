@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { strength, WET, type RainEvent, type Strength } from '../lib/weatherOutlook'
+import { strength, SURE, WET, type RainEvent, type Strength } from '../lib/weatherOutlook'
 
 /**
  * The next three hours of rain on a real clock: "Now" at the left, the hours along the bottom, a bar per
@@ -41,7 +41,7 @@ function column(x: number, y: number, w: number, h: number) {
 
 interface Props {
   /** the quarter-hours of the forecast (mm in each) */
-  slots: { at: number; mm: number }[]
+  slots: { at: number; mm: number; chance?: number }[]
   /** the rain the sentence above describes, bracketed on the chart */
   event: RainEvent | null
   /** "14:30" in the forecast place's own time */
@@ -53,9 +53,11 @@ interface Props {
   now?: number
   /** dev gallery: hold one quarter-hour as if hovered */
   pin?: number
+  /** how many forecasts the rain is the consensus of: each quarter-hour says how many agree */
+  sources?: number
 }
 
-export function RainTimeline({ slots, event, clock, utcOffset, go, now: nowProp, pin }: Props) {
+export function RainTimeline({ slots, event, clock, utcOffset, go, now: nowProp, pin, sources }: Props) {
   const id = useId().replace(/:/g, '')
   const wrap = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(420)
@@ -91,7 +93,9 @@ export function RainTimeline({ slots, event, clock, utcOffset, go, now: nowProp,
       const wet = s.mm >= WET
       const bw = Math.max(2, Math.min(BAR_MAX, x1 - x0 - 2))
       const h = wet ? level(rate) * PLOT : 0
-      return { ...s, x0, x1, cx: (x0 + x1) / 2, bw, h, wet, kind: wet ? strength(rate) : null }
+      // rain only some of the forecasts have is drawn fainter
+      const maybe = wet && s.chance != null && s.chance < SURE
+      return { ...s, x0, x1, cx: (x0 + x1) / 2, bw, h, wet, maybe, kind: wet ? strength(rate) : null }
     })
     .filter((c) => c.x1 - c.x0 >= 3)
 
@@ -113,7 +117,7 @@ export function RainTimeline({ slots, event, clock, utcOffset, go, now: nowProp,
       const capR = event.end != null && event.end <= end
       const from = event.now ? 'Now' : clock(event.start)
       const to = event.end ? clock(event.end) : 'later'
-      const text = `${from} – ${to} · ${event.strength}`
+      const text = `${from} – ${to} · ${event.strength}${event.chance < SURE ? ', possible' : ''}`
       const x0 = x(s)
       const x1 = x(e)
       const half = text.length * 2.9
@@ -229,7 +233,7 @@ export function RainTimeline({ slots, event, clock, utcOffset, go, now: nowProp,
           const top = y(c.h / PLOT)
           const drops = DROPS[c.kind!]
           return (
-            <g key={i} className={`rt-col rt-${c.kind}${on ? ' on' : ''}`} style={{ animationDelay: `${i * 28}ms` }}>
+            <g key={i} className={`rt-col rt-${c.kind}${c.maybe ? ' maybe' : ''}${on ? ' on' : ''}`} style={{ animationDelay: `${i * 28}ms` }}>
               <path d={column(c.cx - c.bw / 2, top, c.bw, c.h)} />
               <g clipPath={`url(#${id}c${i})`} className="rt-drops">
                 {Array.from({ length: drops.n }, (_, k) => {
@@ -273,7 +277,12 @@ export function RainTimeline({ slots, event, clock, utcOffset, go, now: nowProp,
           <b>
             {clock(Math.max(cur.at, now))}–{clock(cur.at + STEP)}
           </b>
-          <span>{cur.wet ? `${cur.kind![0].toUpperCase()}${cur.kind!.slice(1)} rain · ${cur.mm.toFixed(1)} mm` : 'Dry'}</span>
+          <span>{cur.wet ? `${cur.kind![0].toUpperCase()}${cur.kind!.slice(1)} rain${cur.maybe ? ' possible' : ''} · ${cur.mm.toFixed(1)} mm` : 'Dry'}</span>
+          {sources && sources > 1 && cur.chance != null && (
+            <span>
+              {Math.round(cur.chance * sources)} of {sources} forecasts have rain
+            </span>
+          )}
         </div>
       )}
       <span className="rt-sr" aria-live="polite">

@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { CloudRain } from 'lucide-react'
 import type { Weather } from '../lib/weather'
 import { clockAt, goAdvice, inWords, nextRain, offsetOf } from '../lib/weatherOutlook'
 import { LumiFace } from '../mascot/lumi/LumiFace'
 import { RainTimeline } from './RainTimeline'
 import { WeatherWidget } from './WeatherWidget'
-import { DEFAULTS } from '../lib/settings'
+import { DEFAULTS, type Settings } from '../lib/settings'
 
 /** Dev only (`/?rain`): the rain card in the situations it has to explain, side by side. */
 
@@ -66,6 +67,17 @@ function Card({ w, pin }: { w: Weather; pin?: number }) {
   )
 }
 
+/** the real Weather page, its settings kept here so its questions and toggles can be tried */
+function LiveWeather() {
+  const [s, setS] = useState<Settings>({ ...DEFAULTS, city: LIVE.city, cityLat: LIVE.lat, cityLon: LIVE.lon, weatherAuto: false, fahrenheit: false, weatherAsked: location.search.includes('asked') })
+  return <WeatherWidget settings={s} update={(patch) => setS((x) => ({ ...x, ...patch }))} />
+}
+
+const LIVE = (() => {
+  const [lat, lon] = (new URLSearchParams(location.search).get('live') ?? '').split(',').map(Number)
+  return Number.isFinite(lat) && Number.isFinite(lon) ? { city: `${lat.toFixed(4)}, ${lon.toFixed(4)}`, lat, lon } : { city: 'Depok', lat: -6.3628, lon: 106.8269 }
+})()
+
 export function RainShowcase() {
   return (
     <div
@@ -86,11 +98,11 @@ export function RainShowcase() {
         } as React.CSSProperties
       }
     >
-      {/* the real card on today's real forecast for UI Depok (`?rain&live`) */}
+      {/* the real card on today's real forecast: UI Depok, or any point (`?rain&live=-6.2883,106.7582`) */}
       {location.search.includes('live') && (
         <div style={{ gridColumn: '1 / -1', width: 480, background: '#0b0d14', borderRadius: 24, padding: '14px 16px 16px' }}>
-          <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 8 }}>Live: Depok, right now</div>
-          <WeatherWidget settings={{ ...DEFAULTS, city: 'Depok', cityLat: -6.3628, cityLon: 106.8269, weatherAuto: false, fahrenheit: false }} update={() => {}} />
+          <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 8 }}>Live: {LIVE.city}, right now</div>
+          <LiveWeather />
         </div>
       )}
       {SCENES.map((s) => (

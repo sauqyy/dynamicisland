@@ -6,10 +6,11 @@ import { CloudRain, Droplets, LocateFixed, MapPin, Wind } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import { LocationError, detectPlace, timezoneGuess, type Place } from '../lib/location'
 import { IS_TAURI } from '../lib/useMedia'
-import { clockAt, goAdvice, inWords, nextRain, offsetOf } from '../lib/weatherOutlook'
+import { agreement, clockAt, goAdvice, inWords, isSure, nextRain, offsetOf } from '../lib/weatherOutlook'
 import { CAMPUS } from '../lib/campus'
 import { LumiFace } from '../mascot/lumi/LumiFace'
 import { RainTimeline } from './RainTimeline'
+import { Toggle } from './SettingsWidget'
 import { WeatherIcon, isNight } from './WeatherIcon'
 
 interface Props {
@@ -19,9 +20,12 @@ interface Props {
 
 export function WeatherWidget({ settings, update }: Props) {
   const { city, fahrenheit, cityLat, cityLon } = settings
-  const [weather, setWeather] = useState<Weather | null>(() => (city ? cachedWeather(city, fahrenheit) : null))
+  const [weather, setWeather] = useState<Weather | null>(() => (city ? cachedWeather(city, fahrenheit, { lat: cityLat, lon: cityLon }) : null))
+  // bumped when the user picks a place (their location, a city, a suggestion): the weather is fetched again even if
+  // the place keeps its name, which is what used to leave the page blank after "Use my location" found the same area
+  const [reload, setReload] = useState(0)
+  const seenReload = useRef(0)
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(!city)
   const [draft, setDraft] = useState(city)
   const [locating, setLocating] = useState(false)
@@ -40,6 +44,7 @@ export function WeatherWidget({ settings, update }: Props) {
       const p = await detectPlace({ allowNetwork: network })
       update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: true })
       setWeather(null)
+      setReload((n) => n + 1)
       setEditing(false)
     } catch (e) {
       // the try made on its own when the page first opens: no blame, just what to press next
@@ -63,23 +68,25 @@ export function WeatherWidget({ settings, update }: Props) {
 
   useEffect(() => {
     if (!city) return
-    const cached = cachedWeather(city, fahrenheit)
+    // a place the user just picked is fetched fresh; otherwise a recent forecast for this same point will do
+    const picked = reload !== seenReload.current
+    seenReload.current = reload
+    const cached = picked ? null : cachedWeather(city, fahrenheit, { lat: cityLat, lon: cityLon })
     if (cached && isFresh(cached)) {
       setWeather(cached)
       return
     }
     let cancelled = false
-    setLoading(true)
     setError(null)
     fetchWeather(city, fahrenheit, cityLat != null && cityLon != null ? { lat: cityLat, lon: cityLon } : null)
       .then((w) => !cancelled && setWeather(w))
       .catch((e: Error) => !cancelled && setError(e.message === 'Failed to fetch' ? 'You appear to be offline' : e.message))
-      .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
+    // (the point counts, not just the name: two spots can share one)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, fahrenheit])
+  }, [city, fahrenheit, cityLat, cityLon, reload])
 
   const unit = fahrenheit ? '°F' : '°C'
 
@@ -93,6 +100,7 @@ export function WeatherWidget({ settings, update }: Props) {
           // a city picked by hand stays: the weather stops following the user
           update({ city: hit.name, cityLat: hit.latitude, cityLon: hit.longitude, weatherAuto: false })
           setWeather(null)
+          setReload((n) => n + 1)
           setEditing(false)
         }}
         onLocate={() => void locate(true)}
@@ -104,6 +112,7 @@ export function WeatherWidget({ settings, update }: Props) {
           // a guess from the time zone is a city picked by hand: the weather does not follow the user from it
           update({ city: p.name, cityLat: p.lat, cityLon: p.lon, weatherAuto: false })
           setWeather(null)
+          setReload((n) => n + 1)
           setEditing(false)
         }}
       />
@@ -113,7 +122,8 @@ export function WeatherWidget({ settings, update }: Props) {
   if (!weather) {
     return (
       <div className="weather center" onClick={(e) => e.stopPropagation()}>
-        <div className="timer-label">{error ?? (loading ? 'Loading weather…' : '')}</div>
+        {/* never an empty page: without a forecast or a reason why, one is on its way */}
+        <div className="timer-label">{error ?? 'Loading weather…'}</div>
         {error && (
           <button className="pill-btn" data-cuelume-open onClick={() => setEditing(true)}>
             Change city
@@ -141,9 +151,13 @@ export function WeatherWidget({ settings, update }: Props) {
     : !ev
       ? 'No rain expected for the next 12 hours'
       : ev.now
-        ? `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}${more}.` : 'It looks like it will last for hours.'}`
+        ? !isSure(ev)
+          ? `${cap(ev.strength)} rain possible now (${agreement(weather, ev)})${ev.end ? `, until about ${clockAt(weather, ev.end)}` : ''}.`
+          : `Raining now (${ev.strength}). ${ev.end ? `It should stop ${inWords((ev.end - Date.now()) / 60_000)}, around ${clockAt(weather, ev.end)}${more}.` : 'It looks like it will last for hours.'}`
         : evMins <= 480
-          ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}${more}.`
+          ? isSure(ev)
+            ? `Rain ${inWords(evMins)} (${ev.strength})${ev.end ? `, easing around ${clockAt(weather, ev.end)}` : ''}${more}.`
+            : `${cap(ev.strength)} rain possible ${inWords(evMins)} (${agreement(weather, ev)})${ev.end ? `, until about ${clockAt(weather, ev.end)}` : ''}.`
           : 'No rain expected for the next 8 hours'
   // the chart and Lumi's advice cover the next three hours
   const chart = !!weather.rain15 && !!ev && (ev.now || evMins <= 180)
@@ -179,6 +193,7 @@ export function WeatherWidget({ settings, update }: Props) {
           {weather.city} · {unit}
         </button>
       </div>
+      {!settings.weatherAsked && <NotifyAsk lumi={lumi} onAnswer={(yes) => update({ weatherAlerts: yes, weatherAsked: true })} />}
       {(rainLine || rainText) && (
         <div className="wx-rain">
           {/* Lumi says what to do about it (go now, wait, or take the umbrella); her mood is the situation at a glance */}
@@ -193,13 +208,59 @@ export function WeatherWidget({ settings, update }: Props) {
             <span>{rainLine || rainText}</span>
             {advice && <b className="wx-go">{advice.text}</b>}
           </span>
-          {chart && <RainTimeline slots={weather.rain15!} event={ev} clock={(ms) => clockAt(weather, ms)} utcOffset={offsetOf(weather)} go={advice} />}
+          {chart && <RainTimeline slots={weather.rain15!} event={ev} clock={(ms) => clockAt(weather, ms)} utcOffset={offsetOf(weather)} go={advice} sources={weather.sources?.length} />}
+          {chart && weather.sources && weather.sources.length > 1 && (
+            <span className="wx-src" title={weather.sources.join(' · ')}>
+              The middle of {weather.sources.length} forecasts{weather.sources.some((s) => s.startsWith('BMKG')) ? `, including ${weather.sources.find((s) => s.startsWith('BMKG'))}` : ''}
+            </span>
+          )}
         </div>
       )}
       <TempCurve hours={weather.hourly} now={start} />
+      {/* the answer to the question above, to change any time (it is in Settings too) */}
+      {settings.weatherAsked && (
+        <div className="row wx-notify">
+          <div className="row-text">
+            <span>{lumi ? 'Weather heads-ups from Lumi' : 'Weather alerts'}</span>
+            <small>Rain on its way and when it stops, storms, strong sun, heat</small>
+          </div>
+          <Toggle on={settings.weatherAlerts} onChange={(v) => update({ weatherAlerts: v })} />
+        </div>
+      )}
     </div>
   )
 }
+
+/** Asked once, the first time the Weather page is opened: weather alerts are off until the user says yes. */
+function NotifyAsk({ lumi, onAnswer }: { lumi: boolean; onAnswer: (yes: boolean) => void }) {
+  return (
+    <div className="wx-ask" role="group" aria-label="Weather alerts">
+      {lumi ? (
+        <span className="wx-ask-lumi">
+          <LumiFace mood="rainSoon" height={40} body still follow={false} />
+        </span>
+      ) : (
+        <CloudRain size={18} aria-hidden />
+      )}
+      <span className="wx-ask-text">
+        <b>{lumi ? 'Want Lumi to keep you posted on the weather?' : 'Get alerts about the weather?'}</b>
+        <small>
+          {lumi ? "She'll tell you" : "You'll hear"} when rain is on its way and when it stops, and about storms, strong sun and heat. You can change this here any time.
+        </small>
+        <span className="wx-ask-acts">
+          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => onAnswer(false)}>
+            Not now
+          </button>
+          <button className="chip on" data-cuelume-open onClick={() => onAnswer(true)}>
+            {lumi ? 'Yes, keep me posted' : 'Yes, alert me'}
+          </button>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 /** Hours the rain heads-up looks ahead, and hours visible at once in the curve. */
 const HOURS = 8

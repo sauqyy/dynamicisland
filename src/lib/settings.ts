@@ -77,8 +77,11 @@ export interface Settings {
   lumiClock: boolean
   /** how Lumi's eyes look and where they sit in the resting pill (the Lumi page) */
   lumiLook: LumiLook
-  /** tell the user about the weather that matters: rain on its way, when it stops, a rainy day, storms, strong sun, heat */
+  /** tell the user about the weather that matters: rain on its way, when it stops, a rainy day, storms, strong sun, heat.
+   *  Off until they say yes: the Weather page asks once (weatherAsked) */
   weatherAlerts: boolean
+  /** the Weather page has asked whether to have weather alerts (and the answer is weatherAlerts) */
+  weatherAsked: boolean
   /** the weather follows the user: the city is found from where they are, and updated as they move */
   weatherAuto: boolean
   /** small sounds for clicks, typing, pages and alerts; off = muted */
@@ -380,7 +383,8 @@ export const DEFAULTS: Settings = {
   lumiCalm: false,
   lumiClock: true,
   lumiLook: LUMI_LOOK_DEFAULT,
-  weatherAlerts: true,
+  weatherAlerts: false,
+  weatherAsked: false,
   weatherAuto: false,
   uiSounds: true,
   soundPack: 'mech',
@@ -460,6 +464,7 @@ function setLocalAt(ms: number) {
 
 /** set once the one-time "Prompter off" change has been made to an older Universitas Indonesia install */
 const PROMPTER_OFF_KEY = 'di.ui.prompterOff'
+const WEATHER_ASK_KEY = 'di.weatherAlertsAsk'
 
 function load(): Settings {
   try {
@@ -469,6 +474,17 @@ function load(): Settings {
     if (CAMPUS && !localStorage.getItem(PROMPTER_OFF_KEY)) {
       localStorage.setItem(PROMPTER_OFF_KEY, '1')
       if (saved.hiddenPages && !saved.hiddenPages.includes('prompter')) saved.hiddenPages = [...saved.hiddenPages, 'prompter']
+    }
+    // weather alerts became something to say yes to (the Weather page asks): installs from before, where they were on
+    // without anyone choosing it, start off and are asked, once. Counted as a change here, so the account's copy
+    // (which still has them on) doesn't switch them back
+    if (!localStorage.getItem(WEATHER_ASK_KEY)) {
+      localStorage.setItem(WEATHER_ASK_KEY, '1')
+      if (saved.weatherAlerts !== undefined) {
+        saved.weatherAlerts = false
+        saved.weatherAsked = false
+        setLocalAt(Date.now())
+      }
     }
     const merged = { ...DEFAULTS, ...saved }
     // the Universitas Indonesia build has no Astra: whatever was saved, she stays off

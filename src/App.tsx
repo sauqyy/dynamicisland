@@ -55,7 +55,7 @@ import { useGroupRing } from './lib/useGroupRing'
 import { DEMO_SOCIAL, useDemo } from './lib/useDemo'
 import { playJoin, playLeave } from './lib/callSounds'
 import { useClipboard } from './lib/useClipboard'
-import { Rail } from './island/Rail'
+import { Rail, type PageCounts } from './island/Rail'
 import { MascotEyes } from './mascot/MascotEyes'
 import { LumiFace } from './mascot/lumi/LumiFace'
 import { setLumiLook } from './mascot/lumi/lumiLook'
@@ -257,6 +257,9 @@ function stepPage(list: { id: Tab }[], from: Tab, dir: -1 | 1): Tab {
 function clockText(d: Date, clock24: boolean) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !clock24 })
 }
+
+/** px kept clear between the island and the left or right side of the screen */
+const SCREEN_EDGE = 8
 
 export default function App() {
   // the playback position is only needed smoothly while the Playing page is open (see below)
@@ -706,7 +709,14 @@ export default function App() {
     const midnight = new Date(now).setHours(24, 0, 0, 0)
     return scele.deadlines.filter((d) => d.due > now && d.due < midnight && d.submission !== 'submitted').length
   }, [scele.deadlines, now])
-  const sceleUnread = scele.notices.some((n) => !n.read)
+  const sceleUnreadCount = scele.notices.filter((n) => !n.read).length
+  // looking at the Inbox page for a second reads it: its count goes (a glance passing through doesn't)
+  const markInboxRead = scele.markInboxRead
+  useEffect(() => {
+    if (!expanded || tab !== 'inbox' || !sceleUnreadCount || !markInboxRead) return
+    const t = setTimeout(markInboxRead, 1000)
+    return () => clearTimeout(t)
+  }, [expanded, tab, sceleUnreadCount, markInboxRead])
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
@@ -1119,8 +1129,12 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Escape steps back one level at a time: out of fullscreen, then out of an open chat (back to the list, the
+      // island still open), and only then closes the island
       if (e.key === 'Escape') {
+        const inChat = (tabRef.current === 'friends' || tabRef.current === 'groups') && Boolean(openChatRef.current.friend || openChatRef.current.group)
         if (fsRef.current) exitFullscreen()
+        else if (inChat && expandedRef.current) setOpenChat({ friend: null, group: null })
         else setExpanded(false)
       }
       if (!fsRef.current && !document.querySelector('.chat') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
@@ -1196,6 +1210,19 @@ export default function App() {
     Object.values(social.unread).reduce((a, b) => a + b, 0) +
     (DEMO_SOCIAL ? 0 : Object.values(groupChats.unread).reduce((a, b) => a + b, 0) + groupChats.invites.length)
   // who wrote while the user was away, for the catch-up: friends, then groups
+  // what is new on each page, for the rail: the page says how many, and its group adds them up
+  const friendMsgs = Object.values(social.unread).reduce((a, b) => a + b, 0)
+  const groupMsgs = DEMO_SOCIAL ? 0 : Object.values(groupChats.unread).reduce((a, b) => a + b, 0)
+  const groupInvites = DEMO_SOCIAL ? 0 : groupChats.invites.length
+  const pageCounts = useMemo<PageCounts>(() => {
+    const c: PageCounts = {}
+    const say = (n: number, one: string, many: string) => (n ? [`${n} ${n === 1 ? one : many}`] : [])
+    const friends = friendMsgs + social.incoming.length
+    if (friends) c.friends = { n: friends, label: [...say(friendMsgs, 'unread message', 'unread messages'), ...say(social.incoming.length, 'friend request', 'friend requests')].join(', ') }
+    if (groupMsgs + groupInvites) c.groups = { n: groupMsgs + groupInvites, label: [...say(groupMsgs, 'unread message', 'unread messages'), ...say(groupInvites, 'group invite', 'group invites')].join(', ') }
+    if (sceleUnreadCount) c.inbox = { n: sceleUnreadCount, label: say(sceleUnreadCount, 'new SCELE notification', 'new SCELE notifications')[0] }
+    return c
+  }, [friendMsgs, groupMsgs, groupInvites, social.incoming.length, sceleUnreadCount])
   const unreadFrom = useMemo<UnreadFrom[]>(
     () => [
       ...social.friends
@@ -1259,7 +1286,7 @@ export default function App() {
   // Re-read when the card closes, which is when the city may have changed.
   const idleWeather = useMemo(() => {
     if (settings.idle === 'weather' && settings.city) {
-      const w = cachedWeather(settings.city, settings.fahrenheit)
+      const w = cachedWeather(settings.city, settings.fahrenheit, { lat: settings.cityLat, lon: settings.cityLon })
       if (w) return { code: w.code, text: `${w.temp}°${settings.fahrenheit ? 'F' : 'C'} · ${w.city}` }
     }
     return null
@@ -1469,6 +1496,24 @@ export default function App() {
     }
   }, [hitW, shape.h, settings.scale])
 
+  // The island never hangs off the side of the screen. Parked near an edge, anything wider than where it sits (the
+  // open card, mostly) comes in just far enough to fit, and goes back out when it closes: where it was put is kept.
+  const [screenW, setScreenW] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const onResize = () => setScreenW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const reach = Math.max(0, screenW / 2 - (hitW * settings.scale) / 2 - SCREEN_EDGE)
+  const shownX = fs ? pos.x : Math.max(-reach, Math.min(reach, pos.x))
+  const shown = useMemo(() => ({ x: shownX, y: pos.y }), [shownX, pos.y])
+  const shownRef = useRef(shown)
+  shownRef.current = shown
+  // where it is on screen is where clicks land: the window's hit-testing follows the same offset
+  useEffect(() => {
+    if (IS_TAURI) invoke('set_offset', { x: shown.x, y: shown.y }).catch(() => {})
+  }, [shown.x, shown.y])
+
   useEffect(() => {
     if (group) lastInGroup.current[group.id] = tab
   }, [group, tab])
@@ -1492,6 +1537,8 @@ export default function App() {
   const isSocial = (t: Tab) => t === 'friends' || t === 'groups'
   const chatSwitch = useRef(false)
   chatSwitch.current = Boolean(openChat.friend || openChat.group)
+  const openChatRef = useRef(openChat)
+  openChatRef.current = openChat
   const soundState = useRef({ expanded, tab })
   useEffect(() => {
     const was = soundState.current
@@ -1649,10 +1696,8 @@ export default function App() {
       m.vel = { x: 0, y: 0 }
     }
     const next = { x: Math.round(m.pos.x), y: Math.max(0, Math.round(m.pos.y)) }
-    if (next.x !== posRef.current.x || next.y !== posRef.current.y) {
-      setPos(next)
-      invoke('set_offset', { x: next.x, y: next.y }).catch(() => {})
-    }
+    // (the window learns the offset from `shown`, which keeps the island on screen)
+    if (next.x !== posRef.current.x || next.y !== posRef.current.y) setPos(next)
     if (moving || m.held) {
       m.raf = requestAnimationFrame(stepSpring)
     } else {
@@ -1698,8 +1743,10 @@ export default function App() {
           if (mode === 'expanded' && !el.closest('.xtop')) return
           // docked, the island's top is wherever its height puts it above the taskbar
           const oy = motionRef.current.magBottom ? Math.round(dockTop()) : posRef.current.y
-          if (oy !== posRef.current.y) setPos((p) => ({ ...p, y: oy }))
-          posRef.current = { ...posRef.current, y: oy }
+          // a card drawn further in than where it was put (near an edge) is moved from where it is seen
+          const ox = shownRef.current.x
+          if (oy !== posRef.current.y || ox !== posRef.current.x) setPos({ x: ox, y: oy })
+          posRef.current = { x: ox, y: oy }
           dragRef.current = { sx: e.screenX, sy: e.screenY, ox: posRef.current.x, oy, active: false }
           e.currentTarget.setPointerCapture(e.pointerId)
         },
@@ -1989,7 +2036,8 @@ export default function App() {
                 const g = groups.find((x) => x.id === id)!
                 setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
               }}
-              dots={[...(unreadCount > 0 ? ['social'] : []), ...(sceleUnread ? ['campus'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+              dots={[...(updater.state.s === 'available' ? ['settings'] : [])]}
+              counts={pageCounts}
             />
         </div>
         {astraIntro && (
@@ -2385,7 +2433,7 @@ export default function App() {
         contentKey={contentKey}
         bubble={bubble}
         floating={!docked && pos.y > 2}
-        offset={pos}
+        offset={shown}
         dock={dockAt}
         centered={Boolean(fs)}
         dragHandlers={dragHandlers}
