@@ -8,7 +8,7 @@ import { IS_TAURI } from './useMedia'
  * that has been looked at, every change is written to the file too.
  */
 export function useKept<T>(name: 'todos' | 'todoGroups', list: T[], set: (list: T[]) => void) {
-  const ready = useRef(!IS_TAURI)
+  const ready = useRef(false)
   const latest = useRef(list)
   latest.current = list
 
@@ -35,6 +35,6 @@ export function useKept<T>(name: 'todos' | 'todoGroups', list: T[], set: (list: 
   }, [])
 
   useEffect(() => {
-    if (ready.current) invoke('keep_save', { name, json: JSON.stringify(list) }).catch(() => {})
+    if (IS_TAURI && ready.current) invoke('keep_save', { name, json: JSON.stringify(list) }).catch(() => {})
   }, [name, list])
 }
