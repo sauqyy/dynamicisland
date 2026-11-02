@@ -8,6 +8,7 @@ import { fmtSize, openPath } from '../lib/files'
 import { dueLabel } from '../lib/deadlines'
 import { DuePicker, whenText } from './DuePicker'
 import { IS_TAURI } from '../lib/useMedia'
+import { useKept } from '../lib/keep'
 
 interface Props {
   todos: Todo[]
@@ -39,6 +40,7 @@ function useGroups() {
       /* ignore */
     }
   }, [groups])
+  useKept('todoGroups', groups, setGroups)
   return [groups, setGroups] as const
 }
 
