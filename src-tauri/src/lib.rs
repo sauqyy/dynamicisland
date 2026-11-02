@@ -7,6 +7,7 @@ mod assistant;
 mod auth;
 mod claude;
 mod grants;
+mod keep;
 mod public_data;
 mod llm;
 mod llm_core;
@@ -493,6 +494,8 @@ pub fn run() {
             set_dragging,
             auth::oauth_wait,
             auth::open_url,
+            keep::keep_load,
+            keep::keep_save,
             public_data::public_json,
             #[cfg(feature = "campus")]
             scele::scele_login,
