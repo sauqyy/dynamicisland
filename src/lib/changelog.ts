@@ -11,6 +11,15 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.19',
+    campus: true,
+    title: 'To-dos that stay put',
+    items: [
+      'Your to-dos, their descriptions and your groups are now also saved in a file, so they come back if the island's storage is ever cleared.',
+      'This also fixes the update to 0.7.18 not changing the version.',
+    ],
+  },
+  {
     version: '0.7.17',
     campus: true,
     title: 'Weather you can trust',
