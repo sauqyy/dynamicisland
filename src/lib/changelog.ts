@@ -15,7 +15,7 @@ export const CHANGELOG: Release[] = [
     campus: true,
     title: 'To-dos that stay put',
     items: [
-      'Your to-dos, their descriptions and your groups are now also saved in a file, so they come back if the island's storage is ever cleared.',
+      "Your to-dos, their descriptions and your groups are now also saved in a file, so they come back if the island's storage is ever cleared.",
       'This also fixes the update to 0.7.18 not changing the version.',
     ],
   },
