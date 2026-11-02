@@ -10,6 +10,7 @@ import { Bars, EqContext } from './widgets/Equalizer'
 import { Ring } from './widgets/TimerWidget'
 import { TimerTab, type ClockMode } from './widgets/TimerTab'
 import { TodoWidget } from './widgets/TodoWidget'
+import { useKept } from './lib/keep'
 import { useUpdater } from './lib/useUpdater'
 import { getVersion } from '@tauri-apps/api/app'
 import { CHANGELOG, releaseToShow, type Release } from './lib/changelog'
@@ -550,6 +551,7 @@ export default function App() {
       /* ignore */
     }
   }, [todos])
+  useKept('todos', todos, setTodos)
 
   // wall clock + timer tick
   useEffect(() => {
