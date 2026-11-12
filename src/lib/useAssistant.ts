@@ -175,6 +175,7 @@ export function useAssistant({ enabled, hotkey, talk, brain, voice, getContext, 
   const lineId = useRef(0)
   const addLine = useCallback((line: Omit<ChatLine, 'id'>) => setMessages((m) => [...m.slice(-79), { ...line, id: ++lineId.current }]), [])
   const [chatBusy, setChatBusy] = useState(false)
+  const [chatSpeaking, setChatSpeaking] = useState(false)
   const chatBusyRef = useRef(false)
   const chatRun = useRef(0)
   const optsRef = useRef({ brain, voice, getContext, controls, onChatReply })
@@ -444,7 +445,25 @@ export function useAssistant({ enabled, hotkey, talk, brain, voice, getContext, 
           const v = optsRef.current.voice
           if (opts?.speak && v.enabled) {
             stopSpeaking.current()
-            stopSpeaking.current = speak(r.text, v)
+            // the mascot's mouth moves while the answer is read aloud
+            let mouth = 0
+            const done = () => {
+              window.clearInterval(mouth)
+              level.set(0)
+              setChatSpeaking(false)
+            }
+            stopSpeaking.current = speak(r.text, v, {
+              onStart: () => {
+                setChatSpeaking(true)
+                mouth = window.setInterval(() => level.set(0.3 + Math.random() * 0.6), 90)
+              },
+              onEnd: done,
+            })
+            const stopVoice = stopSpeaking.current
+            stopSpeaking.current = () => {
+              stopVoice()
+              done()
+            }
           }
         }
       } catch (e) {
@@ -454,7 +473,7 @@ export function useAssistant({ enabled, hotkey, talk, brain, voice, getContext, 
         setChatBusy(false)
       }
     },
-    [think, addLine],
+    [think, addLine, level],
   )
 
   /** A fresh start: the written record and what the brain remembers are cleared. */
@@ -717,5 +736,5 @@ export function useAssistant({ enabled, hotkey, talk, brain, voice, getContext, 
     [reset, later, level, bands],
   )
 
-  return { state, level, bands, start, stop, cancel, preview, answerConfirm, chat: { messages, busy: chatBusy, send: sendChat, clear: clearChat } }
+  return { state, level, bands, start, stop, cancel, preview, answerConfirm, chat: { messages, busy: chatBusy, speaking: chatSpeaking, send: sendChat, clear: clearChat } }
 }

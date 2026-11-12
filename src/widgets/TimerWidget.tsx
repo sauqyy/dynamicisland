@@ -25,6 +25,7 @@ export function Ring({ fraction, size, stroke, className = '' }: { fraction: num
         r={r}
         strokeWidth={stroke}
         className="ring-fg"
+        style={{ opacity: fraction < 0.008 ? 0 : 1 }}
         strokeDasharray={c}
         strokeDashoffset={c * (1 - fraction)}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
@@ -33,7 +34,7 @@ export function Ring({ fraction, size, stroke, className = '' }: { fraction: num
   )
 }
 
-function CustomTime({ onStart }: { onStart: (minutes: number) => void }) {
+export function CustomTime({ onStart }: { onStart: (minutes: number) => void }) {
   const [min, setMin] = useState('')
   const [sec, setSec] = useState('')
   const total = (Number(min) || 0) * 60 + (Number(sec) || 0)

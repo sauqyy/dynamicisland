@@ -91,6 +91,7 @@ export function StudyWidget({ log, history, onClearHistory, onStartSolo, now, se
           </div>
         </div>
       )}
+      <div className="st-c st-c1">
       {session && (
         <div className="st-live">
           <i aria-hidden />
@@ -103,58 +104,6 @@ export function StudyWidget({ log, history, onClearHistory, onStartSolo, now, se
             Stop
           </button>
         </div>
-      )}
-
-      <div className="st-stats">
-        <div>
-          <Clock size={14} strokeWidth={2.2} aria-hidden />
-          <b>{fmtStudy(today)}</b>
-          <small>Today</small>
-        </div>
-        <div>
-          <CalendarRange size={14} strokeWidth={2.2} aria-hidden />
-          <b>{fmtStudy(week)}</b>
-          <small>This week</small>
-        </div>
-        <div className={streak > 0 ? 'hot' : ''}>
-          <Flame size={14} strokeWidth={2.2} aria-hidden />
-          <b>{streak}</b>
-          <small>Day streak</small>
-        </div>
-      </div>
-
-      <div className="st-chart">
-        <div className="st-week" aria-label="Study time this week">
-          {days.map((k, i) => (
-            <div key={k} className={`st-bar ${i === days.length - 1 ? 'today' : ''}`} title={`${k}: ${fmtStudy(totals[i])}`}>
-              <i style={{ height: `${Math.max(totals[i] > 0 ? 10 : 4, (totals[i] / peak) * 100)}%` }} />
-              <span>{DOW[new Date(`${k}T12:00`).getDay()]}</span>
-            </div>
-          ))}
-        </div>
-        {subjects.length > 0 && (
-          <div className="st-subjects">
-            {subjects.map(([label, m]) => (
-              <span key={label}>
-                {label} <b>{fmtStudy(m)}</b>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {studying.length > 0 && (
-        <section className="st-sec">
-          <h4>Friends studying now</h4>
-          <div className="st-now">
-            {studying.map((f) => (
-              <span key={f.profile.id} className="st-pal" title={f.activity}>
-                <Avatar profile={f.profile} size={26} />
-                <small>{f.profile.display_name || f.profile.username}</small>
-              </span>
-            ))}
-          </div>
-        </section>
       )}
 
       {!session && (
@@ -203,6 +152,62 @@ export function StudyWidget({ log, history, onClearHistory, onStartSolo, now, se
             <Play size={11} strokeWidth={0} fill="currentColor" aria-hidden />
             Start studying
           </button>
+        </section>
+      )}
+
+      </div>
+      <div className="st-c st-c2">
+      <div className="st-stats">
+        <div>
+          <Clock size={14} strokeWidth={2.2} aria-hidden />
+          <b>{fmtStudy(today)}</b>
+          <small>Today</small>
+        </div>
+        <div>
+          <CalendarRange size={14} strokeWidth={2.2} aria-hidden />
+          <b>{fmtStudy(week)}</b>
+          <small>This week</small>
+        </div>
+        <div className={streak > 0 ? 'hot' : ''}>
+          <Flame size={14} strokeWidth={2.2} aria-hidden />
+          <b>{streak}</b>
+          <small>Day streak</small>
+        </div>
+      </div>
+
+      <div className="st-chart">
+        <div className="st-week" aria-label="Study time this week">
+          {days.map((k, i) => (
+            <div key={k} className={`st-bar ${i === days.length - 1 ? 'today' : ''}`} title={`${k}: ${fmtStudy(totals[i])}`}>
+              <i style={{ height: `${Math.max(totals[i] > 0 ? 10 : 4, (totals[i] / peak) * 100)}%` }} />
+              <span>{DOW[new Date(`${k}T12:00`).getDay()]}</span>
+            </div>
+          ))}
+        </div>
+        {subjects.length > 0 && (
+          <div className="st-subjects">
+            {subjects.map(([label, m]) => (
+              <span key={label}>
+                {label} <b>{fmtStudy(m)}</b>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      </div>
+      <div className="st-c st-c3">
+      {studying.length > 0 && (
+        <section className="st-sec">
+          <h4>Friends studying now</h4>
+          <div className="st-now">
+            {studying.map((f) => (
+              <span key={f.profile.id} className="st-pal" title={f.activity}>
+                <Avatar profile={f.profile} size={26} />
+                <small>{f.profile.display_name || f.profile.username}</small>
+              </span>
+            ))}
+          </div>
         </section>
       )}
 
@@ -346,6 +351,7 @@ export function StudyWidget({ log, history, onClearHistory, onStartSolo, now, se
           {board.length <= 1 && <p className="st-hint">Friends who share their study time show up here. Turn on “Share my time” and ask them to do the same.</p>}
         </section>
       )}
+      </div>
     </div>
   )
 }

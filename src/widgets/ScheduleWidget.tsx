@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { play } from 'cuelume'
-import { CalendarDays } from 'lucide-react'
+import { motion } from 'motion/react'
+import { Plus } from 'lucide-react'
 import { minutes, type Slot } from '../lib/schedule'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+/** Quick lengths for a class, in minutes. */
+const LENGTHS = [50, 100, 150]
+const clockText = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 
 /** Monday-first index of today */
 const today = () => (new Date().getDay() + 6) % 7
@@ -22,6 +26,9 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
   const [room, setRoom] = useState('')
   const [start, setStart] = useState('09:00')
   const [end, setEnd] = useState('10:00')
+  const [adding, setAdding] = useState(false)
+  // the days a new class repeats on; it starts as the day you are looking at
+  const [days, setDays] = useState<number[]>([])
   const [clock, setClock] = useState(() => new Date())
 
   // the "now" highlight follows the minute
@@ -30,14 +37,24 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
     return () => clearInterval(id)
   }, [])
 
+  const length = minutes(end) - minutes(start)
+  const valid = Boolean(title.trim()) && days.length > 0 && length > 0
+
+  const openForm = () => {
+    setDays([sel])
+    setAdding(true)
+  }
   const add = () => {
-    const text = title.trim()
-    if (!text || !start || !end) return
+    if (!valid) return
     play('tap')
-    setSlots([...slots, { id: Date.now(), day: sel, start, end, title: text, room: room.trim() || undefined }])
+    const id = Date.now()
+    setSlots([...slots, ...days.map((d, i) => ({ id: id + i, day: d, start, end, title: title.trim(), room: room.trim() || undefined }))])
+    if (!days.includes(sel)) setSel(days[0])
     setTitle('')
     setRoom('')
+    setAdding(false)
   }
+  const toggleDay = (d: number) => setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort()))
 
   const remove = (id: number) => setSlots(slots.filter((s) => s.id !== id))
   const daySlots = (day: number) => slots.filter((s) => s.day === day).sort((a, b) => minutes(a.start) - minutes(b.start))
@@ -60,37 +77,83 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
     </li>
   )
 
-  const form = (
-    <div className="wk-add">
-      <input
-        className="todo-input"
-        placeholder={`Add to ${DAYS[sel]}`}
-        value={title}
-        data-cuelume-type
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          e.stopPropagation()
-          if (e.key === 'Enter') add()
-        }}
-      />
-      <input
-        className="todo-input wk-room-in"
-        placeholder="Room"
-        value={room}
-        data-cuelume-type
-        onChange={(e) => setRoom(e.target.value)}
-        onKeyDown={(e) => {
-          e.stopPropagation()
-          if (e.key === 'Enter') add()
-        }}
-      />
-      <input className="todo-input wk-clock" type="time" value={start} aria-label="Start" onChange={(e) => setStart(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
-      <input className="todo-input wk-clock" type="time" value={end} aria-label="End" onChange={(e) => setEnd(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
-      <button className="pill-btn dl-go" data-cuelume-tap onClick={add} disabled={!title.trim()}>
-        Add
-      </button>
-    </div>
-  )
+  const summary =
+    length <= 0
+      ? 'Pick an end time after the start.'
+      : days.length === 0
+        ? 'Pick at least one day.'
+        : `${days.map((d) => DAYS[d]).join(', ')}, ${start} to ${end}`
+
+  if (adding) {
+    return (
+      <motion.div className="fm" onClick={(e) => e.stopPropagation()} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}>
+        <div className="fm-c">
+          <span className="fm-h">Class name</span>
+          <input
+            className="fm-in lg"
+            placeholder="Basis Data"
+            aria-label="Class name"
+            autoFocus
+            value={title}
+            maxLength={60}
+            data-cuelume-type
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') add()
+              if (e.key === 'Escape') setAdding(false)
+            }}
+          />
+          <span className="fm-h">Room</span>
+          <input
+            className="fm-in"
+            placeholder="A3.04"
+            aria-label="Room"
+            value={room}
+            maxLength={30}
+            data-cuelume-type
+            onChange={(e) => setRoom(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') add()
+              if (e.key === 'Escape') setAdding(false)
+            }}
+          />
+        </div>
+        <div className="fm-c">
+          <span className="fm-h">Days</span>
+          <div className="fm-days">
+            {DAYS.map((d, i) => (
+              <button key={d} className={`fm-chip ${days.includes(i) ? 'on' : ''}`} aria-pressed={days.includes(i)} data-cuelume-select onClick={() => toggleDay(i)}>
+                {d}
+              </button>
+            ))}
+          </div>
+          <span className="fm-h">Starts at, ends at</span>
+          <div className="fm-row">
+            <input className="fm-in time" type="time" value={start} aria-label="Start" onChange={(e) => setStart(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+            <input className="fm-in time" type="time" value={end} aria-label="End" onChange={(e) => setEnd(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+          </div>
+          <div className="fm-chips">
+            {LENGTHS.map((m) => (
+              <button key={m} className={`fm-chip ${length === m ? 'on' : ''}`} aria-pressed={length === m} data-cuelume-select onClick={() => setEnd(clockText(minutes(start) + m))}>
+                {m} min
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="fm-c">
+          <span className={`fm-sum ${length <= 0 || days.length === 0 ? 'bad' : ''}`}>{summary}</span>
+          <button className="fm-btn" disabled={!valid} data-cuelume-tap onClick={add}>
+            Add class
+          </button>
+          <button className="fm-btn ghost" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => setAdding(false)}>
+            Cancel
+          </button>
+        </div>
+      </motion.div>
+    )
+  }
 
   const fullBtn = (
     <button
@@ -125,30 +188,21 @@ export function ScheduleWidget({ slots, setSlots, fullscreen, onFullscreen }: Pr
             </button>
           ))}
         </div>
+        <button className="fm-add" data-cuelume-tap onClick={openForm}>
+          <Plus size={13} strokeWidth={2.6} aria-hidden />
+          Add class
+        </button>
         {fullBtn}
       </div>
-      {form}
-      {fullscreen ? (
-        <div className="wk-week">
-          {DAYS.map((d, i) => (
-            <section key={d} className={`wk-col ${sel === i ? 'sel' : ''} ${today() === i ? 'today' : ''}`} onClick={() => setSel(i)}>
-              <h4>{d}</h4>
-              <ul>{daySlots(i).map(renderSlot)}</ul>
-              {!daySlots(i).length && <span className="wk-free">Free</span>}
-            </section>
-          ))}
-        </div>
-      ) : (
-        <ul className="wk-list">
-          {daySlots(sel).map(renderSlot)}
-          {!daySlots(sel).length && (
-            <div className="empty">
-              <CalendarDays size={20} strokeWidth={1.7} aria-hidden />
-              Nothing on {DAYS[sel]}
-            </div>
-          )}
-        </ul>
-      )}
+      <div className="wk-week">
+        {DAYS.map((d, i) => (
+          <section key={d} className={`wk-col ${sel === i ? 'sel' : ''} ${today() === i ? 'today' : ''}`} onClick={() => setSel(i)}>
+            <h4>{d}</h4>
+            <ul>{daySlots(i).map(renderSlot)}</ul>
+            {!daySlots(i).length && <span className="wk-free">Free</span>}
+          </section>
+        ))}
+      </div>
     </div>
   )
 }

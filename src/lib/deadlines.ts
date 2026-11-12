@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 export interface Deadline {
   id: number
   title: string
+  /** the course it belongs to, when one was picked */
+  course?: string
   /** due moment, ms since epoch */
   due: number
   done: boolean
@@ -55,6 +57,13 @@ export function urgency(due: number, now: number): 'late' | 'urgent' | 'soon' | 
   if (due < now) return 'late'
   if (due - now < URGENT_HOURS * 3600_000) return 'urgent'
   return due - now < 24 * 3600_000 ? 'soon' : 'ok'
+}
+
+/** value for a date input: YYYY-MM-DD in local time */
+export function toDateValue(ms: number): string {
+  const d = new Date(ms)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
 /** value for a datetime-local input */

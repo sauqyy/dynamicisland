@@ -119,10 +119,16 @@ export function WeatherWidget({ settings, update }: Props) {
 const HOURS = 8
 /** Width of one hour in the curve, in px: eight fit across the card. */
 const VISIBLE_COL = 50.5
+/** Hours shown in the curve, all at once, scaled to the card's width. */
+const FIT_HOURS = 10
 const isRain = (code: number) => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95
 
 /** Today's hours as a temperature curve with rainy hours shaded, scrolled so the current hour is first. */
-function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
+function TempCurve({ hours: allHours, now: nowAll }: { hours: Weather['hourly']; now: number }) {
+  // no sideways scrolling: show the hours that fit, from the one before now
+  const from = Math.max(0, nowAll - 1)
+  const hours = allHours.slice(from, from + FIT_HOURS)
+  const now = nowAll - from
   const strip = useRef<HTMLDivElement>(null)
   // which day the strip starts on, and whether the current hour is in view
   const [view, setView] = useState({ tomorrow: false, nowInView: true })
@@ -214,7 +220,7 @@ function TempCurve({ hours, now }: { hours: Weather['hourly']; now: number }) {
           e.currentTarget.classList.remove('dragging')
         }}
       >
-        <div className="wx-strip" style={{ width: (W * VISIBLE_COL) / COL }}>
+        <div className="wx-strip" style={{ width: '100%' }}>
           <svg viewBox={`0 0 ${W} ${H}`} aria-label="Temperature for today and tomorrow">
             <defs>
               <linearGradient id="wx-area" x1="0" y1="0" x2="0" y2="1">

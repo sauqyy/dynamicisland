@@ -57,7 +57,7 @@ const HIDDEN_TOP = 40
 /** Radius of the concave "ears" where the sides curve out into the screen edge. */
 const EAR = 14
 /** Must match .stage width in App.css. */
-const STAGE_W = 520
+const STAGE_W = 860
 /** How far above its resting place the island starts when the app opens. */
 const ENTER_FROM = 220
 

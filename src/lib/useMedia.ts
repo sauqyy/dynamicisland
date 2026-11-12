@@ -144,6 +144,7 @@ export function useMedia() {
       id: info.id,
       title: info.title,
       artist: info.artist,
+      album: info.album || undefined,
       duration: info.duration,
       hue: hueOf(info.id),
       art: art?.id === info.id ? art.url : undefined,

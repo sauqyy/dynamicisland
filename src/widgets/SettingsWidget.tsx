@@ -11,7 +11,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { ACCENTS, ASSISTANT_MODELS, CLOUD_MODEL, LOCAL_MODELS, CLOUD_VOICES, EQ_STYLES, ACCESSORY_SLOTS, toggleAccessory, type MascotAccessory, PERSONAS, TOOLS, SIZE_DEFAULTS, SIZE_LIMITS, SOUND_PACKS, TAB_ANIMS, toolOn, type Anim, type ChatAnim, type IdleDisplay, type GlassTint, type AssistantModel, type Persona, type Settings, type ToolId, type TalkMode, type Theme } from '../lib/settings'
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
-import { PAGES, type Tab } from '../types'
+import { PAGES } from '../types'
 import { play } from 'cuelume'
 import { disclosureCue, previewPack } from '../lib/sound'
 import { Bars } from './Equalizer'
@@ -34,15 +34,13 @@ interface Props {
   /** the settings can fill the screen as a sidebar-and-pane window, like the system settings of a Mac */
   fullscreen?: boolean
   onFullscreen?: (on: boolean) => void
-  /** pages that are not available right now (Campus before Verify Student), left out of the list */
-  unavailable: Tab[]
 }
 
 /** The sidebar of the full-screen settings, and which titled card belongs to which entry. */
 const SYS_CATS: { id: string; label: string; color: string; Icon: ComponentType<{ size?: number | string; strokeWidth?: number | string }>; titles: string[] }[] = [
-  { id: 'general', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Updates'] },
+  { id: 'general', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Notifications and calendar', 'Updates'] },
   { id: 'appearance', label: 'Appearance', color: '#0a84ff', Icon: Palette, titles: ['Appearance', 'Pill', 'Motion'] },
-  { id: 'sound', label: 'Sound', color: '#ff453a', Icon: Volume2, titles: ['Sound'] },
+  { id: 'sound', label: 'Sound', color: '#ff453a', Icon: Volume2, titles: ['Sound', 'Calls'] },
   { id: 'astra', label: 'Astra', color: '#bf5af2', Icon: AstraStar, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
   { id: 'pages', label: 'Pages', color: '#ff9f0a', Icon: LayoutGrid, titles: ['Pages'] },
   { id: 'privacy', label: 'Study & privacy', color: '#30d158', Icon: ShieldCheck, titles: ['Study', 'Clipboard privacy'] },
@@ -620,7 +618,7 @@ function CallAudio() {
   )
 }
 
-export function SettingsWidget({ settings, update, updater, fullscreen, onFullscreen, unavailable }: Props) {
+export function SettingsWidget({ settings, update, updater, fullscreen, onFullscreen }: Props) {
   const [cat, setCat] = useState(SYS_CATS[0].id)
   const buddyColor = settings.mascotColor === 'accent' ? settings.accent : settings.mascotColor
   // a window that hot-reloaded from an older build can still hold settings without per-item colours
@@ -666,12 +664,6 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
 
   const body = (
     <div className="settings settings2" onClick={(e) => e.stopPropagation()}>
-      {!fullscreen && onFullscreen && (
-        <button className="set-open" data-cuelume-tap onClick={() => onFullscreen(true)}>
-          <Maximize2 size={13} strokeWidth={2.2} aria-hidden />
-          Open in full window
-        </button>
-      )}
       <Group title="Appearance">
         <div className="row">
           <span>Theme</span>
@@ -951,7 +943,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
 
       <Group title="Pages">
         <div className="page-toggles">
-          {PAGES.filter((p) => p.id !== 'settings' && !unavailable.includes(p.id)).map((p) => {
+          {PAGES.filter((p) => p.id !== 'settings').map((p) => {
             const on = !settings.hiddenPages.includes(p.id)
             return (
               <button
@@ -967,6 +959,43 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
               </button>
             )
           })}
+        </div>
+      </Group>
+
+      <Group title="Notifications and calendar">
+        <div className="row">
+          <span>Show other apps' notifications (Windows)</span>
+          <Toggle on={settings.mirrorNotifications} onChange={(v) => update({ mirrorNotifications: v })} />
+        </div>
+        {settings.mirrorNotifications && (
+          <div className="row">
+            <span>Hide these apps</span>
+            <input
+              className="set-input"
+              value={settings.mirrorBlocked}
+              placeholder="Chrome, Slack"
+              spellCheck={false}
+              onChange={(e) => update({ mirrorBlocked: e.target.value })}
+            />
+          </div>
+        )}
+        <div className="row">
+          <span>Bluetooth connect and battery alerts</span>
+          <Toggle on={settings.bluetoothAlerts} onChange={(v) => update({ bluetoothAlerts: v })} />
+        </div>
+        <div className="row">
+          <span>New screenshots drop into the island</span>
+          <Toggle on={settings.screenshotTray} onChange={(v) => update({ screenshotTray: v })} />
+        </div>
+        <div className="row">
+          <span>Calendar feed (.ics address)</span>
+          <input
+            className="set-input"
+            value={settings.calendarUrl}
+            placeholder="https://calendar.google.com/…/basic.ics"
+            spellCheck={false}
+            onChange={(e) => update({ calendarUrl: e.target.value })}
+          />
         </div>
       </Group>
 
@@ -1181,8 +1210,32 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
     </div>
   )
 
-  if (!fullscreen) return body
   const current = SYS_CATS.find((c) => c.id === cat) ?? SYS_CATS[0]
+  // in the card: the sections down the left, and only the chosen section's cards on the right
+  if (!fullscreen)
+    return (
+      <div className="setcard" onClick={(e) => e.stopPropagation()}>
+        <nav className="sc-nav" aria-label="Settings sections">
+          {SYS_CATS.map(({ id, label, color, Icon }) => (
+            <button key={id} className={`sc-item ${id === current.id ? 'on' : ''}`} aria-current={id === current.id ? 'page' : undefined} data-cuelume-select onClick={() => setCat(id)}>
+              <span className="sc-ic" style={{ background: color }}>
+                <Icon size={12} strokeWidth={2.3} aria-hidden />
+              </span>
+              {label}
+            </button>
+          ))}
+          {onFullscreen && (
+            <button className="sc-open" data-cuelume-tap onClick={() => onFullscreen(true)}>
+              <Maximize2 size={12} strokeWidth={2.2} aria-hidden />
+              Open in full window
+            </button>
+          )}
+        </nav>
+        <div className="sc-main">
+          <SysCat.Provider value={current.id}>{body}</SysCat.Provider>
+        </div>
+      </div>
+    )
   return (
     <div className="sysset" onClick={(e) => e.stopPropagation()}>
       <aside className="sys-side">

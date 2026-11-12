@@ -12,9 +12,6 @@ export type Tab =
   | 'schedule'
   | 'study'
   | 'clipboard'
-  | 'deadlines'
-  | 'classes'
-  | 'inbox'
   | 'shelf'
   | 'apps'
   | 'friends'
@@ -28,7 +25,6 @@ export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[]
   { id: 'home', title: 'Home', icon: '🎵', pages: ['media', 'weather', 'timer'] },
   { id: 'tools', title: 'Tools', icon: '🛠️', pages: ['todo', 'notes', 'prompter'] },
   { id: 'plan', title: 'Plan', icon: '📅', pages: ['deadlist', 'schedule', 'study'] },
-  { id: 'campus', title: 'Campus', icon: '🎓', pages: ['deadlines', 'classes', 'inbox'] },
   { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps', 'clipboard'] },
   { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'groups', 'profile'] },
   { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
@@ -46,9 +42,6 @@ const TITLES: Record<Tab, string> = {
   schedule: 'Schedule',
   study: 'Study',
   clipboard: 'Clipboard',
-  deadlines: 'SCELE Deadlines',
-  classes: 'SCELE Classes',
-  inbox: 'SCELE Inbox',
   shelf: 'Shelf',
   apps: 'Apps',
   friends: 'Friends',
@@ -73,9 +66,6 @@ export const SHORT: Record<Tab, string> = {
   schedule: 'Schedule',
   study: 'Study',
   clipboard: 'Clipboard',
-  deadlines: 'Due',
-  classes: 'Classes',
-  inbox: 'Inbox',
   shelf: 'Shelf',
   apps: 'Apps',
   friends: 'Friends',
@@ -88,6 +78,7 @@ export interface Track {
   id: string
   title: string
   artist: string
+  album?: string
   /** seconds, 0 when unknown (live streams) */
   duration: number
   hue: number
@@ -114,6 +105,12 @@ export interface IslandAlert {
   nowPlaying?: boolean
   /** clicking the alert opens the card on this page */
   openTab?: Tab
+  /** clicking the alert opens this https link in the browser (a meeting's join link) */
+  openUrl?: string
+  /** a picture shown instead of the icon, e.g. a fresh screenshot */
+  thumb?: string
+  /** clicking the alert puts this file on the shelf and opens it */
+  shelfPath?: string
 }
 
 export interface TimerState {
@@ -136,6 +133,9 @@ export interface Todo {
 }
 
 export type PomoPhase = 'focus' | 'break' | 'long'
+
+/** Minutes in each Pomodoro phase. */
+export const POMO_MIN: Record<PomoPhase, number> = { focus: 25, break: 5, long: 15 }
 
 export interface PomodoroState {
   phase: PomoPhase

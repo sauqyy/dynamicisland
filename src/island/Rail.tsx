@@ -1,11 +1,10 @@
 import { useLayoutEffect, useRef } from 'react'
 import { GroupIcon } from '../widgets/GroupIcon'
-import { SHORT, type Tab } from '../types'
+import type { Tab } from '../types'
 
 interface Props {
   groups: { id: string; title: string; pages: Tab[] }[]
   tab: Tab
-  onPage: (tab: Tab) => void
   onGroup: (id: string) => void
   /** group ids that get a dot on their icon (unread messages, an update) */
   dots: string[]
@@ -22,28 +21,22 @@ function inkOn(color: string): string {
   return lum > 0.58 ? '#0b0b10' : '#ffffff'
 }
 
-/** How long a group takes to open (must match .rail-pages in App.css). */
-const OPEN_MS = 340
-
 /**
- * The one navigator of the open card: an icon per group, and the active group opened up
- * to show its pages as labels. A highlight slides to the active page; while a group is
- * opening it follows the label every frame, so it stays locked to it as the pill grows.
+ * The navigator of the open card, along its bottom edge: one labelled icon per group. A highlight
+ * springs to the active group; the pages inside a group are switched from the card's header.
  */
-export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: Props) {
+export function Rail({ groups, tab, onGroup, dots, astraColor: color }: Props) {
   const astraColor = color || '#8fa8ff'
   const rail = useRef<HTMLElement>(null)
   const lit = useRef<HTMLSpanElement>(null)
   const active = groups.find((g) => g.pages.includes(tab))?.id
-  const lastGroup = useRef(active)
 
   useLayoutEffect(() => {
     const el = rail.current
     const hl = lit.current
     if (!el || !hl) return
     const place = () => {
-      // Astra's highlight wraps her icon as well as her label
-      const b = el.querySelector<HTMLElement>(active === 'astra' ? '.rail-g.on' : '.rail-pg.on')
+      const b = el.querySelector<HTMLElement>('.rail-g.on')
       if (!b) return
       // the island is scaled by the Size setting, so convert screen pixels back to layout pixels
       const r = el.getBoundingClientRect()
@@ -52,47 +45,38 @@ export function Rail({ groups, tab, onPage, onGroup, dots, astraColor: color }: 
       hl.style.transform = `translateX(${(q.left - r.left) / s}px)`
       hl.style.width = `${q.width / s}px`
     }
-    if (lastGroup.current === active) {
+    place()
+    // the card is still growing when it first opens: lock the highlight to its tab (no easing) until it settles
+    let settle = 0
+    const ro = new ResizeObserver(() => {
+      hl.classList.add('follow')
       place()
-      return
+      window.clearTimeout(settle)
+      settle = window.setTimeout(() => hl.classList.remove('follow'), 120)
+    })
+    ro.observe(el)
+    return () => {
+      window.clearTimeout(settle)
+      ro.disconnect()
     }
-    lastGroup.current = active
-    hl.classList.add('follow')
-    const end = performance.now() + OPEN_MS
-    let raf = 0
-    const loop = () => {
-      place()
-      if (performance.now() < end) raf = requestAnimationFrame(loop)
-      else hl.classList.remove('follow')
-    }
-    loop()
-    return () => cancelAnimationFrame(raf)
   }, [tab, active, groups])
 
   return (
     <nav
       className={`rail ${groups.length > 6 ? 'tight' : ''}`}
       ref={rail}
-      aria-label="Pages"
+      aria-label="Sections"
       style={{ ['--astra' as string]: astraColor, ['--astra-ink' as string]: inkOn(astraColor) }}
       onClick={(e) => e.stopPropagation()}
     >
       <span className={`rail-lit ${active === 'astra' ? 'is-astra' : ''}`} ref={lit} />
       {groups.map((g) => (
         <div key={g.id} className={`rail-g ${g.id === active ? 'on' : ''} ${g.id === 'astra' ? 'is-astra' : ''}`}>
-          <button className="rail-ic" aria-label={g.title} title={g.title} onClick={() => onGroup(g.id)}>
-            <GroupIcon id={g.id} size={16} />
+          <button className="rail-ic" aria-label={g.title} aria-current={g.id === active ? 'page' : undefined} onClick={() => onGroup(g.id)}>
+            <GroupIcon id={g.id} size={17} />
+            <span className="rail-lb">{g.title}</span>
             {dots.includes(g.id) && <i className="rail-dot" />}
           </button>
-          <span className="rail-pages">
-            <span className="rail-in">
-              {g.pages.map((p) => (
-                <button key={p} className={`rail-pg ${p === tab ? 'on' : ''}`} aria-current={p === tab ? 'page' : undefined} tabIndex={g.id === active ? 0 : -1} onClick={() => onPage(p)}>
-                  {SHORT[p]}
-                </button>
-              ))}
-            </span>
-          </span>
         </div>
       ))}
     </nav>

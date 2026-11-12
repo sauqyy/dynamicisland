@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { play } from 'cuelume'
+import type { MotionValue } from 'motion/react'
 import { Mascot } from '../mascot/Mascot'
 import { ChatInput } from './ChatInput'
 import type { useAssistant } from '../lib/useAssistant'
@@ -13,6 +14,11 @@ interface Props {
   accessoryColors: AccessoryColors
   /** the "speak answers aloud" setting; the chat can read its answers out when this is on */
   voiceOn: boolean
+  /** the card is fullscreen, and the button to toggle it */
+  /** the mouth level while the answer is read aloud */
+  level?: MotionValue<number>
+  fullscreen?: boolean
+  onFullscreen?: (on: boolean) => void
 }
 
 const HINTS = ['What can you do?', 'Open Spotify', 'Set a 10 minute timer', 'Tell me a joke']
@@ -27,7 +33,7 @@ const loadVoice = () => {
 }
 
 /** Text chat with the assistant: the same brain, memory and actions as talking, written instead of spoken. */
-export function AstraChatWidget({ chat, name, color, accessories, accessoryColors, voiceOn }: Props) {
+export function AstraChatWidget({ chat, name, color, accessories, accessoryColors, voiceOn, level, fullscreen, onFullscreen }: Props) {
   const [draft, setDraft] = useState('')
   const [speakIt, setSpeakIt] = useState(loadVoice)
   const end = useRef<HTMLDivElement>(null)
@@ -42,10 +48,11 @@ export function AstraChatWidget({ chat, name, color, accessories, accessoryColor
     setDraft('')
   }
 
-  return (
+  const full = Boolean(fullscreen)
+  const chatPane = (
     <div className="chat astra-chat">
       <div className="chat-head">
-        <Mascot state={chat.busy ? 'thinking' : 'idle'} size={28} color={color} accessories={accessories} accessoryColors={accessoryColors} />
+        {!full && <Mascot state={chat.busy ? 'thinking' : 'idle'} size={28} color={color} accessories={accessories} accessoryColors={accessoryColors} />}
         <div className="astra-who">
           <b>{name}</b>
           <small>{chat.busy ? 'Thinking...' : 'Online'}</small>
@@ -75,19 +82,46 @@ export function AstraChatWidget({ chat, name, color, accessories, accessoryColor
             New
           </button>
         )}
+        {onFullscreen && (
+          <button
+            className="chip chat-full"
+            aria-pressed={full}
+            data-cuelume-toggle
+            title={full ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={full ? 'Exit fullscreen' : 'Fullscreen'}
+            onClick={() => onFullscreen(!full)}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {full ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+            </svg>
+          </button>
+        )}
       </div>
+      {/* in the card the suggestions sit under Astra's name; fullscreen keeps them in the empty chat */}
+      {!full && (
+        <div className="astra-side">
+          <span className="astra-side-h">Try asking</span>
+          {HINTS.map((h) => (
+            <button key={h} className="chip" data-cuelume-tap disabled={chat.busy} onClick={() => send(h)}>
+              {h}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="chat-list">
         {chat.messages.length === 0 ? (
           <div className="astra-empty">
             <b>How can I help?</b>
             <small>Ask a question, or have me open apps and set timers.</small>
-            <div className="astra-hints">
-              {HINTS.map((h) => (
-                <button key={h} className="chip" data-cuelume-tap onClick={() => send(h)}>
-                  {h}
-                </button>
-              ))}
-            </div>
+            {full && (
+              <div className="astra-hints">
+                {HINTS.map((h) => (
+                  <button key={h} className="chip" data-cuelume-tap onClick={() => send(h)}>
+                    {h}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           chat.messages.map((m) => (
@@ -128,6 +162,16 @@ export function AstraChatWidget({ chat, name, color, accessories, accessoryColor
           </svg>
         </button>
       </form>
+    </div>
+  )
+
+  if (!full) return chatPane
+  return (
+    <div className="astra-split">
+      <aside className="astra-stage">
+        <Mascot state={chat.busy ? 'thinking' : chat.speaking ? 'speaking' : 'idle'} level={level} size={260} color={color} accessories={accessories} accessoryColors={accessoryColors} />
+      </aside>
+      {chatPane}
     </div>
   )
 }

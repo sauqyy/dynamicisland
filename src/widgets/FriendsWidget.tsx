@@ -9,7 +9,7 @@ import type { GroupVoice } from '../lib/useGroupVoice'
 import { CallBar } from './CallBar'
 import { GroupChat, GroupIcon, GroupsPanel } from './GroupsWidget'
 import { DEMO_SOCIAL } from '../lib/useDemo'
-import { shownPresence } from '../lib/presence'
+import { shownPresence, SHOWN_LABEL } from '../lib/presence'
 import { Avatar } from './Avatar'
 import { ChatInput } from './ChatInput'
 import { ProfileAvatar, ProfileOpener, ProfileView } from './ProfileView'
@@ -412,65 +412,92 @@ function FriendsBody({ auth, social, call, voice, groups, section = 'friends', c
       {msg && <div className="form-msg">{msg}</div>}
       {call && social.friends.map((f) => <CallBar key={f.friendshipId} call={call} friend={f} />)}
 
-      {social.incoming.map((r) => (
-        <div key={r.friendshipId} className="friend-row request">
-          <ProfileAvatar profile={r.profile} size={30} />
-          <div className="friend-meta">
-            <b>{r.profile.display_name || `@${r.profile.username}`}</b>
-            <small>
-              <span className="handle">@{r.profile.username}</span> wants to be friends
-            </small>
+      <div
+        className="friend-cards"
+        onWheel={(e) => {
+          // a mouse wheel scrolls the row sideways
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
+        }}
+      >
+        {social.incoming.map((r) => (
+          <div key={r.friendshipId} className="friend-row friend-card request">
+            <ProfileAvatar profile={r.profile} size={50} />
+            <div className="friend-meta">
+              <b>{r.profile.display_name || `@${r.profile.username}`}</b>
+              <small>
+                <span className="handle">@{r.profile.username}</span> wants to be friends
+              </small>
+            </div>
+            <div className="friend-actions">
+            <button className="chip on" data-cuelume-tap onClick={() => social.accept(r.friendshipId)}>
+              Accept
+            </button>
+            <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
+              Decline
+            </button>
+            </div>
           </div>
-          <button className="chip on" data-cuelume-tap onClick={() => social.accept(r.friendshipId)}>
-            Accept
-          </button>
-          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
-            Decline
-          </button>
-        </div>
-      ))}
-
-      {social.friends.map((f) => (
-        <div key={f.friendshipId} className="friend-row" data-cuelume-navigate onClick={() => openFriend(f.profile.id)}>
-          <ProfileAvatar profile={f.profile} size={30} presence />
-          <div className="friend-meta">
-            <b>{f.profile.display_name || `@${f.profile.username}`}</b>
-            <small>
-              <span className="handle">@{f.profile.username}</span>
-              {(f.activity || f.profile.status) && ` · ${f.activity || f.profile.status}`}
-            </small>
+        ))}
+        {social.friends.map((f) => {
+          const shown = shownPresence(f.profile)
+          return (
+            <div key={f.friendshipId} className="friend-row friend-card" data-cuelume-navigate onClick={() => openFriend(f.profile.id)}>
+              <ProfileAvatar profile={f.profile} size={50} presence />
+              <div className="friend-meta">
+                <b>{f.profile.display_name || `@${f.profile.username}`}</b>
+                <small>{f.activity || f.profile.status || SHOWN_LABEL[shown]}</small>
+              </div>
+              {call && shown !== 'offline' ? (
+                <button
+                  className="chip friend-call"
+                  disabled={call.state.phase !== 'idle' || voiceBusy}
+                  data-cuelume-tap
+                  aria-label={`Call ${f.profile.display_name || f.profile.username}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    call.start(f.profile.id)
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z" />
+                  </svg>
+                  Call
+                </button>
+              ) : (
+                <span className="friend-call-gap" />
+              )}
+              {social.unread[f.profile.id] > 0 && <span className="badge">{social.unread[f.profile.id]}</span>}
+              <button
+                className="x"
+                aria-label="Remove friend"
+                data-cuelume-close
+                data-cuelume-emphasis="subtle"
+                title="Remove friend"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  social.remove(f.friendshipId)
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )
+        })}
+        {social.outgoing.map((r) => (
+          <div key={r.friendshipId} className="friend-row friend-card pending">
+            <ProfileAvatar profile={r.profile} size={50} />
+            <div className="friend-meta">
+              <b>{r.profile.display_name || `@${r.profile.username}`}</b>
+              <small>
+                <span className="handle">@{r.profile.username}</span> · request sent
+              </small>
+            </div>
+            <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
+              Cancel
+            </button>
           </div>
-          {social.unread[f.profile.id] > 0 && <span className="badge">{social.unread[f.profile.id]}</span>}
-          <button
-            className="x"
-            aria-label="Remove friend"
-            data-cuelume-close
-            data-cuelume-emphasis="subtle"
-            title="Remove friend"
-            onClick={(e) => {
-              e.stopPropagation()
-              social.remove(f.friendshipId)
-            }}
-          >
-            ×
-          </button>
-        </div>
-      ))}
-
-      {social.outgoing.map((r) => (
-        <div key={r.friendshipId} className="friend-row pending">
-          <ProfileAvatar profile={r.profile} size={30} />
-          <div className="friend-meta">
-            <b>{r.profile.display_name || `@${r.profile.username}`}</b>
-            <small>
-              <span className="handle">@{r.profile.username}</span> · request sent
-            </small>
-          </div>
-          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
-            Cancel
-          </button>
-        </div>
-      ))}
+        ))}
+      </div>
 
       {!social.friends.length && !social.incoming.length && !social.outgoing.length && (
         <div className="empty">No friends yet. Add someone by their username.</div>

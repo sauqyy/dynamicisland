@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
+import { meetingLabel, nextMeeting, upcoming as upcomingMeetings, useCalendar } from './lib/calendar'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { listen } from '@tauri-apps/api/event'
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
@@ -28,10 +29,6 @@ import { classState, nextClassLabel, useSchedule } from './lib/schedule'
 import { DEFAULT_LABEL, studyActivity, useStudyBoard, useStudyLog, type StudySession } from './lib/study'
 import { useStudyRoom, type StudyRoom } from './lib/useStudyRoom'
 import { WeatherWidget } from './widgets/WeatherWidget'
-import { SceleWidget } from './widgets/SceleWidget'
-import { useScele } from './lib/useScele'
-import { demoPostGrade, demoResetScele, demoSubmitLab } from './lib/scele'
-import { NO_STUDENT, useStudent } from './lib/sso'
 import { ClipboardWidget } from './widgets/ClipboardWidget'
 import { ProfileWidget } from './widgets/ProfileWidget'
 import { Avatar } from './widgets/Avatar'
@@ -72,10 +69,11 @@ import { IS_TAURI, useMedia } from './lib/useMedia'
 import { useAutoIdle } from './lib/useAutoIdle'
 import { useHeartbeat } from './lib/useHeartbeat'
 import { play, type PlayOptions, type SoundName } from 'cuelume'
-import { useSoundSetup } from './lib/sound'
+import { playChime, useSoundSetup } from './lib/sound'
 import { cachedWeather } from './lib/weather'
 import { WeatherIcon, isNight } from './widgets/WeatherIcon'
-import { GROUPS, PAGES, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
+import { shownPresence } from './lib/presence'
+import { GROUPS, PAGES, POMO_MIN, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
 // loaded once at startup: building a fresh Audio per message re-fetches and re-decodes the file, which is what made the sound lag
@@ -90,7 +88,6 @@ ringAudio.loop = true
 ringAudio.volume = 0.5
 
 const LOW_BATTERY = 20
-const POMO_MIN: Record<PomoPhase, number> = { focus: 25, break: 5, long: 15 }
 
 function nextPomo(p: PomodoroState): PomodoroState {
   if (p.phase !== 'focus') return { phase: 'focus', done: p.done }
@@ -107,13 +104,6 @@ function loadTodos(): Todo[] {
 }
 
 const TAB_KEY = 'di.tab'
-/** The Universitas Indonesia build (VITE_CAMPUS=1). Written out here, not imported, so the bundler can drop the campus modules from the regular build. */
-// also the browser dev server, for the SCELE demo (see campus.ts)
-const CAMPUS = (import.meta.env.VITE_CAMPUS === '1' || (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window) && !location.search.includes('nocampus')))
-const CAMPUS_PAGES: Tab[] = ['deadlines', 'classes', 'inbox']
-/** what the campus hook returns in the regular build, where it is never called */
-const NO_SCELE = { deadlines: [], notices: [] } as unknown as ReturnType<typeof useScele>
-
 /** The page that was open last time, so the card comes back where it was left. */
 function loadTab(): Tab {
   try {
@@ -330,18 +320,14 @@ export default function App() {
   const alertId = useRef(0)
   const tabRef = useRef(tab)
   tabRef.current = tab
-  // the Campus pages only exist for a Fasilkom student verified with SSO UI on the Profile page
-  const student = CAMPUS ? useStudent() : NO_STUDENT
-  const campus = Boolean(student.student?.fasilkom)
   const pages = useMemo(
     () =>
       PAGES.filter(
         (p) =>
           (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) &&
-          (campus || !CAMPUS_PAGES.includes(p.id)) &&
           (p.id !== 'astra' || settings.assistant),
       ),
-    [settings.hiddenPages, campus, settings.assistant],
+    [settings.hiddenPages, settings.assistant],
   )
   // the groups that still have a visible page, and which one the current page is in
   const groups = useMemo(
@@ -457,17 +443,6 @@ export default function App() {
     logStudy(s.label, Math.min((Date.now() - s.startedAt) / 60_000, s.maxMin), s.startedAt, Boolean(s.gid))
     if (s.gid) leaveRoomRef.current(s.gid)
   }, [logStudy])
-  const scele = CAMPUS ? useScele(pushAlert, student.student === undefined ? undefined : campus) : NO_SCELE
-  // a Campus page left open from before is not there once the verification is removed
-  useEffect(() => {
-    if (student.student === null && CAMPUS_PAGES.includes(tab)) setTab('profile')
-  }, [student.student, tab])
-  // what is still due before midnight, for the badge on the pill
-  const dueToday = useMemo(() => {
-    const midnight = new Date(now).setHours(24, 0, 0, 0)
-    return scele.deadlines.filter((d) => d.due > now && d.due < midnight && d.submission !== 'submitted').length
-  }, [scele.deadlines, now])
-  const sceleUnread = scele.notices.some((n) => !n.read)
 
   // a new song (skipped to, or the next one in the queue) shows what is now playing
   const lastTrackId = useRef(track?.id)
@@ -506,6 +481,16 @@ export default function App() {
     missed.current++
     return true
   }
+
+  const hushRef = useRef(hush)
+  hushRef.current = hush
+
+  // the calendar feed: what is on in the next day and a half, and the next meeting
+  const calendarFeed = useCalendar(settings.calendarUrl)
+  const minute = Math.floor(now / 60_000)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const meetings = useMemo(() => upcomingMeetings(calendarFeed, Date.now()), [calendarFeed, minute])
+  const meeting = nextMeeting(meetings, now)
 
   const playMessageSound = () => {
     if (settings.messageSound) {
@@ -603,7 +588,7 @@ export default function App() {
   }, [alert])
 
   const advancePomo = useCallback(
-    (p: PomodoroState) => {
+    (p: PomodoroState, announce = true) => {
       endStudy() // a finished (or skipped) focus phase is logged; a break has nothing to log
       const next = nextPomo(p)
       const total = POMO_MIN[next.phase] * 60_000
@@ -612,11 +597,15 @@ export default function App() {
       setTimer({ endsAt: start + total, total })
       setNow(start) // so the ring shows the new phase full straight away instead of waiting for the next tick
       if (next.phase === 'focus') beginStudy(taskRef.current, { maxMin: POMO_MIN.focus, deadlineId: taskDeadline.current })
+      // a finished phase says so out loud: a falling chime to rest, a rising one to get back to work
+      if (!announce) return
+      playChime(next.phase === 'focus' ? 'focus' : next.phase === 'long' ? 'long' : 'rest')
       pushAlert(
         next.phase === 'focus'
-          ? { icon: '🎯', text: 'Focus time', sub: taskRef.current ? `${taskRef.current} · session ${next.done + 1}` : `Session ${next.done + 1}` }
-          : { icon: '☕', text: next.phase === 'long' ? 'Long break' : 'Break time', sub: next.phase === 'long' ? `${next.done} done · stretch your legs` : `${next.done} done` },
-        'attention',
+          ? { icon: '🎯', text: 'Back to focus', sub: `${taskRef.current ? `${taskRef.current}, session` : 'Session'} ${(next.done % 4) + 1} of 4 starts now, ${POMO_MIN.focus} min` }
+          : next.phase === 'long'
+            ? { icon: '☕', text: 'Long break, you earned it', sub: `Four sessions done. Rest for ${POMO_MIN.long} min` }
+            : { icon: '☕', text: 'Time for a break', sub: `You focused for ${POMO_MIN.focus} min. Rest for ${POMO_MIN.break}` },
       )
     },
     [pushAlert, endStudy, beginStudy],
@@ -630,7 +619,8 @@ export default function App() {
       const wasRoom = Boolean(studyRef.current?.gid)
       endStudy()
       setTimer(null)
-      pushAlert(wasRoom ? { icon: '📚', text: 'Study session done' } : { icon: '⏰', text: 'Timer done' }, 'attention')
+      playChime('done')
+      pushAlert(wasRoom ? { icon: '📚', text: 'Study session done' } : { icon: '⏰', text: 'Timer done' })
     }
   }, [now, timer, pomo, pushAlert, advancePomo, endStudy])
 
@@ -772,6 +762,82 @@ export default function App() {
     return () => offs.forEach((o) => o.then((f) => f()))
   }, [pushAlert])
 
+  // a meeting 10 minutes and 1 minute before it starts; clicking joins the call when there is a link
+  useEffect(() => {
+    if (!meeting) return
+    const left = meeting.start - now
+    const key = left <= 60_000 ? 'now' : left <= 10 * 60_000 ? 'soon' : null
+    if (!key || notified.current.has(`${meeting.id}-${key}`)) return
+    notified.current.add(`${meeting.id}-${key}`)
+    if (key === 'now') notified.current.add(`${meeting.id}-soon`)
+    pushAlert(
+      {
+        icon: '📅',
+        text: meetingLabel(meeting, now),
+        sub: meeting.join ? 'Click to join' : meeting.where,
+        openUrl: meeting.join,
+      },
+      'attention',
+    )
+  }, [meeting, now, pushAlert])
+
+  // Bluetooth devices: a connect alert with the battery, and a warning when it runs low
+  useEffect(() => {
+    if (!IS_TAURI) return
+    let known: Map<string, number | null> | null = null
+    const off = listen<{ name: string; battery: number | null }[]>('bluetooth', (e) => {
+      const next = new Map(e.payload.map((d) => [d.name, d.battery]))
+      const prev = known
+      known = next
+      // devices that were already connected when the app started are not news
+      if (!prev || !settingsRef.current.bluetoothAlerts) return
+      for (const [name, battery] of next) {
+        if (!prev.has(name)) {
+          pushAlert(
+            { icon: '🎧', text: `${name} connected`, sub: battery !== null ? `${battery}%` : undefined, value: battery ?? undefined },
+            'ready',
+          )
+        } else if (battery !== null && battery <= 20 && (prev.get(name) ?? 100) > 20) {
+          pushAlert({ icon: '🪫', text: `${name} battery low`, sub: `${battery}%`, value: battery }, 'warning')
+        }
+      }
+    })
+    return () => {
+      off.then((f) => f())
+    }
+  }, [pushAlert])
+
+  // toasts from other apps (Windows reads them from the notification centre)
+  useEffect(() => {
+    if (!IS_TAURI) return
+    const off = listen<{ app: string; title: string; body: string }>('notification', (e) => {
+      const s = settingsRef.current
+      const { app, title, body } = e.payload
+      if (!s.mirrorNotifications || hushRef.current()) return
+      const name = app.toLowerCase()
+      // never echo the island's own notifications
+      if (name === 'app' || name.includes('astra')) return
+      const blocked = s.mirrorBlocked.split(',').map((b) => b.trim().toLowerCase()).filter(Boolean)
+      if (blocked.some((b) => name.includes(b))) return
+      pushAlert({ icon: '🔔', text: title.slice(0, 40), sub: (body ? `${app} · ${body}` : app).slice(0, 60) }, 'ready')
+    })
+    return () => {
+      off.then((f) => f())
+    }
+  }, [pushAlert])
+
+  // a new screenshot: shows as a thumbnail, click to keep it on the shelf
+  useEffect(() => {
+    if (!IS_TAURI) return
+    const off = listen<{ path: string }>('screenshot', (e) => {
+      if (!settingsRef.current.screenshotTray) return
+      pushAlert({ icon: '📸', text: 'Screenshot saved', sub: 'Click to keep it on the shelf', thumb: convertFileSrc(e.payload.path), shelfPath: e.payload.path }, 'ready')
+    })
+    return () => {
+      off.then((f) => f())
+    }
+  }, [pushAlert])
+
   // in-place update: progress shows in the island itself
   useEffect(() => {
     if (!IS_TAURI) return
@@ -900,7 +966,7 @@ export default function App() {
 
   // fullscreen only belongs to an open chat, the prompter or the schedule
   useEffect(() => {
-    if (fs && !(expanded && (tab === 'friends' || tab === 'groups' || tab === 'prompter' || tab === 'schedule' || tab === 'settings'))) exitFullscreen()
+    if (fs && !(expanded && (tab === 'friends' || tab === 'groups' || tab === 'prompter' || tab === 'schedule' || tab === 'settings' || tab === 'astra'))) exitFullscreen()
   }, [fs, expanded, tab, exitFullscreen])
 
   // what friends can see: the song or timer that is running
@@ -982,6 +1048,9 @@ export default function App() {
     if (settings.classPill && cls.current && cls.endsIn !== undefined) {
       return { text: `🎓 ${cls.current.title}${cls.current.room ? ` · ${cls.current.room}` : ''} · ${cls.endsIn}m left`, key: `class-${cls.current.id}`, kind: 'class' }
     }
+    if (meeting && meeting.start - now <= 15 * 60_000) {
+      return { text: `📅 ${meetingLabel(meeting, now)}`, key: `meet-${meeting.id}`, kind: 'class' }
+    }
     if (settings.classPill && cls.next && cls.startsIn !== undefined && cls.startsIn <= 20) {
       return { text: `🎓 ${nextClassLabel(cls.next, cls.startsIn)}`, key: `next-${cls.next.id}`, kind: 'class' }
     }
@@ -993,7 +1062,7 @@ export default function App() {
       return { text: `🎓 ${nextClassLabel(cls.next, cls.startsIn)}`, key: `next-${cls.next.id}`, kind: 'class' }
     }
     return null
-  }, [study, timer, pomo, now, cls, openDeadlines, settings.classPill, settings.deadlineAlert])
+  }, [study, timer, pomo, now, cls, meeting, openDeadlines, settings.classPill, settings.deadlineAlert])
 
   const idleExtra = studyStatus?.text ?? idleWeather?.text ?? idleDeadline
   const weatherGlyph = idleWeather && !idleLyric && !studyStatus ? <WeatherIcon code={idleWeather.code} night={isNight(new Date(now).getHours())} size={15} /> : null
@@ -1061,8 +1130,8 @@ export default function App() {
       : Math.min(CARD_MAX, settings.cardH)
 
   // grow the pill to fit the lyric line, up to what the stage can hold
-  const idleW = live ? liveWidth(live) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(140, idleExtra.length * 9 + 60)) : 140
-  const peekW = peekText ? Math.max(340, liveWidth(peekText)) : 300
+  const idleW = live ? Math.max(320, liveWidth(live)) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(200, idleExtra.length * 9 + 60)) : 200
+  const peekW = peekText ? Math.max(480, liveWidth(peekText)) : 460
 
   // hovering the pill during a group call drops down who is in the voice chat
   const voicePeople = voiceGroup ? voiceGroup.members.filter((p) => activeVoice.state.members.includes(p.id)) : []
@@ -1071,7 +1140,11 @@ export default function App() {
 
   // hovering the pill in deadline mode drops down the whole list (the first few, then a "+N more" row)
   const dlShown = openDeadlines.slice(0, 6)
-  const dlRows = mode === 'peek' && settings.idle === 'deadline' && openDeadlines.length ? dlShown.length + (openDeadlines.length > dlShown.length ? 1 : 0) : 0
+  // two columns, so the rows count in pairs, plus a "+N more" row
+  const dlRows = mode === 'peek' && settings.idle === 'deadline' && openDeadlines.length ? Math.ceil(dlShown.length / 2) + (openDeadlines.length > dlShown.length ? 1 : 0) : 0
+
+  // how much text the Astra card has to hold: her reply, or the error message
+  const asLen = assistant.state.phase === 'error' ? assistant.state.error.length : assistant.state.replyLen
 
   const shape: Shape = useMemo(() => {
     switch (mode) {
@@ -1080,23 +1153,24 @@ export default function App() {
         return { w: settings.cardW, h: expandedHeight, r: 32 }
       case 'alert':
         // volume and brightness are a slim level meter; a message has room for the friend and a reply
-        if (!updating && alert?.kind) return { w: 290, h: 40, r: 16 }
-        if (!updating && alert?.avatar) return { w: 380, h: 56, r: 24 }
-        if (!updating && alert?.nowPlaying) return { w: 360, h: 56, r: 24 }
-        return { w: 340, h: 48, r: 22 }
+        // wide and low: an alert is one line (icon, title, detail, button), so it needs width, not height
+        if (!updating && alert?.kind) return { w: 380, h: 30, r: 12 }
+        if (!updating && alert?.avatar) return { w: 540, h: 40, r: 16 }
+        if (!updating && alert?.nowPlaying) return { w: 480, h: 38, r: 14 }
+        return { w: 460, h: 34, r: 14 }
       case 'assistant':
-        return assistantShape(assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length > 0)
+        return assistantShape(assistant.state.phase, assistant.state.heard, asLen, assistant.state.actions.length > 0)
       case 'call':
-        return { w: 340, h: 64, r: 28 }
+        return { w: 540, h: 44, r: 18 }
       case 'incall':
-        return voiceRows ? { w: 300, h: 42 + 14 + voiceRows * 30, r: 22 } : { w: 250, h: 42, r: 18 }
+        return voiceRows ? { w: 360, h: 30 + 12 + voiceRows * 28, r: 16 } : { w: 360, h: 30, r: 12 }
       case 'peek':
-        if (dlRows) return { w: 340, h: 14 + dlRows * 30, r: 20 }
-        return { w: peekW, h: 40, r: 16 }
+        if (dlRows) return { w: 460, h: 14 + dlRows * 28, r: 18 }
+        return { w: peekW, h: 32, r: 12 }
       default:
-        return { w: idleW, h: 34, r: 13 }
+        return { w: idleW, h: 28, r: 10 }
     }
-  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows, dlRows, assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length])
+  }, [mode, fs, settings.scale, expandedHeight, settings.cardW, idleW, peekW, updating, alert?.kind, alert?.avatar, alert?.nowPlaying, voiceRows, dlRows, assistant.state.phase, assistant.state.heard, asLen, assistant.state.actions.length])
 
   const remaining = timer ? Math.max(0, (timer.endsAt - now) / 1000) : 0
   const bubble = timer
@@ -1171,7 +1245,7 @@ export default function App() {
     setTimer({ endsAt: Date.now() + POMO_MIN.focus * 60_000, total: POMO_MIN.focus * 60_000 })
     beginStudy(taskRef.current, { maxMin: POMO_MIN.focus, deadlineId: taskDeadline.current })
   }
-  const skipPomo = () => pomo && advancePomo(pomo)
+  const skipPomo = () => pomo && advancePomo(pomo, false)
   const pickTask = (t: string) => {
     taskDeadline.current = undefined
     setTask(t)
@@ -1407,10 +1481,9 @@ export default function App() {
 
   let content: React.ReactNode
   let contentKey: string
-  const dueBadge = dueToday > 0 ? <span className="sc-badge" title={`${dueToday} due today on SCELE`}>{dueToday}</span> : null
 
   if (mode === 'assistant') {
-    contentKey = `assistant-${assistantShape(assistant.state.phase, assistant.state.heard, assistant.state.replyLen, assistant.state.actions.length > 0).w}-${assistant.state.phase === 'error' ? 'err' : 'ok'}`
+    contentKey = `assistant-${assistantShape(assistant.state.phase, assistant.state.heard, asLen, assistant.state.actions.length > 0).w}-${assistant.state.phase === 'error' ? 'err' : 'ok'}`
     content = (
       <AssistantCard
         state={assistant.state}
@@ -1442,10 +1515,45 @@ export default function App() {
           {clipboard.items.length > 0 && <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={clipboard.clear}>Clear</button>}
         </>
       ) : null
+    const openTodos = todos.filter((t) => !t.done).length
+    const online = social.friends.filter((f) => shownPresence(f.profile) === 'online').length
+    const headState: [string, string] =
+      tab === 'media'
+        ? playing && track ? [`Playing, ${track.title}`, 'good'] : ['Nothing playing', '']
+        : tab === 'timer'
+          ? timer ? [`${Math.ceil(remaining / 60)} min left`, 'good'] : ['No timer running', '']
+          : tab === 'todo'
+            ? [openTodos ? `${openTodos} open` : 'All done', openTodos ? 'warn' : 'good']
+            : tab === 'shelf'
+                  ? [`${shelf.items.length} held`, shelf.items.length ? 'good' : '']
+                  : tab === 'clipboard'
+                    ? [settings.clipPaused ? 'Paused' : `${clipboard.items.length} copied`, settings.clipPaused ? 'warn' : '']
+                    : tab === 'friends' || tab === 'groups'
+                      ? [`${online} online`, online ? 'good' : '']
+                      : tab === 'astra'
+                        ? [settings.assistant ? 'Ready' : 'Off', settings.assistant ? 'good' : '']
+                        : ['', '']
     content = (
       <div className={`expanded ${fs ? 'fs' : ''} ${settings.cardFit ? '' : 'fixed'} chat-${settings.chatAnim}`}>
         <div className="xtop">
-          <span className="xtop-date">{d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <div className="xtop-main">
+            <h2 className="xtop-title">{PAGES.find((p) => p.id === tab)?.title ?? ''}</h2>
+            {headState[0] && (
+              <span className={`xtop-state ${headState[1]}`}>
+                <i />
+                <span>{headState[0]}</span>
+              </span>
+            )}
+          </div>
+          {group.pages.length > 1 && (
+            <div className="xtop-pages" role="tablist" aria-label={`${group.title} pages`} onClick={(e) => e.stopPropagation()}>
+              {group.pages.map((p) => (
+                <button key={p} role="tab" aria-selected={p === tab} className={`xtop-pg ${p === tab ? 'on' : ''}`} onClick={() => setTab(p)}>
+                  {SHORT[p]}
+                </button>
+              ))}
+            </div>
+          )}
           <span className="xtop-status">
             {playing && track && <Bars active hue={track.hue} />}
             {timer && <Ring fraction={remaining / (timer.total / 1000)} size={16} stroke={2.5} />}
@@ -1492,6 +1600,9 @@ export default function App() {
                 accessories={settings.mascotAccessories}
                 accessoryColors={settings.mascotAccessoryColors}
                 voiceOn={settings.assistantSpeak}
+                level={assistant.level}
+                fullscreen={Boolean(fs)}
+                onFullscreen={toggleFullscreen}
               />
             )}
             {tab === 'media' && (
@@ -1527,7 +1638,7 @@ export default function App() {
             {tab === 'todo' && <TodoWidget todos={todos} setTodos={setTodos} />}
             {tab === 'notes' && <NotesWidget />}
             {tab === 'prompter' && <PrompterWidget fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
-            {tab === 'deadlist' && <DeadlinesWidget deadlines={deadlines} setDeadlines={setDeadlines} now={now} onStart={startOnDeadline} studyingId={study?.deadlineId} />}
+            {tab === 'deadlist' && <DeadlinesWidget courses={[...new Set(slots.map((s) => s.title))]} deadlines={deadlines} setDeadlines={setDeadlines} now={now} onStart={startOnDeadline} studyingId={study?.deadlineId} />}
             {tab === 'schedule' && <ScheduleWidget slots={slots} setSlots={setSlots} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
             {tab === 'study' && (
               <StudyWidget
@@ -1548,9 +1659,6 @@ export default function App() {
                 onJoinRoom={joinRoom}
                 onLeave={stopTimer}
               />
-            )}
-            {CAMPUS && (tab === 'deadlines' || tab === 'classes' || tab === 'inbox') && student.student?.fasilkom && (
-              <SceleWidget page={tab} scele={scele} now={now} username={student.student.username} />
             )}
             {tab === 'weather' && <WeatherWidget settings={settings} update={update} />}
             {tab === 'clipboard' && (
@@ -1597,8 +1705,8 @@ export default function App() {
                 onFullscreen={toggleFullscreen}
               />
             )}
-            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} student={student} />}
-            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} unavailable={campus ? [] : CAMPUS_PAGES} />}
+            {tab === 'profile' && <ProfileWidget auth={auth} settings={settings} update={update} onHold={setHoldOpen} />}
+            {tab === 'settings' && <SettingsWidget settings={settings} update={update} updater={updater} fullscreen={Boolean(fs)} onFullscreen={toggleFullscreen} />}
             </div>
             </motion.div>
           </AnimatePresence>
@@ -1608,12 +1716,11 @@ export default function App() {
               astraColor={mascotColor}
               groups={groups}
               tab={tab}
-              onPage={setTab}
               onGroup={(id) => {
                 const g = groups.find((x) => x.id === id)!
                 setTab(g.pages.includes(lastInGroup.current[id]) ? lastInGroup.current[id] : g.pages[0])
               }}
-              dots={[...(unreadCount > 0 ? ['social'] : []), ...(sceleUnread ? ['campus'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
+              dots={[...(unreadCount > 0 ? ['social'] : []), ...(updater.state.s === 'available' ? ['settings'] : [])]}
             />
         </div>
         {astraIntro && (
@@ -1782,7 +1889,9 @@ export default function App() {
     const sub = value !== undefined && alert.sub === `${value}%` ? undefined : alert.sub
     content = (
       <div className={`alert2 ${alert.avatar ? 'msg-alert' : ''}`} style={{ ['--c' as string]: alertTone(alert.icon) }}>
-        {alert.avatar ? (
+        {alert.thumb ? (
+          <img className="al-thumb" src={alert.thumb} alt="" draggable={false} />
+        ) : alert.avatar ? (
           <Avatar profile={alert.avatar} size={34} />
         ) : (
           <span className="al-ic">
@@ -1827,7 +1936,7 @@ export default function App() {
       content = (
         <div className="peek center">
           <span className="peek-text">
-            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null, dueToday ? `${dueToday} due today` : null]
+            {[clock, d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), battery !== null ? `${battery}%` : null]
               .filter(Boolean)
               .join(' · ')}
           </span>
@@ -1841,9 +1950,9 @@ export default function App() {
         <Art track={track} size={22} />
         {weatherGlyph}
         <LiveText text={live} k={studyStatus ? studyStatus.key : idleLyric ? lyricIdx : live} />
-        {(unreadCount > 0 || privacy.camera || privacy.mic || dueToday > 0) && (
+        {(unreadCount > 0 || privacy.camera || privacy.mic) && (
           <span className="live-dots">
-            {dueBadge}
+            
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1861,7 +1970,7 @@ export default function App() {
             {playing && track && settings.idleBars && !idleLyric && <Bars active hue={track.hue} />}
             {weatherGlyph}
             <span className={`idle-lyric ${studyStatus ? `st-${studyStatus.kind}` : ''}`}>{idleText}</span>
-            {dueBadge}
+            
             {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
             {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
             {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1882,7 +1991,7 @@ export default function App() {
             </span>
             <span>{clock}</span>
             <span className="idle-side right">
-              {dueBadge}
+              
               {unreadCount > 0 && <span className="dot unread-dot" title={`${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`} />}
               {privacy.camera && <span className="dot cam" title={`Camera: ${privacy.camera}`} />}
               {privacy.mic && <span className="dot mic" title={`Microphone: ${privacy.mic}`} />}
@@ -1934,6 +2043,16 @@ export default function App() {
           if (mode === 'assistant') return assistant.cancel()
           if (mode === 'alert' && alert?.nowPlaying) {
             setTab('media')
+            setAlert(null)
+          }
+          if (mode === 'alert' && alert?.openUrl) {
+            invoke('open_url', { url: alert.openUrl }).catch(() => {})
+            setAlert(null)
+            return
+          }
+          if (mode === 'alert' && alert?.shelfPath) {
+            describePaths([alert.shelfPath]).then(shelf.add).catch(() => {})
+            setTab('shelf')
             setAlert(null)
           }
           if (mode === 'alert' && alert?.openTab) {
@@ -2092,41 +2211,6 @@ export default function App() {
             <button onClick={playJoin}>Join sound</button>
             <button onClick={playLeave}>Leave sound</button>
           </div>
-          {CAMPUS && campus && <div className="demo-row">
-            <span>SCELE</span>
-            <button onClick={() => pushAlert({ icon: '📅', text: 'PBD: Lab 8: Todo app', sub: 'Due in 2h 30m · still a draft', openTab: 'deadlines' }, 'attention')}>Deadline</button>
-            <button onClick={() => pushAlert({ icon: '🎓', text: 'PPW in 30m · 2.2304', sub: 'Week 9: React Hooks & State', openTab: 'classes' }, 'attention')}>Class soon</button>
-            <button onClick={() => pushAlert({ icon: '📣', text: 'PPW: Perubahan deadline Lab 8', sub: 'Deadline Lab 8 diundur ke Jumat 23.55.', openTab: 'inbox' }, 'ready')}>Announcement</button>
-            <button onClick={() => pushAlert({ icon: '📄', text: 'New in SDA', sub: 'Slide AVL Tree', openTab: 'inbox' }, 'ready')}>New material</button>
-          </div>}
-          {CAMPUS && campus && <div className="demo-row">
-            <span>SCELE work</span>
-            {/* these change the demo's SCELE data and sync, so the Due page and alerts react as they would to the real thing */}
-            <button
-              onClick={() => {
-                demoSubmitLab()
-                scele.refresh()
-              }}
-            >
-              Submit Lab 8
-            </button>
-            <button
-              onClick={() => {
-                demoPostGrade()
-                scele.refresh()
-              }}
-            >
-              Post a grade
-            </button>
-            <button
-              onClick={() => {
-                demoResetScele()
-                scele.refresh()
-              }}
-            >
-              Reset
-            </button>
-          </div>}
           <div className="demo-row">
             <span>App</span>
             <button

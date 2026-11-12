@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Music2, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
 import { currentLineIndex } from '../lib/lyrics'
+import { Bars } from './Equalizer'
 import type { Track } from '../types'
 
 /** Where the current lyric line sits in the lyrics window, as a share of its height from the top. */
@@ -41,7 +42,7 @@ interface Props {
  * Synced lyrics, read like a page: the current line is large and bright a third of the way
  * down, the lines around it fade with distance, long lines wrap, and clicking a line seeks to it.
  */
-function Lyrics({ track, idx, onSeek, lyricOffset }: { track: Track; idx: number; onSeek: (t: number) => void; lyricOffset: number }) {
+function Lyrics({ track, idx, onSeek, lyricOffset, position }: { track: Track; idx: number; onSeek: (t: number) => void; lyricOffset: number; position: number }) {
   const box = useRef<HTMLDivElement>(null)
   const stack = useRef<HTMLDivElement>(null)
   const [shift, setShift] = useState(0)
@@ -76,6 +77,9 @@ function Lyrics({ track, idx, onSeek, lyricOffset }: { track: Track; idx: number
       <div className="ly-stack" ref={stack} style={{ transform: `translateY(${shift}px)` }}>
         {lines.map((l, i) => {
           const away = Math.min(3, Math.abs(i - idx))
+          // the line being sung fills with the song's colour from left to right, in step with the music
+          const end = lines[i + 1]?.t ?? l.t + 4
+          const sung = i === idx ? Math.min(1, Math.max(0, (position + lyricOffset - l.t) / Math.max(0.5, end - l.t))) : 0
           return (
             <button
               key={i}
@@ -85,7 +89,7 @@ function Lyrics({ track, idx, onSeek, lyricOffset }: { track: Track; idx: number
               title="Play from this line"
               onClick={() => onSeek(Math.max(0, l.t - lyricOffset))}
             >
-              {l.text || '♪'}
+              <span style={i === idx ? ({ ['--k' as string]: `${(sung * 100).toFixed(1)}%` } as React.CSSProperties) : undefined}>{l.text || '♪'}</span>
             </button>
           )
         })}
@@ -122,56 +126,64 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   }
 
   return (
-    <div className="np-page" onClick={(e) => e.stopPropagation()}>
-      <div className="np">
-        <Art track={track} size={46} />
-        <div className="np-meta">
-          <b>{track.title}</b>
-          <span>{track.artist}</span>
+    <div className={`np2 ${playing ? '' : 'paused'}`} style={{ ['--h' as string]: track.hue } as React.CSSProperties} onClick={(e) => e.stopPropagation()}>
+      <div className="np2-art">
+        <Art track={track} size={148} />
+        <span className="np2-eq">
+          <Bars active={playing} hue={track.hue} />
+        </span>
+      </div>
+
+      <div className="np2-mid">
+        <div className="np2-meta">
+          <b title={track.title}>{track.title}</b>
+          <span>
+            {track.artist}
+            {track.album && <i>{track.album}</i>}
+          </span>
+        </div>
+        <div className="np2-time">
+          <span>{fmt(position)}</span>
+          <div
+            className={`np2-bar ${seeking ? 'seeking' : ''} ${canSeek ? '' : 'live'}`}
+            ref={barRef}
+            role="slider"
+            aria-label="Position"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(track.duration)}
+            aria-valuenow={Math.round(position)}
+            data-cuelume-select
+            data-cuelume-emphasis="subtle"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              setSeeking(true)
+              seekFromEvent(e.clientX)
+            }}
+            onPointerMove={(e) => e.buttons === 1 && seekFromEvent(e.clientX)}
+            onPointerUp={() => setSeeking(false)}
+            onPointerCancel={() => setSeeking(false)}
+          >
+            <i style={{ width: `${progress}%` }} />
+            <u style={{ left: `${progress}%` }} />
+          </div>
+          <span>{canSeek ? `-${fmt(Math.max(0, track.duration - position))}` : 'Live'}</span>
+        </div>
+        <div className="np2-ctl">
+          <button className="np2-skip" onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">
+            <SkipBack size={17} fill="currentColor" aria-hidden />
+          </button>
+          <button className="np2-play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
+            {playing ? <Pause size={18} fill="currentColor" aria-hidden /> : <Play size={18} fill="currentColor" aria-hidden />}
+          </button>
+          <button className="np2-skip" onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">
+            <SkipForward size={17} fill="currentColor" aria-hidden />
+          </button>
+          <span className="np2-hint">{track.lyrics ? 'Click a lyric line to jump to it' : ''}</span>
         </div>
       </div>
 
-      <Lyrics track={track} idx={idx} onSeek={onSeek} lyricOffset={lyricOffset} />
-
-      {/* one row: the three buttons on the left, the timeline with both times on the right */}
-      <div className="np-transport">
-        <div className="np-buttons">
-          <button className="np-skip" onClick={() => onSkip(-1)} aria-label="Previous" data-cuelume-tap data-cuelume-emphasis="subtle">
-            <SkipBack size={16} fill="currentColor" aria-hidden />
-          </button>
-          <button className="np-play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'} aria-pressed={playing} data-cuelume-toggle>
-            {playing ? <Pause size={16} fill="currentColor" aria-hidden /> : <Play size={16} fill="currentColor" aria-hidden />}
-          </button>
-          <button className="np-skip" onClick={() => onSkip(1)} aria-label="Next" data-cuelume-tap data-cuelume-emphasis="subtle">
-            <SkipForward size={16} fill="currentColor" aria-hidden />
-          </button>
-        </div>
-        <span className="np-time">{fmt(position)}</span>
-        <div
-          className={`np-scrub ${seeking ? 'seeking' : ''} ${canSeek ? '' : 'live'}`}
-          ref={barRef}
-          role="slider"
-          aria-label="Position"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(track.duration)}
-          aria-valuenow={Math.round(position)}
-          data-cuelume-select
-          data-cuelume-emphasis="subtle"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId)
-            setSeeking(true)
-            seekFromEvent(e.clientX)
-          }}
-          onPointerMove={(e) => e.buttons === 1 && seekFromEvent(e.clientX)}
-          onPointerUp={() => setSeeking(false)}
-          onPointerCancel={() => setSeeking(false)}
-        >
-          <div className="np-track">
-            <div className="np-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="np-knob" style={{ left: `${progress}%` }} />
-        </div>
-        <span className="np-time end">{canSeek ? fmt(track.duration) : 'Live'}</span>
+      <div className="np2-side">
+        <Lyrics track={track} idx={idx} onSeek={onSeek} lyricOffset={lyricOffset} position={position} />
       </div>
     </div>
   )

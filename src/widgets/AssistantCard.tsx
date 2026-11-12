@@ -36,22 +36,28 @@ export function mascotFor(phase: AssistantState['phase']): MascotState {
   }
 }
 
-/** Island size for each phase: a slim bar while listening, a roomier card once there is an answer. */
+/**
+ * Island size for each phase. The card is wide and low: a slim bar while listening or thinking, one line
+ * for a question, and as many lines as the answer needs (at 74 characters a line) once she is speaking.
+ */
 export function assistantShape(phase: AssistantState['phase'], heard = '', replyLen = 0, hasActions = false) {
-  if (phase === 'confirm') return { w: 400, h: 112, r: 30 }
+  if (phase === 'confirm') return { w: 620, h: 44, r: 18 }
   if (phase === 'speaking' || phase === 'done') {
     // the card is sized for the whole answer from the start, so it does not keep growing while it is typed
-    const lines = Math.min(7, Math.max(3, Math.ceil(replyLen / 44)))
-    return { w: 400, h: 52 + lines * 19 + (hasActions ? 30 : 0), r: 32 }
+    const lines = Math.min(6, Math.max(1, Math.ceil(replyLen / 74)))
+    return { w: 660, h: Math.max(44, 22 + lines * 19 + (hasActions ? 28 : 0)), r: 18 }
   }
-  // once there are words to show, the bar grows into a card that fits them
-  if ((phase === 'listening' || phase === 'thinking') && heard.trim()) return { w: 400, h: 96, r: 30 }
-  if (phase === 'error') return { w: 400, h: 84, r: 30 }
-  return { w: 320, h: 76, r: 30 }
+  if (phase === 'error') {
+    // `replyLen` carries the message length here: about 56 characters fit on a line
+    const lines = Math.min(4, Math.max(1, Math.ceil(replyLen / 56)))
+    return { w: 480, h: Math.max(44, 20 + lines * 17), r: 18 }
+  }
+  if (phase === 'thinking' && !heard.trim()) return { w: 300, h: 36, r: 14 }
+  return { w: 560, h: 40, r: 16 }
 }
 
 /** A long sentence shows its latest words, so the card follows what is being said right now. */
-const tail = (t: string, max = 96) => (t.length > max ? `…${t.slice(-max).replace(/^\S*\s/, '')}` : t)
+const tail = (t: string, max = 56) => (t.length > max ? `…${t.slice(-max).replace(/^\S*\s/, '')}` : t)
 
 /** One bar of the mic meter: grows with its band of the voice and never quite disappears, so a live mic always shows. */
 function Bar({ band }: { band: MotionValue<number> }) {
@@ -83,7 +89,7 @@ export function AssistantCard({ state, level, bands, name, color, accessories, a
               ? `Downloading speech recognition (${Math.round(stt.progress * 100)}%), first time only`
               : 'Waking up speech recognition...'
           : talk === 'hold'
-            ? 'Hold the keys while you talk, or tap once and just talk'
+            ? 'Hold the keys and talk, or tap once and just talk'
             : 'Go ahead, press again or just stop talking'}
       </span>
     )
@@ -136,7 +142,7 @@ export function AssistantCard({ state, level, bands, name, color, accessories, a
   return (
     <div className={`assistant as-${phase}${live ? ' as-live' : ''}`}>
       <div className="as-mascot">
-        <Mascot state={mascotFor(phase)} level={level} size={phase === 'speaking' || phase === 'done' ? 64 : 52} color={color} accessories={accessories} accessoryColors={accessoryColors} />
+        <Mascot state={mascotFor(phase)} level={level} size={phase === 'speaking' || phase === 'done' ? 36 : 30} color={color} accessories={accessories} accessoryColors={accessoryColors} />
       </div>
       <div className="as-body">
         <b className="as-title">{title}</b>
