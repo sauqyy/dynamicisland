@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import { fmt } from './MediaWidget'
 import type { TimerState } from '../types'
 

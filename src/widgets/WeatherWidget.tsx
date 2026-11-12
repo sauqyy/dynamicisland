@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import { cachedWeather, describe, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
 import type { Settings } from '../lib/settings'
 import { CloudRain, Droplets, Wind } from 'lucide-react'

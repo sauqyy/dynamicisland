@@ -42,7 +42,7 @@ interface Props {
  * Synced lyrics, read like a page: the current line is large and bright a third of the way
  * down, the lines around it fade with distance, long lines wrap, and clicking a line seeks to it.
  */
-function Lyrics({ track, idx, onSeek, lyricOffset, position }: { track: Track; idx: number; onSeek: (t: number) => void; lyricOffset: number; position: number }) {
+function Lyrics({ track, idx, onSeek, lyricOffset }: { track: Track; idx: number; onSeek: (t: number) => void; lyricOffset: number }) {
   const box = useRef<HTMLDivElement>(null)
   const stack = useRef<HTMLDivElement>(null)
   const [shift, setShift] = useState(0)
@@ -77,9 +77,6 @@ function Lyrics({ track, idx, onSeek, lyricOffset, position }: { track: Track; i
       <div className="ly-stack" ref={stack} style={{ transform: `translateY(${shift}px)` }}>
         {lines.map((l, i) => {
           const away = Math.min(3, Math.abs(i - idx))
-          // the line being sung fills with the song's colour from left to right, in step with the music
-          const end = lines[i + 1]?.t ?? l.t + 4
-          const sung = i === idx ? Math.min(1, Math.max(0, (position + lyricOffset - l.t) / Math.max(0.5, end - l.t))) : 0
           return (
             <button
               key={i}
@@ -89,7 +86,7 @@ function Lyrics({ track, idx, onSeek, lyricOffset, position }: { track: Track; i
               title="Play from this line"
               onClick={() => onSeek(Math.max(0, l.t - lyricOffset))}
             >
-              <span style={i === idx ? ({ ['--k' as string]: `${(sung * 100).toFixed(1)}%` } as React.CSSProperties) : undefined}>{l.text || '♪'}</span>
+              {l.text || '♪'}
             </button>
           )
         })}
@@ -183,7 +180,7 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
       </div>
 
       <div className="np2-side">
-        <Lyrics track={track} idx={idx} onSeek={onSeek} lyricOffset={lyricOffset} position={position} />
+        <Lyrics track={track} idx={idx} onSeek={onSeek} lyricOffset={lyricOffset} />
       </div>
     </div>
   )

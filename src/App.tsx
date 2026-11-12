@@ -68,12 +68,12 @@ import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
 import { useAutoIdle } from './lib/useAutoIdle'
 import { useHeartbeat } from './lib/useHeartbeat'
-import { play, type PlayOptions, type SoundName } from 'cuelume'
-import { playChime, useSoundSetup } from './lib/sound'
+import type { PlayOptions, SoundName } from 'cuelume'
+import { play, playChime, useSoundSetup } from './lib/sound'
 import { cachedWeather } from './lib/weather'
 import { WeatherIcon, isNight } from './widgets/WeatherIcon'
 import { shownPresence } from './lib/presence'
-import { GROUPS, PAGES, POMO_MIN, SHORT, type IslandAlert, type PomodoroState, type PomoPhase, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
+import { GROUPS, PAGES, POMO_MIN, SHORT, type IslandAlert, type PomodoroState, type StopwatchState, type Tab, type TimerState, type Todo } from './types'
 import './App.css'
 
 // loaded once at startup: building a fresh Audio per message re-fetches and re-decodes the file, which is what made the sound lag
@@ -234,7 +234,7 @@ export default function App() {
   }, [settings.assistant, settings.assistantSpeak, settings.assistantVoiceEngine])
   const assistantAwake = useRef(false)
   assistantAwake.current = assistant.state.phase !== 'idle'
-  useSoundSetup(settings.uiSounds, settings.soundPack, settings.soundVolume, settings.typingSounds)
+  useSoundSetup(settings.uiSounds, settings.soundPack, settings.soundVolume)
   const [hidden, setHidden] = useState(false)
   const updater = useUpdater()
   const [pomo, setPomo] = useState<PomodoroState | null>(null)

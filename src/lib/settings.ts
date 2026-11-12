@@ -79,7 +79,6 @@ export interface Settings {
   /** loudness of the interface sounds, 0-1 */
   soundVolume: number
   /** the keystroke sound in text fields */
-  typingSounds: boolean
   /** font size of the idle pill text in px */
   clockSize: number
   /** seconds the lyrics run ahead of the player; the fade-in and Windows' position lag make them feel late */
@@ -305,7 +304,9 @@ export function clampPos(x: number, y: number) {
   return { x: Math.round(Math.max(-maxX, Math.min(maxX, x))), y: Math.round(Math.max(0, Math.min(maxY, y))) }
 }
 
-export const SIZE_DEFAULTS = { scale: 1, cardW: 820, cardH: 320, cardFit: true }
+/** Every page of the card is the same height; the content is laid out to fit it. */
+export const CARD_HEIGHT = 252
+export const SIZE_DEFAULTS = { scale: 1, cardW: 820, cardH: CARD_HEIGHT, cardFit: false }
 
 const DEFAULTS: Settings = {
   monitor: 0,
@@ -339,7 +340,6 @@ const DEFAULTS: Settings = {
   uiSounds: true,
   soundPack: 'mech',
   soundVolume: 1,
-  typingSounds: true,
   clockSize: 15,
   lyricOffset: 0.35,
   hiddenPages: [],
@@ -422,15 +422,16 @@ function load(): Settings {
     if (!['base', 'small'].includes(merged.assistantListenModel)) merged.assistantListenModel = 'small'
     // "Pip" was the mascot's name before Astra, so anyone still on it never picked it
     if (merged.mascotName === 'Pip') merged.mascotName = DEFAULTS.mascotName
-    // the wide card sizes itself to each page: move everyone off the old fixed height once
-    if (!localStorage.getItem('di.wideCard')) {
-      merged.cardFit = true
+    // every page of the card is now one height (it used to follow the page): move everyone over once
+    if (!localStorage.getItem('di.sameHeight')) {
+      merged.cardH = CARD_HEIGHT
       try {
-        localStorage.setItem('di.wideCard', '1')
+        localStorage.setItem('di.sameHeight', '1')
       } catch {
         /* ignore */
       }
     }
+    merged.cardFit = false
     // the card used to be a tall 400-490 column: keep it inside the new wide, short range
     merged.cardW = Math.min(SIZE_LIMITS.cardW.max, Math.max(SIZE_LIMITS.cardW.min, merged.cardW))
     merged.cardH = Math.min(SIZE_LIMITS.cardH.max, Math.max(SIZE_LIMITS.cardH.min, merged.cardH))

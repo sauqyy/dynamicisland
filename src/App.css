@@ -7590,14 +7590,8 @@ button.ao-text:hover {
 }
 
 /* ---------- Now Playing: the cover glows in its own colour, controls in the middle, lyrics on the right ---------- */
-@property --k {
-  syntax: '<percentage>';
-  inherits: false;
-  initial-value: 0%;
-}
 .np2 {
   --np-tone: hsl(var(--h) 90% 66%);
-  --np-sung: hsl(var(--h) 92% 72%);
   position: relative;
   isolation: isolate;
   height: 100%;
@@ -7609,7 +7603,6 @@ button.ao-text:hover {
 }
 .root.light .np2 {
   --np-tone: hsl(var(--h) 75% 45%);
-  --np-sung: hsl(var(--h) 80% 40%);
 }
 .np2::before {
   content: '';
@@ -7813,21 +7806,9 @@ button.ao-text:hover {
 .expanded:not(.fs) .np2 .ly-line.now {
   font-size: 17px;
 }
-/* the line being sung fills from left to right in the song's colour */
-.np2 .ly-line.now span {
-  background: linear-gradient(90deg, var(--np-sung) var(--k, 0%), var(--text-1) var(--k, 0%));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  transition: --k 0.12s linear;
-}
-.np2.paused .ly-line.now span {
-  transition: none;
-}
 @media (prefers-reduced-motion: reduce) {
   .np2-art,
-  .np2-play,
-  .np2 .ly-line.now span {
+  .np2-play {
     transition: none;
   }
 }
@@ -8307,4 +8288,123 @@ button.ao-text:hover {
 }
 .expanded:not(.fs) .setcard .settings.settings2 > .set-group {
   margin-bottom: 12px;
+}
+
+/* ---------- one card height for every page: each page fills it and lays its content out to fit ---------- */
+.expanded:not(.fs) .page-fit {
+  height: 100%;
+  min-height: 0;
+}
+.expanded:not(.fs) .page-fit .empty,
+.expanded:not(.fs) .page-fit .media.nothing,
+.expanded:not(.fs) .page-fit .empty-block {
+  min-height: 0;
+  padding: 8px 16px;
+}
+.expanded:not(.fs) .notes-input {
+  min-height: 0;
+}
+.expanded:not(.fs) .dl-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+  scrollbar-width: thin;
+}
+.expanded:not(.fs) .wk .wk-week {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+.expanded:not(.fs) .wk .wk-col {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.expanded:not(.fs) .st {
+  height: 100%;
+}
+.expanded:not(.fs) .st-c3 {
+  max-height: 100%;
+}
+.expanded:not(.fs) .setcard {
+  height: 100%;
+}
+
+/* Study: the left column drops its labels (the controls say what they do) and each stat is one line */
+.expanded:not(.fs) .st-c1 .st-sec h4 {
+  display: none;
+}
+.expanded:not(.fs) .st-c1 .st-seg {
+  min-height: 32px;
+}
+.expanded:not(.fs) .st-stats > div {
+  gap: 0;
+  padding: 6px 10px;
+}
+.expanded:not(.fs) .st-stats svg {
+  display: none;
+}
+.expanded:not(.fs) .st-stats small {
+  white-space: nowrap;
+}
+.expanded:not(.fs) .st-week {
+  height: 40px;
+}
+.expanded:not(.fs) .st-chart {
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+/* Profile sign-in: Google on the left, the email form on the right, so it fits without scrolling */
+.expanded:not(.fs) .scroll-panel > .profile-auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  column-gap: 28px;
+  row-gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  align-content: center;
+}
+.expanded:not(.fs) .profile-auth > .google-btn {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  align-self: center;
+  justify-self: stretch;
+  padding: 12px 14px;
+}
+.expanded:not(.fs) .profile-auth > .or {
+  display: none;
+}
+.expanded:not(.fs) .profile-auth > .todo-input,
+.expanded:not(.fs) .profile-auth > .form-warn,
+.expanded:not(.fs) .profile-auth > .presets,
+.expanded:not(.fs) .profile-auth > .form-msg {
+  grid-column: 2;
+}
+.expanded:not(.fs) .profile-auth > .presets {
+  justify-content: flex-start;
+}
+
+/* Settings: a compact section list so it and its "Open in full window" button fit the card without scrolling */
+.expanded:not(.fs) .sc-item {
+  padding: 2px 8px;
+}
+.expanded:not(.fs) .sc-ic {
+  width: 18px;
+  height: 18px;
+}
+.expanded:not(.fs) .sc-nav {
+  gap: 0;
+}
+.expanded:not(.fs) .sc-open {
+  padding: 3px 8px;
+}
+.expanded:not(.fs) .notes {
+  padding-bottom: 0;
+}
+
+.expanded:not(.fs) .notes-input {
+  display: block;
 }

@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import { CalendarRange, Clock, Flame, History, Play, Square, Trophy, UserPlus } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { DEFAULT_LABEL, dayKey, dayTotal, fmtStudy, isStudying, lastDays, streakOf, type BoardRow, type StudyEntry, type StudyLog, type StudySession } from '../lib/study'

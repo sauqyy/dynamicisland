@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, Reorder, motion } from 'motion/react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import { Check, ListChecks } from 'lucide-react'
 import type { Todo } from '../types'
 

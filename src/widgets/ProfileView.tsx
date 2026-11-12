@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import type { Profile } from '../lib/supabase'
 import { SHOWN_LABEL, shownPresence } from '../lib/presence'
 import { Avatar } from './Avatar'

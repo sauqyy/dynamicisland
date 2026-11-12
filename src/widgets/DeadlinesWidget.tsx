@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import { CalendarClock, Check, Play, Plus } from 'lucide-react'
 import { dueLabel, toDateValue, urgency, type Deadline } from '../lib/deadlines'
 

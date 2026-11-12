@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import { motion } from 'motion/react'
 import { Plus } from 'lucide-react'
 import { minutes, type Slot } from '../lib/schedule'

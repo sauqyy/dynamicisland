@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { motionValue } from 'motion/react'
-import { play } from 'cuelume'
+import { play } from './sound'
 import { invoke } from '@tauri-apps/api/core'
 import { register, unregister } from '@tauri-apps/plugin-global-shortcut'
 import { IS_TAURI } from './useMedia'

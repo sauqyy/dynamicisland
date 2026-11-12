@@ -12,8 +12,7 @@ import { ACCENTS, ASSISTANT_MODELS, CLOUD_MODEL, LOCAL_MODELS, CLOUD_VOICES, EQ_
 import { IS_TAURI } from '../lib/useMedia'
 import { IS_MAC } from '../lib/files'
 import { PAGES } from '../types'
-import { play } from 'cuelume'
-import { disclosureCue, previewPack } from '../lib/sound'
+import { previewPack } from '../lib/sound'
 import { Bars } from './Equalizer'
 import { Mascot } from '../mascot/Mascot'
 
@@ -693,7 +692,6 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
               className={`swatch-custom ${ACCENTS.includes(settings.accent) ? '' : 'filled active'} ${customOpen ? 'open' : ''}`}
               title="Custom colour"
               aria-label="Custom colour"
-              {...disclosureCue(customOpen)}
               style={ACCENTS.includes(settings.accent) ? undefined : ({ '--swatch': settings.accent } as React.CSSProperties)}
               onClick={() => setCustomOpen((o) => !o)}
             />
@@ -821,23 +819,13 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           format={(v) => `${v}`}
           onChange={(cardW) => update({ cardW })}
         />
-        <div className="row">
-          <span>Card height</span>
-          <Segmented<'fit' | 'fixed'>
-            options={[['fit', 'Fits the page'], ['fixed', 'Fixed']]}
-            value={settings.cardFit ? 'fit' : 'fixed'}
-            onPick={(v) => update({ cardFit: v === 'fit' })}
-          />
-        </div>
-        {!settings.cardFit && (
-          <Slider
-            label="Height"
-            value={settings.cardH}
-            limits={SIZE_LIMITS.cardH}
-            format={(v) => `${v}`}
-            onChange={(cardH) => update({ cardH })}
-          />
-        )}
+        <Slider
+          label="Card height"
+          value={settings.cardH}
+          limits={SIZE_LIMITS.cardH}
+          format={(v) => `${v}`}
+          onChange={(cardH) => update({ cardH })}
+        />
       </Group>
 
       <Group title="Motion">
@@ -896,15 +884,12 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
 
       <Group title="Sound">
         <div className="row">
-          <span>Sound effects</span>
-          {/* these play their own cue: a preview in the pack just picked, or a last one on the way to mute */}
+          <span>Alert sounds</span>
+          {/* picking a pack plays a preview; clicks, typing and page changes are silent */}
           <div className="segmented small">
             <button
               className={settings.uiSounds ? '' : 'active'}
-              onClick={() => {
-                if (settings.uiSounds) play('close', { emphasis: 'subtle' })
-                update({ uiSounds: false })
-              }}
+              onClick={() => update({ uiSounds: false })}
             >
               Mute
             </button>
@@ -929,10 +914,6 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           format={(v) => `${Math.round(v * 100)}%`}
           onChange={(soundVolume) => update({ soundVolume })}
         />
-        <div className="row">
-          <span>Keyboard sounds</span>
-          <Toggle on={settings.typingSounds} onChange={(v) => update({ typingSounds: v })} />
-        </div>
         <div className="row">
           <span>Message sound</span>
           <Toggle on={settings.messageSound} onChange={(v) => update({ messageSound: v })} />

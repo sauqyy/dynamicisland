@@ -1,8 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import type { Message, Profile } from '../lib/supabase'
 import { inviteLink, type Group, type GroupMessage, type Groups } from '../lib/useGroups'
-import { disclosureCue } from '../lib/sound'
 import { ACCENTS } from '../lib/settings'
 import type { GroupVoice } from '../lib/useGroupVoice'
 import { MAX_VOICE } from '../lib/useGroupVoice'
@@ -146,7 +145,7 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
       {isOwner && (
         <div className="group-icon-edit">
           <GroupIcon group={{ emoji, color }} size={26} />
-          <button className={`chip ${editing ? 'on' : ''}`} {...disclosureCue(editing)} onClick={() => setEditing((v) => !v)}>
+          <button className={`chip ${editing ? 'on' : ''}`} onClick={() => setEditing((v) => !v)}>
             Change icon
           </button>
           {editing && (
@@ -283,7 +282,7 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
           <b>{group.name}</b>
           <small className="handle">{group.members.length} {group.members.length === 1 ? 'member' : 'members'}</small>
         </span>
-        <button className={`chip group-info-btn ${info ? 'on' : ''}`} {...disclosureCue(info)} aria-pressed={info} title="Members and invites" onClick={() => setInfo((v) => !v)}>
+        <button className={`chip group-info-btn ${info ? 'on' : ''}`} aria-pressed={info} title="Members and invites" onClick={() => setInfo((v) => !v)}>
           Info
         </button>
         {onFullscreen && (
@@ -377,7 +376,7 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
               setDraft('')
             }}
           >
-            <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" {...disclosureCue(sharing)} data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
+            <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
               +
             </button>
             <ChatInput
@@ -457,7 +456,7 @@ export function GroupsPanel({ me, groups, onOpen }: Props) {
       ))}
 
       <div className="group-actions">
-        <button className={`group-action ${mode === 'create' ? 'on' : ''}`} aria-pressed={mode === 'create'} {...disclosureCue(mode === 'create')} onClick={() => setMode(mode === 'create' ? null : 'create')}>
+        <button className={`group-action ${mode === 'create' ? 'on' : ''}`} aria-pressed={mode === 'create'} onClick={() => setMode(mode === 'create' ? null : 'create')}>
           <span className="ga-icon" aria-hidden>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
@@ -468,7 +467,7 @@ export function GroupsPanel({ me, groups, onOpen }: Props) {
             <small>Chat with friends</small>
           </span>
         </button>
-        <button className={`group-action ${mode === 'join' ? 'on' : ''}`} aria-pressed={mode === 'join'} {...disclosureCue(mode === 'join')} onClick={() => setMode(mode === 'join' ? null : 'join')}>
+        <button className={`group-action ${mode === 'join' ? 'on' : ''}`} aria-pressed={mode === 'join'} onClick={() => setMode(mode === 'join' ? null : 'join')}>
           <span className="ga-icon" aria-hidden>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />

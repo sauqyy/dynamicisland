@@ -7,8 +7,7 @@ import { NO_CROP, MAX_ZOOM, clampCrop, cropPhoto, cropRect, type Crop } from '..
 import { PRESENCES, presenceOf } from '../lib/presence'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { Avatar } from './Avatar'
-import { play } from 'cuelume'
-import { disclosureCue } from '../lib/sound'
+import { play } from '../lib/sound'
 
 const EMOJIS = ['🙂', '😎', '🤖', '🦊', '🐼', '🐸', '🦄', '🐙', '🌵', '🚀', '🎧', '🔥', '🌙', '🍕', '👾', '🐱']
 
@@ -67,7 +66,7 @@ function StatusField({ value, onChange }: { value: string; onChange: (v: string)
           if (e.key === 'Escape') setOpen(false)
         }}
       />
-      <button className={`status-toggle ${open ? 'open' : ''}`} aria-label="Choose a status" title="Templates" {...disclosureCue(open)} data-cuelume-emphasis="subtle" onClick={() => setOpen((o) => !o)}>
+      <button className={`status-toggle ${open ? 'open' : ''}`} aria-label="Choose a status" title="Templates" data-cuelume-emphasis="subtle" onClick={() => setOpen((o) => !o)}>
         ▾
       </button>
       {open && (

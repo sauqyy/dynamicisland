@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { play as cue } from 'cuelume'
+import { play as cue } from '../lib/sound'
 import { FlipHorizontal2, Minus, Pause, Play, Plus, SquarePen } from 'lucide-react'
 
 const KEY = 'di.prompter'

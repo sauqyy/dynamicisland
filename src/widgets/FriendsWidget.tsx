@@ -13,8 +13,7 @@ import { shownPresence, SHOWN_LABEL } from '../lib/presence'
 import { Avatar } from './Avatar'
 import { ChatInput } from './ChatInput'
 import { ProfileAvatar, ProfileOpener, ProfileView } from './ProfileView'
-import { play } from 'cuelume'
-import { disclosureCue } from '../lib/sound'
+import { play } from '../lib/sound'
 
 export interface OpenChat {
   friend: string | null
@@ -202,7 +201,7 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
           setDraft('')
         }}
       >
-        <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" {...disclosureCue(sharing)} data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
+        <button type="button" className={`chip chat-plus ${sharing ? 'on' : ''}`} title="Share activity or note" data-cuelume-emphasis="subtle" onClick={() => setSharing((v) => !v)}>
           +
         </button>
         <ChatInput
@@ -281,6 +280,8 @@ export function FriendsWidget(props: Props) {
 }
 
 function FriendsBody({ auth, social, call, voice, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
+  // in a group voice chat, so a one-to-one call cannot start
+  const voiceBusy = Boolean(voice?.state.groupId)
   const [username, setUsername] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   // going back plays the chat's closing animation first, then really leaves
@@ -329,7 +330,7 @@ function FriendsBody({ auth, social, call, voice, groups, section = 'friends', c
     }, CHAT_CLOSE_MS)
   }
   const chatView = friend ? (
-    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} voiceBusy={Boolean(voice?.state.groupId)} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} voiceBusy={voiceBusy} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
   ) : group && groups ? (
     <GroupChat key={group.id} group={group} me={auth.user.id} groups={groups} voice={voice} voiceBlocked={Boolean(call && call.state.phase !== 'idle')} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
   ) : null

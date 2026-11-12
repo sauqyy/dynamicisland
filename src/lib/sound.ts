@@ -1,37 +1,40 @@
 import { useEffect } from 'react'
-import { bind, play, setEnabled, setTheme, setVolume, unlock, type ThemeName } from 'cuelume'
+import { play as cuePlay, setEnabled, setTheme, setVolume, unlock, type PlayOptions, type SoundName, type ThemeName } from 'cuelume'
 import type { SoundPack } from './settings'
 
 /*
- * Interface sounds (cuelume). Most controls are marked in the markup with data-cuelume-* attributes,
- * which one bind() at the root wires up; what is not a click on one control (the card opening, page
- * changes, alerts, keyboard picks) plays from code. Settings can turn them off and pick the pack.
+ * Sounds. The interface itself is silent: no clicks, no key presses, no sound for opening a card or
+ * changing a page. What still plays are the sounds that tell you something happened (a message, an
+ * update, a finished timer, a success or an error). Settings can turn them off and pick the pack.
  */
+
+/** The only cues that play: things that report something, never the click of a control. */
+const NOTICES: readonly SoundName[] = ['ready', 'attention', 'success', 'error', 'loading']
+
+/** Plays a notification sound. Click and navigation cues are ignored, so the controls stay quiet. */
+export function play(name: SoundName, options?: PlayOptions) {
+  if (NOTICES.includes(name)) void cuePlay(name, options)
+}
 
 /** Our pack names to cuelume's themes: what cuelume calls 'default' is 'basic' here. */
 export const soundTheme = (pack: SoundPack): ThemeName => (pack === 'basic' ? 'default' : pack)
 
-/** Wires every marked control and follows the Interface sounds settings. Mounted once, in App. */
-export function useSoundSetup(enabled: boolean, pack: SoundPack, volume: number, typing: boolean) {
-  useEffect(() => bind(), [])
+/** Follows the sound settings. Mounted once, in App. */
+export function useSoundSetup(enabled: boolean, pack: SoundPack, volume: number) {
   useEffect(() => setEnabled(enabled), [enabled])
   useEffect(() => setTheme(soundTheme(pack)), [pack])
   useEffect(() => setVolume(volume), [volume])
   useEffect(() => setChimeSettings(enabled, volume), [enabled, volume])
+  // browsers keep audio locked until the first click or key press; unlock it then, silently
   useEffect(() => {
-    if (typing) return
-    // cuelume reads data-cuelume-type while it handles the keydown, so the mark is lifted for that one
-    // event (our capture listener runs first) and put back right after
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target instanceof Element ? e.target.closest('[data-cuelume-type]') : null
-      if (!el) return
-      const value = el.getAttribute('data-cuelume-type') ?? ''
-      el.removeAttribute('data-cuelume-type')
-      setTimeout(() => el.setAttribute('data-cuelume-type', value), 0)
+    const open = () => void unlock()
+    window.addEventListener('pointerdown', open, { once: true, capture: true })
+    window.addEventListener('keydown', open, { once: true, capture: true })
+    return () => {
+      window.removeEventListener('pointerdown', open, true)
+      window.removeEventListener('keydown', open, true)
     }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [typing])
+  }, [])
 }
 
 /**
@@ -41,11 +44,8 @@ export function useSoundSetup(enabled: boolean, pack: SoundPack, volume: number,
 export function previewPack(pack: SoundPack) {
   setEnabled(true)
   void unlock()
-  play('select', { theme: soundTheme(pack) })
+  void cuePlay('ready', { theme: soundTheme(pack) })
 }
-
-/** The cue for a control that opens and closes something: open while it is closed, close while open. */
-export const disclosureCue = (open: boolean) => (open ? { 'data-cuelume-close': '' } : { 'data-cuelume-open': '' })
 
 /*
  * Timer chimes. A Pomodoro round needs sounds you can tell apart without looking: a soft falling one when

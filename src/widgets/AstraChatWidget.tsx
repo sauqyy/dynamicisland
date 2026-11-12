@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 import type { MotionValue } from 'motion/react'
 import { Mascot } from '../mascot/Mascot'
 import { ChatInput } from './ChatInput'

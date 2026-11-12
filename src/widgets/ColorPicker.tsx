@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { play } from 'cuelume'
+import { play } from '../lib/sound'
 
 type HSV = { h: number; s: number; v: number }
 
