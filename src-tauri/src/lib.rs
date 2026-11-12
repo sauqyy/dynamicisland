@@ -6,14 +6,9 @@ mod actions;
 mod assistant;
 mod auth;
 mod claude;
+mod extras;
 mod llm;
 mod llm_core;
-#[cfg(feature = "campus")]
-mod scele;
-#[cfg(feature = "campus")]
-mod slcm;
-#[cfg(feature = "campus")]
-mod sso;
 #[cfg(windows)]
 mod files;
 #[cfg(windows)]
@@ -58,7 +53,7 @@ const TOP: f64 = 0.0;
 /// Extra grab area around the pill so hover feels forgiving, in logical px.
 const MARGIN: f64 = 10.0;
 /// Window size in logical px: wide and tall enough for the expanded card at the chosen scale.
-static WIN_SIZE: Mutex<(f64, f64)> = Mutex::new((520.0, 340.0));
+static WIN_SIZE: Mutex<(f64, f64)> = Mutex::new((860.0, 340.0));
 
 /// Size of the interactive area in logical px, reported by the frontend.
 struct HitArea(Mutex<(f64, f64)>);
@@ -415,34 +410,7 @@ pub fn run() {
             set_dragging,
             auth::oauth_wait,
             auth::open_url,
-            #[cfg(feature = "campus")]
-            scele::scele_login,
-            #[cfg(feature = "campus")]
-            scele::scele_account,
-            #[cfg(feature = "campus")]
-            scele::scele_logout,
-            #[cfg(feature = "campus")]
-            scele::scele_call,
-            #[cfg(feature = "campus")]
-            scele::scele_file,
-            #[cfg(feature = "campus")]
-            scele::web_doc,
-            #[cfg(feature = "campus")]
-            slcm::slcm_open,
-            #[cfg(feature = "campus")]
-            slcm::slcm_saved,
-            #[cfg(feature = "campus")]
-            slcm::slcm_show,
-            #[cfg(feature = "campus")]
-            slcm::slcm_cancel,
-            #[cfg(feature = "campus")]
-            slcm::slcm_forget,
-            #[cfg(feature = "campus")]
-            sso::sso_verify,
-            #[cfg(feature = "campus")]
-            sso::sso_student,
-            #[cfg(feature = "campus")]
-            sso::sso_forget,
+            extras::fetch_text,
             set_hide_on_fullscreen,
             monitor_count,
             install_update,
@@ -511,6 +479,9 @@ pub fn run() {
             system::spawn_brightness(app.handle().clone());
             system::spawn_lock_keys(app.handle().clone());
             system::spawn_privacy(app.handle().clone());
+            extras::spawn_bluetooth(app.handle().clone());
+            extras::spawn_notifications(app.handle().clone());
+            extras::spawn_screenshots(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())

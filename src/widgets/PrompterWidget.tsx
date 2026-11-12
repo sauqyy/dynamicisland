@@ -23,7 +23,11 @@ function load(): Saved {
   }
 }
 
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+/** the default 40 px/s reads as 1.2×; one tap is 0.1× */
+const BASE = 100 / 3
+const STEP = BASE / 10
+
+const clamp =(n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
 /** A teleprompter: write or paste a script, then read it as it scrolls past at your pace. */
 export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boolean; onFullscreen: (on: boolean) => void }) {
@@ -148,32 +152,37 @@ export function PrompterWidget({ fullscreen, onFullscreen }: { fullscreen: boole
         </div>
         <i className="tp-line" aria-hidden />
       </div>
-      <div className="tp-bar">
-        <button className="chip" data-cuelume-tap onClick={edit} aria-label="Edit script" title="Edit script">
-          <SquarePen size={12} aria-hidden />
-        </button>
-        <button className="chip" data-cuelume-toggle aria-pressed={running} onClick={togglePlay} aria-label={running ? 'Pause' : 'Play'}>
-          {running ? <Pause size={12} aria-hidden /> : <Play size={12} aria-hidden />}
-        </button>
-        <span className="tp-group" title="Speed">
-          <button className="chip" data-cuelume-tap onClick={() => patch({ speed: clamp(saved.speed - 5, 10, 200) })} aria-label="Slower">
+      <div className="tp-bar tp-side">
+        <span className="tp-label">Speed</span>
+        <span className="tp-group tp-speed" title="Speed">
+          <button className="chip round" data-cuelume-tap onClick={() => patch({ speed: clamp(saved.speed - STEP, 10, 200) })} aria-label="Slower">
             <Minus size={12} aria-hidden />
           </button>
-          <small>{saved.speed}</small>
-          <button className="chip" data-cuelume-tap onClick={() => patch({ speed: clamp(saved.speed + 5, 10, 200) })} aria-label="Faster">
+          <small>{(saved.speed / BASE).toFixed(1)}×</small>
+          <button className="chip round" data-cuelume-tap onClick={() => patch({ speed: clamp(saved.speed + STEP, 10, 200) })} aria-label="Faster">
             <Plus size={12} aria-hidden />
           </button>
         </span>
-        <span className="tp-group" title="Text size">
+        <span className="tp-label">Text size</span>
+        <span className="tp-group tp-size" title="Text size">
           <button className="chip" data-cuelume-tap onClick={() => patch({ size: clamp(saved.size - 2, 14, 60) })} aria-label="Smaller text">
             A−
           </button>
+          <small>{saved.size} px</small>
           <button className="chip" data-cuelume-tap onClick={() => patch({ size: clamp(saved.size + 2, 14, 60) })} aria-label="Larger text">
             A+
           </button>
         </span>
-        <button className={`chip ${saved.mirror ? 'on' : ''}`} data-cuelume-toggle aria-pressed={saved.mirror} onClick={() => patch({ mirror: !saved.mirror })} aria-label="Mirror text" title="Mirror text">
-          <FlipHorizontal2 size={12} aria-hidden />
+        <span className="tp-group tp-acts">
+          <button className={`chip ${saved.mirror ? 'on' : ''}`} data-cuelume-toggle aria-pressed={saved.mirror} onClick={() => setSaved((s) => ({ ...s, mirror: !s.mirror }))} aria-label="Mirror text" title="Mirror text">
+            <FlipHorizontal2 size={12} aria-hidden /> Mirror
+          </button>
+          <button className="chip" data-cuelume-tap onClick={edit} aria-label="Edit script" title="Edit script">
+            <SquarePen size={12} aria-hidden /> Edit
+          </button>
+        </span>
+        <button className="chip tp-play" data-cuelume-toggle aria-pressed={running} onClick={togglePlay} aria-label={running ? 'Pause' : 'Play'}>
+          {running ? <Pause size={12} aria-hidden /> : <Play size={12} aria-hidden />}
         </button>
         {fullBtn}
       </div>

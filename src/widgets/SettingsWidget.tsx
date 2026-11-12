@@ -812,20 +812,6 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           format={(v) => `${Math.round(v * 100)}%`}
           onChange={(scale) => update({ scale })}
         />
-        <Slider
-          label="Card width"
-          value={settings.cardW}
-          limits={SIZE_LIMITS.cardW}
-          format={(v) => `${v}`}
-          onChange={(cardW) => update({ cardW })}
-        />
-        <Slider
-          label="Card height"
-          value={settings.cardH}
-          limits={SIZE_LIMITS.cardH}
-          format={(v) => `${v}`}
-          onChange={(cardH) => update({ cardH })}
-        />
       </Group>
 
       <Group title="Motion">

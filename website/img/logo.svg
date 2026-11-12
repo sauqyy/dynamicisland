@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14141a"/><stop offset=".55" stop-color="#050507"/><stop offset="1" stop-color="#000"/></linearGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset=".35" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#fff" stop-opacity=".12"/></linearGradient>
+    <radialGradient id="sheen" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".09"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="star" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cdd6f6"/></linearGradient>
+    <clipPath id="tile"><rect width="1024" height="1024" rx="230"/></clipPath>
+    <filter id="wide" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="38"/></filter>
+    <filter id="tight" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="12"/></filter>
+    <g id="eyes" transform="translate(512 512) scale(12.8) translate(-32 -14)" stroke-width="2" stroke-linejoin="round">
+      <path d="M17 3.5 L20.3 10.7 L27.5 14 L20.3 17.3 L17 24.5 L13.7 17.3 L6.5 14 L13.7 10.7 Z"/>
+      <path d="M47 3.5 L50.3 10.7 L57.5 14 L50.3 17.3 L47 24.5 L43.7 17.3 L36.5 14 L43.7 10.7 Z"/>
+    </g>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bg)"/>
+  <g clip-path="url(#tile)"><ellipse cx="512" cy="-40" rx="620" ry="400" fill="url(#sheen)"/></g>
+  <rect x="3" y="3" width="1018" height="1018" rx="227" fill="none" stroke="url(#edge)" stroke-width="6"/>
+  <g filter="url(#wide)" opacity=".75"><use href="#eyes" fill="#8fa8ff" stroke="#8fa8ff"/></g>
+  <g filter="url(#tight)" opacity=".85"><use href="#eyes" fill="#fff" stroke="#fff"/></g>
+  <use href="#eyes" fill="url(#star)" stroke="url(#star)"/>
+</svg>

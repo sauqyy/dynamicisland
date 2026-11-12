@@ -38,6 +38,18 @@
         "--strictPort"
       ],
       "port": 5174
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5190",
+        "-d",
+        "website"
+      ],
+      "port": 5190
     }
   ]
 }

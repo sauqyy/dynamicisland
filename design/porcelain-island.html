@@ -1,0 +1,1058 @@
+<title>Porcelain Island</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one live "screen" with the island hanging from its top edge, a control column beside it,
+   then a gallery of every pill state on its own strip of wallpaper, then the spring curves. */
+:root{
+  --bg:#dfe5e3; --paper:#eef2f0; --ink:#17201f; --soft:#55625f; --line:#c6cfcc; --accent:#3d7d72;
+  --wall-a:#25323b; --wall-b:#5d7179; --wall-c:#b8a493;
+  /* the island is an object with its own glaze, independent of the page theme */
+  --glaze:#f3f6f4; --g-ink:#15201e; --g-soft:#5d6a67; --g-line:#d8e0dc; --g-well:#e5ebe8; --g-accent:#3d7d72; --g-shadow:rgba(10,22,20,.32);
+  --hot:#d4553f; --warm:#d1902a; --good:#3c9a6a;
+  --astra:#8fa8ff;
+  --display:"Familjen Grotesk",ui-sans-serif,system-ui,sans-serif;
+  --ui:"Onest",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101513;--paper:#18201e;--paper:#19201e;--ink:#e5ebe9;--soft:#9ba9a5;--line:#2a3431;--accent:#7cc4b5;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101513;--paper:#19201e;--ink:#e5ebe9;--soft:#9ba9a5;--line:#2a3431;--accent:#7cc4b5;color-scheme:dark}
+[data-glaze="obsidian"]{--glaze:#131716;--g-ink:#edf2f0;--g-soft:#8f9c99;--g-line:#272e2c;--g-well:#1d2321;--g-accent:#7cc4b5;--g-shadow:rgba(0,0,0,.55)}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--ui);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:36px 72px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:56px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(34px,5vw,56px);line-height:1.02;font-weight:700}
+h2{font-size:26px;font-weight:600}
+h3{font-size:16px;font-weight:600}
+p{margin:0;max-width:64ch}
+.lede{color:var(--soft);font-size:17px}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{display:grid;gap:14px;grid-template-columns:minmax(0,1fr) auto;align-items:end}
+.theme-tg{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px}
+.theme-tg button{border:0;background:none;padding:6px 12px;border-radius:999px;cursor:pointer;font-size:13px;color:var(--soft)}
+.theme-tg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+@media (max-width:640px){header.top{grid-template-columns:1fr}}
+
+/* ---------- live stage ---------- */
+.live{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:20px;align-items:start}
+@media (max-width:980px){.live{grid-template-columns:minmax(0,1fr)}}
+.screen-box{width:100%;overflow:hidden;overflow:clip;border-radius:18px;position:relative}
+.screen{width:1000px;height:560px;position:relative;transform-origin:0 0;overflow:hidden;
+  background:
+   radial-gradient(120% 80% at 80% 110%, var(--wall-c), transparent 60%),
+   radial-gradient(90% 70% at 10% 0%, var(--wall-b), transparent 70%),
+   linear-gradient(170deg,var(--wall-a),#1a2229);}
+.screen::after{content:"";position:absolute;inset:auto 0 0 0;height:40px;background:rgba(14,20,22,.55);backdrop-filter:blur(10px)}
+.screen .clock-wall{position:absolute;left:40px;bottom:66px;color:#f0ece6;font-family:var(--display);font-size:64px;font-weight:500;line-height:1;opacity:.9;font-variant-numeric:tabular-nums}
+.screen .clock-wall small{display:block;font:500 15px var(--ui);opacity:.8;margin-top:6px}
+
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:16px}
+.panel h3{font-size:14px;color:var(--soft);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer;line-height:1.3}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:hover{border-color:var(--soft)}
+.hint{font-size:13px;color:var(--soft)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--bg);border-radius:10px;padding:3px;border:1px solid var(--line)}
+.seg button{border:0;background:none;border-radius:7px;padding:6px 4px;font-size:13px;cursor:pointer;color:var(--soft)}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.swatches{display:flex;gap:8px}
+.sw{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;background:var(--c)}
+.sw[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--paper)}
+
+/* ---------- the island ---------- */
+.isle{position:absolute;top:0;left:50%;width:0;height:0;z-index:5;scale:var(--sc,1);transform-origin:50% 0;transition:translate .5s var(--spring);
+  --w:140px;--h:34px;--r:13px;--dur:.6s;--spring:cubic-bezier(.3,1.25,.5,1)}
+.isle .goo{position:absolute;left:0;top:-40px;filter:url(#goo) drop-shadow(0 10px 18px var(--g-shadow))}
+.blob,.bub{position:absolute;background:var(--glaze)}
+.blob{left:calc(var(--w) / -2);top:0;width:var(--w);height:calc(var(--h) + 40px);border-radius:0 0 var(--r) var(--r);
+  transition:width var(--dur) var(--spring),height var(--dur) var(--spring),left var(--dur) var(--spring),border-radius var(--dur) var(--spring)}
+.bub{width:34px;height:34px;border-radius:50%;left:-17px;top:40px;transform:translateX(0) scale(.4);
+  transition:transform var(--dur) var(--spring)}
+.isle.split .bub{transform:translateX(calc(var(--w) / 2 + 21px)) scale(1)}
+.ear{position:absolute;top:0;width:14px;height:14px;transition:left var(--dur) var(--spring)}
+.ear.l{left:calc(var(--w) / -2 - 14px);background:radial-gradient(circle at 0 100%,transparent 13.5px,var(--glaze) 14px)}
+.ear.r{left:calc(var(--w) / 2);background:radial-gradient(circle at 100% 100%,transparent 13.5px,var(--glaze) 14px)}
+.clip{position:absolute;left:calc(var(--w) / -2);top:0;width:var(--w);height:var(--h);border-radius:0 0 var(--r) var(--r);overflow:hidden;color:var(--g-ink);
+  transition:width var(--dur) var(--spring),height var(--dur) var(--spring),left var(--dur) var(--spring),border-radius var(--dur) var(--spring);cursor:pointer}
+/* glaze: a pooled highlight and a darker foot, like glaze that ran while firing */
+.clip::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(180deg,rgba(255,255,255,.0) 40%,rgba(0,0,0,.035)),radial-gradient(60% 50% at 30% 0%,rgba(255,255,255,.55),transparent 70%);
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.08),inset 0 1px 0 rgba(255,255,255,.4)}
+[data-glaze="obsidian"] .clip::before{background:radial-gradient(60% 50% at 30% 0%,rgba(255,255,255,.07),transparent 70%);box-shadow:inset 0 -1px 0 rgba(255,255,255,.07)}
+.isle.is-card .clip{cursor:default}
+.content{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;animation:in .22s .1s both}
+.content.out{animation:out .08s both;pointer-events:none}
+@keyframes in{from{opacity:0;filter:blur(6px);transform:scale(.96)}}
+@keyframes out{to{opacity:0;filter:blur(6px)}}
+.bub-c{position:absolute;left:-17px;top:0;width:34px;height:34px;display:grid;place-items:center;opacity:0;transform:translateX(0);
+  transition:transform var(--dur) var(--spring),opacity .1s;color:var(--g-ink);font:600 11px var(--ui);font-variant-numeric:tabular-nums}
+.isle.split .bub-c{transform:translateX(calc(var(--w) / 2 + 21px));opacity:1;transition:transform var(--dur) var(--spring),opacity .2s .15s}
+.bub-c svg{position:absolute;inset:3px}
+/* Astra's glow sits behind the glaze */
+.halo{position:absolute;left:calc(var(--w) / -2 - 6px);top:-10px;width:calc(var(--w) + 12px);height:calc(var(--h) + 16px);border-radius:0 0 calc(var(--r) + 8px) calc(var(--r) + 8px);
+  background:var(--astra);filter:blur(16px);opacity:0;transition:opacity .4s,width var(--dur) var(--spring),height var(--dur) var(--spring),left var(--dur) var(--spring)}
+.isle.g-listening .halo{opacity:.75;animation:breathe 1.1s ease-in-out infinite}
+.isle.g-thinking .halo{opacity:.55;animation:orbit 1.6s linear infinite;background:conic-gradient(from var(--a,0deg),var(--astra),transparent 40%,var(--astra) 70%,transparent)}
+.isle.g-speaking .halo{opacity:.6}
+.isle.g-ring .halo{opacity:.8;background:var(--good);animation:breathe .8s ease-in-out infinite}
+@property --a{syntax:"<angle>";initial-value:0deg;inherits:false}
+@keyframes orbit{to{--a:360deg}}
+@keyframes breathe{50%{opacity:.35;transform:scale(.97)}}
+
+/* ---------- pill contents ---------- */
+.eyes{display:flex;gap:7px;align-items:center;height:16px}
+.eyes i{display:block;width:7px;height:14px;border-radius:4px;background:var(--astra);animation:blink 4.6s infinite;transform-origin:center}
+.eyes i:nth-child(2){animation-delay:.04s}
+@keyframes blink{0%,46%,50%,100%{transform:scaleY(1)}48%{transform:scaleY(.12)}}
+.eyes.big i{width:9px;height:18px}
+.eyes.up i{animation:dart 1.4s ease-in-out infinite}
+@keyframes dart{0%,100%{transform:translate(-2px,-3px)}50%{transform:translate(2px,-3px)}}
+.eyes.happy i{height:7px;border-radius:7px 7px 2px 2px;animation:none}
+.row{display:flex;align-items:center;gap:10px;width:100%;padding:0 14px;min-width:0}
+.row.c{justify-content:center}
+.art{flex:none;border-radius:6px;background:linear-gradient(140deg,hsl(var(--hue,200) 55% 62%),hsl(calc(var(--hue,200) + 40) 45% 32%));box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.lyric{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:500}
+.bars{display:flex;gap:2px;align-items:flex-end;height:14px;flex:none}
+.bars i{width:3px;background:hsl(var(--hue,200) 50% 50%);border-radius:2px;animation:eq 0.9s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:-.3s}.bars i:nth-child(3){animation-delay:-.6s}.bars i:nth-child(4){animation-delay:-.15s}
+@keyframes eq{0%,100%{height:4px}50%{height:14px}}
+.paused .bars i{animation-play-state:paused}
+.peek{display:flex;gap:14px;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.peek span+span{padding-left:14px;border-left:1px solid var(--g-line)}
+.peek .due{color:var(--hot)}
+.dl{list-style:none;margin:0;padding:6px 14px;width:100%;align-self:stretch;display:grid;grid-auto-rows:30px;align-items:center}
+.dl li{display:flex;gap:10px;align-items:center;font-size:13px;min-width:0}
+.dl li span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl li small{color:var(--g-soft);font-variant-numeric:tabular-nums}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--good)}
+.dot.hot{background:var(--hot)}.dot.warm{background:var(--warm)}
+.meter{flex:1;height:8px;border-radius:5px;background:var(--g-well);overflow:hidden}
+.meter b{display:block;height:100%;background:var(--g-ink);border-radius:5px;transition:width .3s}
+.ava{flex:none;border-radius:50%;display:grid;place-items:center;font:600 13px var(--ui);color:#fff;background:var(--c,#6a8)}
+.two{flex:1;min-width:0;line-height:1.25}
+.two b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.two small{display:block;font-size:12px;color:var(--g-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbtn{flex:none;border:0;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:var(--g-well);color:var(--g-ink)}
+.round{flex:none;width:36px;height:36px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;color:#fff}
+.round.no{background:var(--hot)}.round.yes{background:var(--good)}
+.ringing .ava{animation:ring 1s ease-in-out infinite}
+@keyframes ring{0%,100%{box-shadow:0 0 0 0 rgba(60,154,106,.6)}70%{box-shadow:0 0 0 8px rgba(60,154,106,0)}}
+.wave{display:flex;gap:2px;align-items:center;height:18px}
+.wave i{width:3px;border-radius:2px;background:var(--astra);animation:eq .7s ease-in-out infinite}
+.wave.green i{background:var(--good)}
+.wave i:nth-child(odd){animation-delay:-.35s}.wave i:nth-child(3n){animation-delay:-.2s}
+.shimmer{font-size:13px;font-weight:600;background:linear-gradient(90deg,var(--g-soft) 30%,var(--g-ink) 50%,var(--g-soft) 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sh 1.4s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.say{flex:1;font-size:13px;line-height:1.35;min-width:0}
+.tnum{font-variant-numeric:tabular-nums;font-weight:600;font-size:13px}
+
+/* ---------- the card ---------- */
+.card{position:absolute;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding:10px 16px 6px;gap:8px;cursor:default;text-align:left}
+.c-head{display:flex;align-items:center;gap:10px;min-width:0}
+.c-head h3{font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tabs{display:flex;gap:2px;background:var(--g-well);border-radius:999px;padding:3px}
+.tabs button{border:0;background:none;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:500;cursor:pointer;color:var(--g-soft)}
+.tabs button[aria-current="page"]{background:var(--glaze);color:var(--g-ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.x{border:0;background:var(--g-well);width:26px;height:26px;border-radius:50%;cursor:pointer;color:var(--g-soft);display:grid;place-items:center}
+.page{overflow:auto;overflow-x:hidden;min-height:0;min-width:0;padding-right:6px;scrollbar-width:thin;font-size:13px}
+.isle.tucked{translate:0 -24px}
+.del{border:0;background:none;color:var(--g-soft);cursor:pointer;padding:4px 6px;border-radius:8px;display:grid;place-items:center;flex:none}
+.del:hover{color:var(--hot);background:var(--g-well)}
+.empty{color:var(--g-soft);text-align:center;padding:22px 8px}
+.snack{position:absolute;left:50%;bottom:52px;translate:-50% 0;background:var(--g-ink);color:var(--glaze);padding:6px 14px;border-radius:999px;font-size:12.5px;font-weight:500;white-space:nowrap;animation:snack .25s both;z-index:3;pointer-events:none}
+@keyframes snack{from{opacity:0;translate:-50% 8px}}
+.ti{width:26px;height:26px;border-radius:50%;background:var(--good);color:#fff;display:grid;place-items:center;flex:none}
+.screen.drag{outline:3px dashed var(--accent);outline-offset:-8px}
+.badge{min-width:18px;height:18px;border-radius:9px;background:var(--hot);color:#fff;font-size:11px;font-weight:600;display:grid;place-items:center;padding:0 5px}
+select.inp{appearance:auto}
+.btn:disabled{opacity:.4;cursor:default}
+.page.enter{animation:pg .28s both}
+@keyframes pg{from{opacity:0;transform:translateX(var(--dx,12px))}}
+.rail{position:relative;display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--g-line);padding-top:6px}
+.rail button{position:relative;z-index:1;border:0;background:none;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 0;cursor:pointer;color:var(--g-soft);font-size:12px;font-weight:500}
+.rail button.on{color:var(--g-ink)}
+.rail button.on.is-astra{color:#0b1020}
+.rail svg{width:17px;height:17px;flex:none}
+.rail .lit{position:absolute;top:6px;left:0;height:calc(100% - 6px);border-radius:12px;background:var(--g-well);
+  transition:transform var(--dur) var(--spring),width var(--dur) var(--spring),background .3s,box-shadow .3s}
+.rail .lit.astra{background:var(--astra);box-shadow:0 0 16px var(--astra)}
+.rail .pip{position:absolute;top:4px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--hot);border:1.5px solid var(--glaze)}
+
+/* page parts */
+.g{display:grid;gap:8px}
+.well{background:var(--g-well);border-radius:12px;padding:10px 12px}
+.lst{list-style:none;margin:0;padding:0;display:grid}
+.lst li{display:flex;align-items:center;gap:10px;padding:6px 2px;border-bottom:1px solid var(--g-line);min-width:0}
+.lst li:last-child{border-bottom:0}
+.muted{color:var(--g-soft)}
+.btn{border:0;border-radius:10px;padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--g-ink);color:var(--glaze)}
+.btn.ghost{background:var(--g-well);color:var(--g-ink)}
+.inp{flex:1;min-width:0;border:1px solid var(--g-line);background:var(--glaze);border-radius:10px;padding:7px 10px;font-size:13px;color:var(--g-ink)}
+.cb{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--g-soft);display:grid;place-items:center;flex:none;cursor:pointer;background:none;padding:0;color:var(--glaze)}
+.cb.on{background:var(--g-accent);border-color:var(--g-accent)}
+.done-t{text-decoration:line-through;color:var(--g-soft)}
+.bubble-a,.bubble-u{max-width:78%;padding:7px 11px;border-radius:14px;line-height:1.4}
+.bubble-a{background:var(--g-well);border-bottom-left-radius:4px}
+.bubble-u{background:var(--g-ink);color:var(--glaze);margin-left:auto;border-bottom-right-radius:4px}
+.typing i{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--g-soft);margin:0 1px;animation:tp 1s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{50%{transform:translateY(-3px);opacity:.5}}
+.pchips{display:flex;gap:6px;flex-wrap:wrap}
+.pchips button{border:1px solid var(--g-line);background:none;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--g-ink)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.grid6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.tile{background:var(--g-well);border-radius:12px;padding:10px;display:grid;gap:6px;justify-items:start;min-width:0}
+.tile b{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ft{width:30px;height:36px;border-radius:5px 12px 5px 5px;display:grid;place-items:end center;padding-bottom:4px;font:700 8.5px var(--ui);color:#fff;background:var(--c)}
+.big{font-family:var(--display);font-size:46px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:4px;background:var(--g-line);overflow:hidden}
+.bar b{display:block;height:100%;background:var(--g-accent)}
+input[type=range]{accent-color:var(--g-accent);width:100%}
+.ctl{display:flex;gap:14px;align-items:center;justify-content:center}
+.ctl button{border:0;background:none;cursor:pointer;color:var(--g-ink);display:grid;place-items:center;padding:4px}
+.ctl .pp{width:40px;height:40px;border-radius:50%;background:var(--g-ink);color:var(--glaze)}
+.hours{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;text-align:center}
+.hours div{display:grid;gap:3px;justify-items:center;font-variant-numeric:tabular-nums}
+.rain{width:6px;height:28px;border-radius:3px;background:var(--g-line);display:flex;align-items:flex-end;overflow:hidden}
+.rain b{width:100%;background:#5d93c9}
+.tl{display:grid;grid-template-columns:44px 1fr;gap:0 10px;position:relative}
+.tl .t{font-variant-numeric:tabular-nums;color:var(--g-soft);padding-top:6px;font-size:12px}
+.tl .ev{border-left:3px solid var(--c);background:var(--g-well);border-radius:4px 10px 10px 4px;padding:4px 10px;margin:2px 0;display:flex;gap:10px;align-items:baseline}
+.tl .now{grid-column:1/-1;height:0;border-top:1.5px solid var(--hot);position:relative;margin:2px 0}
+.tl .now::before{content:"";position:absolute;left:40px;top:-4.5px;width:7px;height:7px;border-radius:50%;background:var(--hot)}
+.toggle{width:36px;height:21px;border-radius:999px;border:0;background:var(--g-line);position:relative;cursor:pointer;flex:none;padding:0}
+.toggle::after{content:"";position:absolute;top:2.5px;left:2.5px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.3,1.4,.5,1)}
+.toggle.on{background:var(--g-accent)}.toggle.on::after{transform:translateX(15px)}
+.set-row{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--g-line)}
+.set-h{font-size:12px;color:var(--g-soft);font-weight:600;margin-top:4px;grid-column:1/-1}
+.prompt{height:96px;overflow:hidden;position:relative;font-family:var(--display);font-size:19px;line-height:1.45;mask-image:linear-gradient(transparent,#000 25%,#000 75%,transparent)}
+.prompt div{transition:transform .2s linear}
+
+/* ---------- gallery ---------- */
+.sec-head{display:grid;gap:8px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:18px}
+.shot{display:grid;gap:8px;min-width:0}
+.strip{position:relative;height:var(--sh);border-radius:12px;overflow:hidden;background:linear-gradient(170deg,var(--wall-a),var(--wall-b));display:flex;justify-content:center}
+.mini{position:relative;height:var(--h);width:var(--w);max-width:calc(100% - 40px);background:var(--glaze);color:var(--g-ink);border-radius:0 0 var(--r) var(--r);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 18px var(--g-shadow);overflow:visible}
+.mini>.inner{position:absolute;inset:0;overflow:hidden;border-radius:inherit;display:flex;align-items:center;justify-content:center}
+.mini::before,.mini::after{content:"";position:absolute;top:0;width:14px;height:14px}
+.mini::before{left:-14px;background:radial-gradient(circle at 0 100%,transparent 13.5px,var(--glaze) 14px)}
+.mini::after{right:-14px;background:radial-gradient(circle at 100% 100%,transparent 13.5px,var(--glaze) 14px)}
+.mini .halo2{position:absolute;inset:-8px -6px -6px;border-radius:0 0 calc(var(--r) + 8px) calc(var(--r) + 8px);background:var(--hc);filter:blur(14px);opacity:.6;z-index:-1}
+.mini-bub{position:absolute;top:0;left:calc(100% + 6px);width:34px;height:34px;border-radius:50%;background:var(--glaze);display:grid;place-items:center;font:600 11px var(--ui);box-shadow:0 8px 14px var(--g-shadow)}
+.cap{display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+.cap b{font-family:var(--display);font-size:16px;font-weight:600}
+.cap code{font:500 12px var(--ui);color:var(--soft);font-variant-numeric:tabular-nums}
+.shot p{font-size:14px;color:var(--soft)}
+
+/* ---------- springs ---------- */
+.springs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px}
+.spr{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:10px}
+.spr svg{width:100%;height:auto;display:block}
+.spr .track{height:34px;border-radius:999px;background:var(--bg);position:relative;overflow:hidden;border:1px solid var(--line)}
+.spr .puck{position:absolute;top:3px;left:3px;width:60px;height:26px;border-radius:999px;background:var(--ink)}
+.spr dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0;font-size:13px;font-variant-numeric:tabular-nums}
+.spr dt{color:var(--soft)}.spr dd{margin:0}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:18px 28px}
+.notes div{display:grid;gap:4px}
+.notes p{font-size:14px;color:var(--soft)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="goo" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+    <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="g"/>
+    <feComposite in="SourceGraphic" in2="g" operator="atop"/>
+  </filter>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <div class="g" style="gap:12px">
+      <h1>Porcelain Island</h1>
+      <p class="lede">A redesign proposal for the Dynamic Island, and a working one. The island is a glazed object that hangs from the screen edge, with Astra's eyes as its only colour at rest. Add to-dos, deadlines, events, notes, friends and files, run timers, chat with Astra and start calls. Everything you add is saved in this browser. Click the island to open the card, hover it to peek.</p>
+    </div>
+    <div class="theme-tg" role="group" aria-label="Page theme">
+      <button data-theme-set="" aria-pressed="true">System</button>
+      <button data-theme-set="light" aria-pressed="false">Light</button>
+      <button data-theme-set="dark" aria-pressed="false">Dark</button>
+    </div>
+  </header>
+
+  <section class="live" aria-label="Live island">
+    <div class="screen-box" id="screenBox">
+      <div class="screen" id="screen" data-glaze="porcelain">
+        <div class="isle" id="isle">
+          <div class="halo"></div>
+          <div class="goo"><div class="blob"></div><div class="bub"></div></div>
+          <i class="ear l"></i><i class="ear r"></i>
+          <div class="clip" id="clip" tabindex="0" role="button" aria-label="Island"></div>
+          <div class="bub-c" id="bubc"></div>
+        </div>
+        <div class="clock-wall"><span id="wallClock">14:32</span><small id="wallDate">Sunday, 8 November</small></div>
+      </div>
+    </div>
+
+    <aside class="panel" aria-label="Controls">
+      <div class="g">
+        <h3>Pill state</h3>
+        <div class="chips" id="stateChips"></div>
+        <p class="hint" id="stateHint"></p>
+      </div>
+      <div class="g">
+        <h3>Open a page</h3>
+        <div class="chips" id="pageChips"></div>
+      </div>
+      <div class="g">
+        <h3>Glaze</h3>
+        <div class="seg" id="glazeSeg" style="grid-template-columns:repeat(2,1fr)">
+          <button data-glaze="porcelain" aria-pressed="true">Porcelain</button>
+          <button data-glaze="obsidian" aria-pressed="false">Obsidian</button>
+        </div>
+      </div>
+      <div class="g">
+        <h3>Astra colour</h3>
+        <div class="swatches" id="astraSw"></div>
+      </div>
+      <div class="g">
+        <h3>Keys, card closed</h3>
+        <p class="hint">Up and down change volume, K plays or pauses, N and P change song.</p>
+      </div>
+      <div class="g">
+        <h3>Animation</h3>
+        <div class="seg" id="springSeg"></div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="g" style="gap:20px" aria-labelledby="gal-h">
+    <div class="sec-head">
+      <h2 id="gal-h">Every pill, side by side</h2>
+      <p class="lede">Sizes are the ones the island springs to, in layout pixels before the Size setting scales them. Widths that follow content are shown at a typical value.</p>
+    </div>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <section class="g" style="gap:20px" aria-labelledby="mo-h">
+    <div class="sec-head">
+      <h2 id="mo-h">Motion</h2>
+      <p class="lede">One spring drives the outline, the ears, the timer bubble and the rail highlight, so everything that moves together arrives together. Each curve below is simulated from the same stiffness, damping and mass the Animation setting stores.</p>
+    </div>
+    <div class="springs" id="springs"></div>
+    <div class="notes">
+      <div><h3>Content cross-fade</h3><p>Old content leaves in 80 ms with a 6 px blur. New content waits 100 ms for the outline to start moving, then sharpens in over 220 ms from 96% scale.</p></div>
+      <div><h3>Timer bubble</h3><p>The bubble is its own blob in the goo layer. It grows from 40% scale and slides out past the right ear, so it visibly pinches off the pill instead of appearing next to it.</p></div>
+      <div><h3>Astra's glow</h3><p>Listening breathes with the microphone level, thinking orbits as a conic sweep, speaking holds steady. A ringing call borrows the same halo in green.</p></div>
+      <div><h3>Page switches</h3><p>Moving right through the rail slides the page in from the right, moving left slides it from the left. The highlight under the rail springs to the new group.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+const $ = (s, r = document) => r.querySelector(s)
+const $$ = (s, r = document) => [...r.querySelectorAll(s)]
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1)
+const pick = a => a[Math.floor(Math.random() * a.length)]
+
+/* ---------- data: saved in this browser ---------- */
+const KEY = 'porcelain-island-v3', H = 3600e3, T0 = Date.now()
+const PALETTE = ['#c76a8a', '#5f8fc9', '#d0903c', '#5aa37d', '#8b7fc9', '#4f9ba3', '#d4553f']
+const DEF = () => ({
+  todos: [
+    { id: 1, t: 'Revise ERD for Basis Data', d: false }, { id: 2, t: 'Email Pak Hadi about the lab swap', d: true },
+    { id: 3, t: 'Print the OS lab report', d: false }, { id: 4, t: 'Book a room for kerja kelompok', d: false },
+  ],
+  notes: 'Basis Data quiz, things to remember\n- 3NF: no transitive dependency on the key\n- BCNF: every determinant is a candidate key\n- bring the calculator, Pak Hadi said no phones\n\nKerja kelompok Thursday 16:00, Perpus Pusat lt. 3',
+  deadlines: [
+    { id: 1, t: 'Tugas 3: Normalisasi', c: 'Basis Data', due: T0 + 5 * H, d: false },
+    { id: 2, t: 'Lab 6: Scheduler', c: 'Sistem Operasi', due: T0 + 30 * H, d: false },
+    { id: 3, t: 'Essay draft', c: 'MPKT', due: T0 + 60 * H, d: false },
+    { id: 4, t: 'Quiz 4 prep sheet', c: 'Statistika', due: T0 + 100 * H, d: false },
+    { id: 5, t: 'Group slides v2', c: 'RPL', due: T0 + 130 * H, d: false },
+  ],
+  events: [
+    { id: 1, time: '08:00', t: 'Sistem Operasi', p: 'GDB 2304, Bu Sari', c: '#5f8fc9' },
+    { id: 2, time: '10:00', t: 'Basis Data', p: 'Auditorium, lecture 9', c: '#5aa37d' },
+    { id: 3, time: '13:00', t: 'Quiz 4, Basis Data', p: 'Reminder at 12:30', c: '#d4553f' },
+    { id: 4, time: '16:00', t: 'Kerja kelompok RPL', p: 'Perpus Pusat lt. 3', c: '#d0903c' },
+  ],
+  clips: [
+    { id: 1, t: 'SELECT nim, nama FROM mahasiswa WHERE angkatan = 2023;', w: 'Code' },
+    { id: 2, t: 'https://scele.cs.ui.ac.id/mod/assign/view.php?id=4821', w: 'Chrome' },
+    { id: 3, t: 'Perpus Pusat lt. 3, 16:00', w: 'Discord' },
+  ],
+  friends: [
+    { id: 1, n: 'Nadia', c: '#c76a8a', s: 'In Basis Data', on: 'busy', unread: 0, msgs: [{ me: 0, t: 'Did you get the ERD template?' }, { me: 1, t: 'Yes, sending it after class' }] },
+    { id: 2, n: 'Fikri', c: '#5f8fc9', s: 'Listening to Lintas Senja', on: 'on', unread: 0, msgs: [] },
+    { id: 3, n: 'Laras', c: '#d0903c', s: 'Studying, 48 min', on: 'on', unread: 0, msgs: [] },
+    { id: 4, n: 'Bima', c: '#5aa37d', s: 'Last seen 2 h ago', on: 'off', unread: 0, msgs: [] },
+  ],
+  groups: [
+    { id: 1, n: 'Kelompok RPL', c: '#d0903c', m: 5 }, { id: 2, n: 'Basis Data 2023', c: '#5aa37d', m: 41 },
+    { id: 3, n: 'Kos Kutek Gang 3', c: '#8b7fc9', m: 8 }, { id: 4, n: 'Ngoding Malam', c: '#5f8fc9', m: 14 },
+  ],
+  apps: ['Code', 'Figma', 'Spotify', 'Terminal', 'Discord', 'Notion', 'Chrome', 'Explorer'],
+  profile: { name: 'Rai', status: 'Working on the shuttle tracker. Ask me about Basis Data.' },
+  week: [120, 75, 160, 40, 95, 30, 62], room: false,
+  city: 'Depok', vol: 64,
+  prompt: 'Selamat sore. Our group looked at how the campus shuttle could report its position live. We interviewed forty students at Halte Stasiun UI. Most of them wait more than twelve minutes, and almost all of them would rather know than guess. So we built a small receiver that sits on the bus and talks to a map on your phone.',
+  chat: [{ a: 1, t: 'Morning. Basis Data quiz is at 13:00 and a few tasks close this week.' }, { a: 0, t: 'remind me to bring the calculator' }, { a: 1, t: 'Added "Bring the calculator" to your to-do list.' }],
+  set: { smart: true, lyrics: true, sounds: true, idle: 'eyes', scale: 1, cardW: 740, cardH: 320 },
+  glaze: 'porcelain', astra: '#8fa8ff', spring: 'snappy', nid: 100,
+})
+let D = DEF()
+try { const r = JSON.parse(localStorage.getItem(KEY) || 'null'); if (r) { D = Object.assign(DEF(), r); D.set = Object.assign(DEF().set, r.set) } } catch (e) {}
+let saveT
+const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(D)) } catch (e) {} }, 150) }
+const uid = () => D.nid++
+
+const GROUPS = [
+  { id: 'astra', title: 'Astra', pages: ['astra'] },
+  { id: 'home', title: 'Home', pages: ['media', 'weather', 'timer'] },
+  { id: 'tools', title: 'Tools', pages: ['todo', 'notes', 'prompter'] },
+  { id: 'plan', title: 'Plan', pages: ['deadlist', 'schedule', 'study'] },
+  { id: 'files', title: 'Files', pages: ['shelf', 'apps', 'clipboard'] },
+  { id: 'social', title: 'Social', pages: ['friends', 'groups', 'profile'] },
+  { id: 'settings', title: 'Settings', pages: ['settings'] },
+]
+const TITLES = { astra: 'Chat with Astra', media: 'Now Playing', weather: 'Weather', timer: 'Timer', todo: 'To-do', notes: 'Notes', prompter: 'Prompter', deadlist: 'Deadlines', schedule: 'Schedule', study: 'Study', shelf: 'Shelf', apps: 'Apps', clipboard: 'Clipboard', friends: 'Friends', groups: 'Groups', profile: 'Profile', settings: 'Settings' }
+const SHORT = { media: 'Playing', weather: 'Weather', timer: 'Timer', todo: 'To-do', notes: 'Notes', prompter: 'Prompter', deadlist: 'Deadlines', schedule: 'Schedule', study: 'Study', shelf: 'Shelf', apps: 'Apps', clipboard: 'Clipboard', friends: 'Friends', groups: 'Groups', profile: 'Profile', settings: 'Settings' }
+const PAGES = GROUPS.flatMap(g => g.pages)
+const ICON = {
+  astra: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="6" width="4" height="12" rx="2"/><rect x="13.5" y="6" width="4" height="12" rx="2"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>',
+  tools: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l2 2 3-3M4 16l2 2 3-3M12.5 8H20M12.5 17H20"/></svg>',
+  plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
+  files: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  social: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="9" r="3.5"/><path d="M3 19c.8-3 3.2-4.5 6-4.5s5.2 1.5 6 4.5"/><circle cx="17" cy="8" r="2.5"/><path d="M16.5 13.5c2.3 0 4 1.2 4.8 3.5"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
+}
+const I = {
+  play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>',
+  pause: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
+  prev: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 6v12l-8.5-6zM6 6h2v12H6z"/></svg>',
+  next: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6v12l8.5-6zM16 6h2v12h-2z"/></svg>',
+  phone: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>',
+  hang: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 9c-1.6 0-3.2.3-4.6.7v3.1c0 .4-.2.7-.6.9-1 .5-1.9 1.1-2.6 1.8-.2.2-.4.3-.7.3s-.5-.1-.7-.3L.3 13c-.2-.2-.3-.4-.3-.7s.1-.5.3-.7C3.3 8.8 7.4 7 12 7s8.7 1.8 11.7 4.6c.2.2.3.4.3.7s-.1.5-.3.7l-2.5 2.5c-.2.2-.4.3-.7.3s-.5-.1-.7-.3c-.8-.7-1.7-1.3-2.7-1.8-.3-.2-.6-.5-.6-.9v-3.1C15.2 9.3 13.6 9 12 9z"/></svg>',
+  mic: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  spk: '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+  x: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  check: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  send: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 20.5l18-8.5L3 3.5l2.5 8.5zM5.5 12H13"/></svg>',
+}
+const ASTRA_COLORS = ['#8fa8ff', '#ff8fb8', '#7fd8c4', '#ffc46b', '#c4a1ff']
+const SPRINGS = { gentle: { label: 'Gentle', k: 170, c: 24, m: 1 }, snappy: { label: 'Snappy', k: 320, c: 30, m: 1 }, bouncy: { label: 'Bouncy', k: 260, c: 14, m: 1 } }
+const TRACKS = [
+  { t: 'Sore di Margonda', a: 'Lintas Senja', len: 214, hue: 18, ly: ['aku pulang lewat Margonda, lampu jalan masih menyala', 'hujan baru reda, aspal berkilau', 'kita bicara hal yang biasa saja', 'dan itu sudah cukup untuk malam ini'] },
+  { t: 'Halte Stasiun', a: 'Lintas Senja', len: 187, hue: 200, ly: ['menunggu bus yang tak kunjung datang', 'di bawah atap seng yang berisik', 'seseorang tertawa di ujung bangku', 'aku hafal jam berapa kau lewat'] },
+  { t: 'Lo-fi Kampus', a: 'Kantin Beat', len: 240, hue: 140, ly: ['(instrumental)', 'kopi dingin, laptop menyala', 'deadline masih tiga jam lagi', 'tenang, kita pasti sempat'] },
+  { t: 'Perpus Lantai Tiga', a: 'Rak Buku', len: 203, hue: 280, ly: ['sunyi yang enak, bunyi halaman', 'kau menandai kalimat yang sama', 'jendela besar, sore keemasan', 'kita pulang saat lampu dimatikan'] },
+]
+const CITIES = {
+  Depok: { now: 29, feel: 33, hum: 78, uv: '6, high', sum: 'Showers from 15:00, clearing by evening', hours: [29, 28, 27, 26, 25, 25], rain: [60, 80, 70, 40, 20, 10] },
+  Jakarta: { now: 31, feel: 36, hum: 72, uv: '8, very high', sum: 'Hot and hazy, a late storm is possible', hours: [31, 31, 30, 29, 28, 27], rain: [10, 10, 20, 40, 60, 50] },
+  Bandung: { now: 24, feel: 25, hum: 84, uv: '4, moderate', sum: 'Cloudy with light rain in the afternoon', hours: [24, 23, 22, 21, 21, 20], rain: [50, 70, 80, 60, 40, 30] },
+  Surabaya: { now: 32, feel: 37, hum: 68, uv: '9, very high', sum: 'Sunny and dry all evening', hours: [32, 32, 31, 30, 29, 28], rain: [0, 0, 5, 5, 10, 10] },
+}
+
+/* ---------- runtime state ---------- */
+const S = {
+  pill: 'idle', tab: 'media', chatWith: null, playing: true, ti: 0, pos: 40,
+  timer: { total: 25 * 60, left: 25 * 60, run: false, active: false },
+  call: null, caller: null, msgFrom: null, say: '', toast: { text: 'Added to your to-do list', sub: 'Revise ERD for Basis Data' },
+  promptRun: false, promptY: 0, promptEdit: false, tt: null, hover: false,
+  files: [{ id: 'f1', name: 'Tugas3_Normalisasi.pdf', size: 482000 }, { id: 'f2', name: 'erd-v4.png', size: 214000 }],
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+const hhmm = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+const track = () => TRACKS[S.ti]
+const lyric = () => { const t = track(); return t.ly[Math.min(t.ly.length - 1, Math.floor(S.pos / (t.len / t.ly.length)))] }
+const open = () => D.deadlines.filter(x => !x.d).sort((a, b) => a.due - b.due)
+const urg = ms => { const h = (ms - Date.now()) / H; return h < 12 ? 'hot' : h < 48 ? 'warm' : 'ok' }
+const dueLabel = ms => {
+  const h = (ms - Date.now()) / H
+  if (h < 0) return 'overdue'
+  if (h < 1) return Math.max(1, Math.round(h * 60)) + ' min'
+  if (h < 24) return 'in ' + Math.round(h) + ' h'
+  const d = new Date(ms); return d.toLocaleDateString([], { weekday: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+const dueToday = () => open().filter(x => new Date(x.due).toDateString() === new Date().toDateString()).length
+const toInput = ms => { const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16) }
+const todayIdx = () => (new Date().getDay() + 6) % 7
+const unreadTotal = () => D.friends.reduce((n, f) => n + f.unread, 0)
+const kb = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1000)) + ' KB'
+
+let ac
+function beep(f = 660) {
+  if (!D.set.sounds) return
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)()
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = f
+    g.gain.setValueAtTime(.0001, ac.currentTime); g.gain.exponentialRampToValueAtTime(.12, ac.currentTime + .02); g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + .35)
+    o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + .4)
+  } catch (e) {}
+}
+
+/* ---------- spring -> CSS linear() ---------- */
+function simulate({ k, c, m }) {
+  let x = 0, v = 0, t = 0
+  const dt = 1 / 600, out = [[0, 0]]
+  while (t < 3) {
+    const a = (-k * (x - 1) - c * v) / m
+    v += a * dt; x += v * dt; t += dt
+    if (Math.round(t * 600) % 10 === 0) out.push([t, x])
+    if (t > 0.1 && Math.abs(1 - x) < 0.001 && Math.abs(v) < 0.01) break
+  }
+  out.push([t, 1])
+  return { pts: out, dur: t }
+}
+const linearOK = CSS.supports('transition-timing-function', 'linear(0, 1)')
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+function applySpring() {
+  const { pts, dur } = simulate(SPRINGS[D.spring])
+  const step = Math.max(1, Math.floor(pts.length / 48))
+  const keep = pts.filter((_, i) => i % step === 0 || i === pts.length - 1)
+  const css = linearOK ? `linear(${keep.map(([t, x]) => `${x.toFixed(3)} ${(t / dur * 100).toFixed(1)}%`).join(', ')})` : 'cubic-bezier(.3,1.25,.5,1)'
+  const el = $('#isle')
+  el.style.setProperty('--spring', reduce ? 'ease' : css)
+  el.style.setProperty('--dur', reduce ? '.15s' : dur.toFixed(2) + 's')
+}
+
+/* ---------- small builders ---------- */
+const eyes = (cls = '') => `<div class="eyes ${cls}"><i></i><i></i></div>`
+const art = (size, hue) => `<span class="art" style="width:${size}px;height:${size}px;--hue:${hue ?? track().hue};border-radius:${size > 40 ? 14 : 6}px"></span>`
+const ava = (f, size = 32) => `<span class="ava" style="--c:${f.c};width:${size}px;height:${size}px;font-size:${Math.round(size * .4)}px">${esc(f.n[0] || '?')}</span>`
+const bars = () => `<span class="bars"><i></i><i></i><i></i><i></i></span>`
+const wave = (n = 9, cls = '') => `<span class="wave ${cls}">${'<i></i>'.repeat(n)}</span>`
+const ring = (frac, size = 28, sw = 3) => {
+  const r = (size - sw - 1) / 2, C = 2 * Math.PI * r
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--g-line)" stroke-width="${sw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--g-accent)" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - Math.max(0, Math.min(1, frac)))}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>`
+}
+const delBtn = (act, id, label = 'Delete') => `<button class="del" data-act="${act}" data-id="${id}" aria-label="${label}">${I.x}</button>`
+const lastMsg = f => f.msgs.length ? f.msgs[f.msgs.length - 1].t : 'No messages yet'
+
+/* ---------- pill states ---------- */
+const idleHTML = () => {
+  if (D.set.idle === 'clock') return `<div class="row c"><span class="tnum">${hhmm()}</span></div>`
+  if (D.set.idle === 'due' && open()[0]) return `<div class="row c">${eyes()}<span class="lyric" style="flex:none;max-width:170px">${esc(open()[0].t)}</span></div>`
+  return `<div class="row c">${eyes()}</div>`
+}
+const idleW = () => D.set.idle === 'clock' ? 100 : D.set.idle === 'due' && open()[0] ? 250 : 140
+const callerOf = () => S.caller || D.friends[1]
+const callOf = () => S.call || { kind: 'friend', name: 'Fikri', c: '#5f8fc9', t0: Date.now() - 252000, muted: false }
+const dlRows = () => Math.max(1, Math.min(5, open().length) + (open().length > 5 ? 1 : 0))
+const PILLS = {
+  idle: { label: 'Resting', hint: "Astra's eyes, nothing else. Settings lets you show the time or your next deadline instead, and smart mode tucks it away until you point at it.", shape: () => ({ w: idleW(), h: 34, r: 13 }), html: idleHTML },
+  live: { label: 'Lyrics', hint: 'A song is playing: art, the current lyric line and the equaliser. The line follows the song.', shape: () => ({ w: 330, h: 34, r: 13 }), html: () => `<div class="row ${S.playing ? '' : 'paused'}">${art(22)}<span class="lyric">${esc(lyric())}</span>${bars()}</div>` },
+  peek: { label: 'Peek', hint: 'Hovering the pill shows the time, date, battery and what is due today.', shape: () => ({ w: 340, h: 40, r: 16 }), html: () => { const n = dueToday(); return `<div class="peek"><span>${hhmm()}</span><span>${new Date().toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}</span><span>84%</span><span class="${n ? 'due' : ''}">${n ? n + ' due today' : 'Nothing due today'}</span></div>` } },
+  timer: { label: 'Timer', hint: 'A running timer splits off into its own bubble that melts out of the pill. Start one on the Timer page.', shape: () => ({ w: idleW(), h: 34, r: 13 }), html: idleHTML, split: true },
+  deadlines: { label: 'Due list', hint: 'Set the resting pill to "Next due" in Settings and hovering drops the whole list down, most urgent first.', shape: () => ({ w: 340, h: 14 + dlRows() * 30, r: 20 }), html: () => open().length ? `<ul class="dl">${open().slice(0, 5).map(d => `<li><i class="dot ${urg(d.due)}"></i><span>${esc(d.t)}</span><small>${dueLabel(d.due)}</small></li>`).join('')}${open().length > 5 ? `<li class="muted"><span>+${open().length - 5} more</span></li>` : ''}</ul>` : '<ul class="dl"><li class="muted"><span>Nothing due. Add a deadline on the Plan tab.</span></li></ul>' },
+  volume: { label: 'Volume', hint: 'Press the up and down arrow keys with the card closed. The meter updates in place while you hold the key.', shape: () => ({ w: 290, h: 40, r: 16 }), html: () => `<div class="row">${I.spk}<span class="meter"><b style="width:${D.vol}%"></b></span><span class="tnum">${D.vol}</span></div>` },
+  message: { label: 'Message', hint: 'A friend wrote. Click to open the chat, or answer from the Social tab.', shape: () => ({ w: 380, h: 56, r: 24 }), html: () => { const f = S.msgFrom || D.friends[0]; return `<div class="row">${ava(f, 34)}<span class="two"><b>${esc(f.n)}</b><small>${esc(lastMsg(f))}</small></span><button class="pbtn" data-act="reply">Reply</button></div>` } },
+  nowplaying: { label: 'New song', hint: 'A new song started. Press N or P with the card closed, or use Next on the Playing page.', shape: () => ({ w: 360, h: 56, r: 24 }), html: () => `<div class="row">${art(36)}<span class="two"><small>Now playing</small><b>${esc(track().t)}</b><small>${esc(track().a)}</small></span>${bars()}</div>` },
+  call: { label: 'Incoming call', hint: 'Someone is calling. The pill glows green until you answer or decline.', glow: 'ring', shape: () => ({ w: 340, h: 64, r: 28 }), html: () => { const f = callerOf(); return `<div class="row ringing">${ava(f, 38)}<span class="two"><b>${esc(f.n)}</b><small>Voice call</small></span><button class="round no" data-act="decline" aria-label="Decline">${I.hang}</button><button class="round yes" data-act="accept" aria-label="Accept">${I.phone}</button></div>` } },
+  incall: { label: 'In a call', hint: 'During a call the pill keeps the duration. Mute or hang up right from it. Start one from Friends or Groups.', shape: () => ({ w: 310, h: 42, r: 18 }), html: () => { const c = callOf(); return `<div class="row">${ava(c, 24)}<span class="two" style="flex:none;max-width:70px"><b style="font-size:12px">${esc(c.name)}</b></span><span class="tnum" id="callT">${callTime(c)}</span>${wave(6, 'green')}<span style="flex:1"></span><button class="pbtn" data-act="mute">${c.muted ? 'Unmute' : 'Mute'}</button><button class="round no" style="width:28px;height:28px" data-act="hang" aria-label="Hang up">${I.hang}</button></div>` } },
+  listening: { label: 'Listening', hint: 'Astra heard her name. Her eyes widen and the halo breathes.', glow: 'listening', shape: () => ({ w: 300, h: 44, r: 18 }), html: () => `<div class="row">${eyes('big')}<span class="two"><b>Listening</b></span>${wave(11)}</div>` },
+  thinking: { label: 'Thinking', hint: 'Astra is working on it. Her eyes look up and the halo orbits.', glow: 'thinking', shape: () => ({ w: 230, h: 40, r: 16 }), html: () => `<div class="row">${eyes('up')}<span class="shimmer">Working on it</span></div>` },
+  speaking: { label: 'Speaking', hint: 'Astra answers in the pill and reads it aloud when your browser allows speech.', glow: 'speaking', shape: () => ({ w: 420, h: 44 + Math.ceil((S.say || sayDefault()).length / 50) * 17, r: 26 }), html: () => `<div class="row">${eyes('happy')}<span class="say">${esc(S.say || sayDefault())}</span></div>` },
+  toast: { label: 'Confirmation', hint: 'Short confirmations (timer finished, file added, copied) slide in and leave on their own.', shape: () => ({ w: 340, h: 48, r: 22 }), html: () => `<div class="row"><span class="ti">${I.check}</span><span class="two"><b>${esc(S.toast.text)}</b>${S.toast.sub ? `<small>${esc(S.toast.sub)}</small>` : ''}</span></div>` },
+}
+const PILL_ORDER = Object.keys(PILLS)
+const sayDefault = () => open()[0] ? `Next up: ${open()[0].t}, ${dueLabel(open()[0].due)}.` : 'Nothing is due. Enjoy it.'
+const callTime = c => { const n = Math.floor((Date.now() - c.t0) / 1000); return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}` }
+
+/* ---------- pages ---------- */
+const listPage = (list, form) => `<div style="display:grid;grid-template-rows:minmax(0,1fr) auto;height:100%;gap:8px"><div style="overflow:auto;min-height:0;padding-right:4px">${list}</div>${form}</div>`
+const empty = t => `<div class="empty">${t}</div>`
+
+function page(tab) {
+  switch (tab) {
+    case 'astra': return `<div style="display:grid;grid-template-rows:minmax(0,1fr) auto auto;height:100%;gap:6px">
+      <div class="g" id="chatLog" style="align-content:end;overflow:auto;min-height:0">${D.chat.slice(-12).map(m => m.a ? `<div style="display:flex;gap:8px;align-items:flex-end">${eyes()}<div class="bubble-a">${esc(m.t)}</div></div>` : `<div class="bubble-u">${esc(m.t)}</div>`).join('')}</div>
+      <div class="pchips">${['Add todo buy printer ink', "What's due today?", 'Start a 15 minute timer', 'Next song', 'Weather'].map(q => `<button data-act="ask" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <form class="row" style="padding:0" data-form="chat"><input class="inp" id="chatIn" placeholder="Ask Astra to add a to-do, start a timer, play music" autocomplete="off"><button class="btn ghost" type="button" data-act="voice" aria-label="Talk to Astra">${I.mic}</button><button class="btn" aria-label="Send">${I.send}</button></form></div>`
+    case 'media': { const t = track(); return `<div style="display:grid;grid-template-columns:112px minmax(0,1fr);gap:18px;align-items:center;height:100%">
+      ${art(112)}
+      <div class="g" style="gap:8px">
+        <div><h3 style="font-size:19px">${esc(t.t)}</h3><span class="muted">${esc(t.a)}</span></div>
+        <div class="well" style="font-family:var(--display);font-size:15px" id="lyricNow">${esc(lyric())}</div>
+        <div class="g" style="gap:0"><input type="range" id="seek" min="0" max="${t.len}" value="${Math.floor(S.pos)}" aria-label="Position"><div style="display:flex;justify-content:space-between" class="muted tnum"><span id="posT">${fmt(S.pos)}</span><span>${fmt(t.len)}</span></div></div>
+        <div class="row" style="padding:0;gap:14px"><div class="ctl" style="flex:1;justify-content:flex-start"><button data-act="prev" aria-label="Previous">${I.prev}</button><button class="pp" data-act="play" aria-label="Play or pause">${S.playing ? I.pause : I.play}</button><button data-act="next" aria-label="Next">${I.next}</button></div>${I.spk}<input type="range" id="vol" min="0" max="100" value="${D.vol}" aria-label="Volume" style="width:110px"></div>
+      </div></div>` }
+    case 'weather': {
+      const w = CITIES[D.city], h0 = new Date().getHours()
+      return `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:18px;align-items:center;height:100%">
+      <div class="g" style="gap:10px"><select class="inp" id="citySel" aria-label="City">${Object.keys(CITIES).map(c => `<option ${c === D.city ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <div style="display:flex;gap:14px;align-items:center"><span class="big">${w.now}°</span><span class="muted" style="font-size:13px">${w.sum}</span></div>
+      <div class="grid3"><div class="tile"><span class="muted">Feels like</span><b>${w.feel}°</b></div><div class="tile"><span class="muted">Humidity</span><b>${w.hum}%</b></div><div class="tile"><span class="muted">UV index</span><b>${w.uv}</b></div></div></div>
+      <div class="hours">${w.hours.map((t, i) => `<div><small class="muted">${String((h0 + i + 1) % 24).padStart(2, '0')}:00</small><b>${t}°</b><span class="rain" title="${w.rain[i]}% rain"><b style="height:${w.rain[i]}%"></b></span><small class="muted">${w.rain[i]}%</small></div>`).join('')}</div></div>`
+    }
+    case 'timer': { const T = S.timer; return `<div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center;height:100%">
+      <div style="position:relative;width:124px;height:124px;display:grid;place-items:center">${ring(T.left / T.total, 124, 8)}<div style="position:absolute;text-align:center"><div class="big" style="font-size:28px" id="tBig">${fmt(T.left)}</div><small class="muted">${T.run ? 'Running' : T.left <= 0 ? 'Done' : 'Ready'}</small></div></div>
+      <div class="g" style="gap:8px"><div class="grid4">${[5, 15, 25, 50].map(m => `<button class="btn ghost" data-act="tmin" data-v="${m}">${m} min</button>`).join('')}</div>
+      <form class="row" style="padding:0" data-form="tmin"><input class="inp" id="tCustom" type="number" min="1" max="180" placeholder="Custom minutes" aria-label="Custom minutes"><button class="btn ghost">Set</button></form>
+      <div class="row" style="padding:0"><button class="btn" style="flex:1" data-act="trun">${T.run ? 'Pause' : T.left <= 0 ? 'Restart' : 'Start'}</button><button class="btn ghost" data-act="treset">Reset</button></div>
+      <p class="muted" style="font-size:12px">Close the card and the timer splits off the pill as a bubble. Finished sessions add to Study.</p></div></div>` }
+    case 'todo': {
+      const left = D.todos.filter(x => !x.d).length
+      return listPage(D.todos.length ? `<ul class="lst">${D.todos.map(x => `<li><button class="cb ${x.d ? 'on' : ''}" data-act="todo" data-id="${x.id}" aria-label="Toggle done">${x.d ? I.check : ''}</button><span style="flex:1;min-width:0" class="${x.d ? 'done-t' : ''}">${esc(x.t)}</span>${delBtn('deltodo', x.id)}</li>`).join('')}</ul>` : empty('Nothing to do. Add the first thing below.'),
+        `<form class="row" style="padding:0" data-form="todo"><input class="inp" id="todoIn" placeholder="Add a to-do" autocomplete="off"><span class="muted tnum" style="white-space:nowrap">${left} left</span>${D.todos.some(x => x.d) ? '<button type="button" class="btn ghost" data-act="cleardone">Clear done</button>' : ''}<button class="btn">Add</button></form>`)
+    }
+    case 'notes': return `<div style="display:grid;grid-template-rows:minmax(0,1fr) auto;height:100%;gap:6px"><textarea class="inp" id="noteArea" aria-label="Note" style="width:100%;height:100%;resize:none;line-height:1.55">${esc(D.notes)}</textarea><div class="row" style="padding:0;justify-content:space-between"><span class="muted" id="noteCount">${D.notes.length} characters, saved in this browser</span><button class="btn ghost" data-act="clearnotes">Clear</button></div></div>`
+    case 'prompter': return `<div style="display:grid;grid-template-rows:minmax(0,1fr) auto;height:100%;gap:8px">${S.promptEdit ? `<textarea class="inp" id="promptArea" aria-label="Script" style="resize:none;line-height:1.5">${esc(D.prompt)}</textarea>` : `<div class="prompt" style="height:100%"><div id="promptText" style="transform:translateY(${-S.promptY}px)">${esc(D.prompt)}</div></div>`}
+      <div class="row" style="padding:0"><button class="btn" data-act="prun" ${S.promptEdit ? 'disabled' : ''}>${S.promptRun ? 'Pause' : 'Start scrolling'}</button><button class="btn ghost" data-act="prestart">Restart</button><button class="btn ghost" data-act="pedit">${S.promptEdit ? 'Done editing' : 'Edit script'}</button><label class="muted" for="pspeed" style="margin-left:auto">Speed</label><input type="range" id="pspeed" min="1" max="6" value="${S.pspeed || 2}" style="width:120px"></div></div>`
+    case 'deadlist': {
+      const rows = [...open(), ...D.deadlines.filter(x => x.d)]
+      return listPage(rows.length ? `<ul class="lst">${rows.map(d => `<li><button class="cb ${d.d ? 'on' : ''}" data-act="dl" data-id="${d.id}" aria-label="Mark done">${d.d ? I.check : ''}</button><i class="dot ${d.d ? '' : urg(d.due)}" style="${d.d ? 'background:var(--g-line)' : ''}"></i><span class="two"><b class="${d.d ? 'done-t' : ''}">${esc(d.t)}</b><small>${esc(d.c || 'No course')}</small></span><span class="muted tnum">${d.d ? 'done' : dueLabel(d.due)}</span>${delBtn('deldl', d.id)}</li>`).join('')}</ul>` : empty('No deadlines. Add one below and it shows up in the pill.'),
+        `<form class="row" style="padding:0;gap:6px" data-form="dl"><input class="inp" id="dlT" placeholder="Deadline" autocomplete="off"><input class="inp" id="dlC" placeholder="Course" autocomplete="off" style="max-width:130px"><input class="inp" id="dlD" type="datetime-local" value="${toInput(Date.now() + 24 * H)}" style="flex:none;width:auto" aria-label="Due"><button class="btn">Add</button></form>`)
+    }
+    case 'schedule': {
+      const ev = [...D.events].sort((a, b) => a.time.localeCompare(b.time)), nowT = hhmm()
+      let out = '', placed = false
+      ev.forEach(e => { if (!placed && e.time > nowT) { out += '<div class="now"></div>'; placed = true } out += `<span class="t">${e.time}</span><div class="ev" style="--c:${e.c}"><div><b>${esc(e.t)}</b><div class="muted">${esc(e.p || '')}</div></div><span style="margin-left:auto">${delBtn('delev', e.id)}</span></div>` })
+      if (!placed && ev.length) out += '<div class="now"></div>'
+      return listPage(ev.length ? `<div class="tl">${out}</div>` : empty('Nothing scheduled today. Add an event below.'),
+        `<form class="row" style="padding:0;gap:6px" data-form="ev"><input class="inp" id="evTime" type="time" value="${nowT}" style="flex:none;width:auto" aria-label="Time"><input class="inp" id="evT" placeholder="Event" autocomplete="off"><input class="inp" id="evP" placeholder="Place" autocomplete="off" style="max-width:150px"><button class="btn">Add</button></form>`)
+    }
+    case 'study': {
+      const wk = D.week, tot = wk.reduce((a, b) => a + b, 0), max = Math.max(...wk, 60)
+      const room = [...(D.room ? [{ n: D.profile.name || 'You', c: D.astra, m: 'now' }] : []), ...D.friends.filter(f => f.on === 'on').map((f, i) => ({ n: f.n, c: f.c, m: [48, 22, 91][i % 3] + ' min' }))]
+      return `<div class="grid2" style="height:100%"><div class="g" style="align-content:start;gap:6px"><b>Focus room</b><span class="muted">${room.length} studying now</span>
+        <ul class="lst" style="max-height:78px;overflow:auto">${room.map(f => `<li style="padding:3px 2px">${ava(f, 22)}<span style="flex:1">${esc(f.n)}</span><span class="muted tnum">${f.m}</span></li>`).join('')}</ul>
+        <div class="row" style="padding:0"><button class="btn" data-act="room">${D.room ? 'Leave room' : 'Join the room'}</button><button class="btn ghost" data-act="log25">Log 25 min</button></div></div>
+      <div class="g" style="align-content:start;gap:4px"><b>This week</b><span class="muted">${Math.floor(tot / 60)} h ${tot % 60} min focused</span>
+        <div style="display:flex;gap:8px;align-items:flex-end;height:84px">${wk.map((m, i) => `<div style="flex:1;display:grid;gap:3px;justify-items:center" title="${m} min"><span style="width:100%;height:${Math.max(3, m / max * 60)}px;border-radius:6px;background:${i === todayIdx() ? 'var(--g-accent)' : 'var(--g-line)'}"></span><small class="muted">${'MTWTFSS'[i]}</small></div>`).join('')}</div></div></div>`
+    }
+    case 'shelf': return listPage(S.files.length ? `<div class="grid4">${S.files.map(f => { const e = (f.name.split('.').pop() || 'FILE').slice(0, 4).toUpperCase(); return `<div class="tile" style="position:relative"><span class="ft" style="--c:${PALETTE[(e.charCodeAt(0) + e.length) % PALETTE.length]}">${esc(e)}</span><b>${esc(f.name)}</b><small class="muted">${kb(f.size)}</small><span style="position:absolute;top:4px;right:4px">${delBtn('delfile', f.id, 'Remove')}</span></div>` }).join('')}</div>` : empty('The shelf is empty. Drop files on the screen or use Add files.'),
+      `<div class="row" style="padding:0"><label class="btn" for="shelfIn" style="cursor:pointer">Add files</label><input type="file" id="shelfIn" multiple hidden><span class="muted" style="flex:1">Drag files anywhere onto the screen to keep them here.</span>${S.files.length ? '<button class="btn ghost" data-act="clearshelf">Clear shelf</button>' : ''}</div>`)
+    case 'apps': return listPage(`<div class="grid4" style="grid-template-columns:repeat(auto-fill,minmax(78px,1fr))">${D.apps.map((n, i) => `<div class="tile" style="position:relative;justify-items:center"><button style="border:0;background:none;cursor:pointer;display:grid;gap:6px;justify-items:center;padding:0" data-act="launch" data-v="${esc(n)}"><span class="ava" style="--c:${PALETTE[i % PALETTE.length]};width:34px;height:34px;border-radius:10px">${esc(n[0] || '?')}</span><b>${esc(n)}</b></button><span style="position:absolute;top:2px;right:2px">${delBtn('delapp', i, 'Remove')}</span></div>`).join('')}</div>`,
+      `<form class="row" style="padding:0" data-form="app"><input class="inp" id="appIn" placeholder="Add an app to the launcher" autocomplete="off"><button class="btn">Add</button></form>`)
+    case 'clipboard': return listPage(D.clips.length ? `<ul class="lst">${D.clips.map(c => `<li><span class="two"><b style="font-weight:500;font-family:ui-monospace,Consolas,monospace;font-size:12px">${esc(c.t)}</b><small>${esc(c.w)}</small></span><button class="pbtn" data-act="copy" data-id="${c.id}">Copy</button>${delBtn('delclip', c.id)}</li>`).join('')}</ul>` : empty('Nothing copied yet. Paste here or type below.'),
+      `<form class="row" style="padding:0" data-form="clip"><input class="inp" id="clipIn" placeholder="Save a snippet, or press Ctrl+V on this page" autocomplete="off"><button class="btn">Save</button></form>`)
+    case 'friends': {
+      if (S.chatWith) {
+        const f = D.friends.find(x => x.id === S.chatWith)
+        if (f) return `<div style="display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%;gap:6px">
+          <div class="row" style="padding:0"><button class="btn ghost" data-act="back">Back</button>${ava(f, 26)}<span class="two"><b>${esc(f.n)}</b><small>${esc(f.s)}</small></span><button class="pbtn" data-act="callfriend" data-id="${f.id}" aria-label="Call ${esc(f.n)}">${I.phone}</button></div>
+          <div class="g" id="thread" style="align-content:end;overflow:auto;min-height:0">${f.msgs.length ? f.msgs.map(m => `<div class="${m.me ? 'bubble-u' : 'bubble-a'}">${esc(m.t)}</div>`).join('') : '<div class="empty">Say hi to ' + esc(f.n) + '.</div>'}</div>
+          <form class="row" style="padding:0" data-form="msg"><input class="inp" id="msgIn" placeholder="Message ${esc(f.n)}" autocomplete="off"><button class="btn" aria-label="Send">${I.send}</button></form></div>`
+      }
+      return listPage(`<ul class="lst">${D.friends.map(f => `<li><span style="position:relative">${ava(f, 32)}<i class="dot" style="position:absolute;right:-1px;bottom:-1px;border:2px solid var(--glaze);background:${f.on === 'on' ? 'var(--good)' : f.on === 'busy' ? 'var(--hot)' : 'var(--g-line)'}"></i></span><span class="two"><b>${esc(f.n)}</b><small>${f.unread ? esc(lastMsg(f)) : esc(f.s)}</small></span>${f.unread ? `<span class="badge">${f.unread}</span>` : ''}<button class="pbtn" data-act="chat" data-id="${f.id}">Chat</button><button class="pbtn" data-act="callfriend" data-id="${f.id}" aria-label="Call ${esc(f.n)}">${I.phone}</button>${delBtn('delfriend', f.id, 'Remove')}</li>`).join('')}</ul>`,
+        `<form class="row" style="padding:0" data-form="friend"><input class="inp" id="friendIn" placeholder="Add a friend by name" autocomplete="off"><button class="btn">Add</button></form>`)
+    }
+    case 'groups': return listPage(D.groups.length ? `<div class="grid4" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${D.groups.map(g => { const live = S.call && S.call.kind === 'group' && S.call.id === g.id; return `<div class="tile" style="position:relative"><span class="ava" style="--c:${g.c};width:28px;height:28px;border-radius:9px">${esc(g.n[0])}</span><b>${esc(g.n)}</b><small class="muted">${g.m} members${live ? ', you are in voice' : ''}</small><button class="pbtn" data-act="gvoice" data-id="${g.id}">${live ? 'Leave voice' : 'Join voice'}</button><span style="position:absolute;top:4px;right:4px">${delBtn('delgroup', g.id, 'Leave group')}</span></div>` }).join('')}</div>` : empty('No groups. Create one below.'),
+      `<form class="row" style="padding:0" data-form="group"><input class="inp" id="groupIn" placeholder="Create a group" autocomplete="off"><button class="btn">Create</button></form>`)
+    case 'profile': return `<div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center;height:100%">
+      <span class="ava" id="profAva" style="--c:${D.astra};width:84px;height:84px;font-size:34px;color:#0b1020">${esc((D.profile.name || '?')[0].toUpperCase())}</span>
+      <div class="g" style="gap:8px"><input class="inp" id="pname" value="${esc(D.profile.name)}" aria-label="Name" style="font-weight:600;font-size:16px" maxlength="24"><input class="inp" id="pstatus" value="${esc(D.profile.status)}" aria-label="Status" maxlength="80">
+      <div class="grid3"><div class="tile"><span class="muted">Friends</span><b>${D.friends.length}</b></div><div class="tile"><span class="muted">To-dos done</span><b>${D.todos.filter(x => x.d).length} of ${D.todos.length}</b></div><div class="tile"><span class="muted">Focus this week</span><b>${Math.floor(D.week.reduce((a, b) => a + b, 0) / 60)} h ${D.week.reduce((a, b) => a + b, 0) % 60}</b></div></div></div></div>`
+    case 'settings': return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));column-gap:28px;align-content:start">
+      <div class="set-h">Look</div>
+      <div class="set-row"><span>Glaze</span><div class="tabs">${['porcelain', 'obsidian'].map(g => `<button data-act="glaze" data-v="${g}" aria-current="${D.glaze === g ? 'page' : 'false'}">${cap(g)}</button>`).join('')}</div></div>
+      <div class="set-row"><span>Astra's colour</span><div class="swatches">${ASTRA_COLORS.map(c => `<button class="sw" style="--c:${c};width:22px;height:22px" data-act="astra" data-v="${c}" aria-label="Astra colour ${c}" aria-pressed="${D.astra === c}"></button>`).join('')}</div></div>
+      <div class="set-row"><span>Animation</span><div class="tabs">${Object.entries(SPRINGS).map(([k, v]) => `<button data-act="spring" data-v="${k}" aria-current="${D.spring === k ? 'page' : 'false'}">${v.label}</button>`).join('')}</div></div>
+      <div class="set-row"><span>Resting pill</span><div class="tabs">${[['eyes', 'Eyes'], ['clock', 'Time'], ['due', 'Next due']].map(([k, l]) => `<button data-act="idle" data-v="${k}" aria-current="${D.set.idle === k ? 'page' : 'false'}">${l}</button>`).join('')}</div></div>
+      <div class="set-row"><label for="cardW">Card width</label><input type="range" id="cardW" min="620" max="900" step="10" value="${D.set.cardW}" style="max-width:150px"></div>
+      <div class="set-row"><label for="cardH">Card height</label><input type="range" id="cardH" min="260" max="420" step="10" value="${D.set.cardH}" style="max-width:150px"></div>
+      <div class="set-row"><label for="isleScale">Island size</label><input type="range" id="isleScale" min="0.8" max="1.25" step="0.05" value="${D.set.scale}" style="max-width:150px"></div>
+      <div class="set-h">Behaviour</div>
+      ${[['smart', 'Tuck the pill away until I point at it'], ['lyrics', 'Show lyrics in the pill'], ['sounds', 'Play sounds']].map(([k, l]) => `<div class="set-row"><span>${l}</span><button class="toggle ${D.set[k] ? 'on' : ''}" data-act="tog" data-v="${k}" role="switch" aria-checked="${D.set[k]}" aria-label="${l}"></button></div>`).join('')}
+      <div class="set-row"><span>Saved in this browser</span><button class="btn ghost" data-act="reset">Reset demo data</button></div></div>`
+  }
+  return ''
+}
+
+const railHTML = () => GROUPS.map(x => `<button data-group="${x.id}" class="${x.id === curGroup().id ? 'on' : ''} ${x.id === 'astra' ? 'is-astra' : ''}" aria-current="${x.id === curGroup().id ? 'page' : 'false'}">${ICON[x.id]}<span>${x.title}</span>${x.id === 'social' && unreadTotal() ? '<i class="pip"></i>' : ''}</button>`).join('')
+const curGroup = () => GROUPS.find(g => g.pages.includes(S.tab))
+const headHTML = () => { const g = curGroup(); return `<div class="c-head"><h3>${TITLES[S.tab]}</h3>${g.pages.length > 1 ? `<div class="tabs">${g.pages.map(p => `<button data-tab="${p}" aria-current="${p === S.tab ? 'page' : 'false'}">${SHORT[p]}</button>`).join('')}</div>` : ''}<button class="x" data-act="close" aria-label="Close card">${I.x}</button></div>` }
+const cardHTML = () => `<div class="card">${headHTML()}<div class="page" id="page">${page(S.tab)}</div><nav class="rail" aria-label="Sections"><span class="lit ${curGroup().id === 'astra' ? 'astra' : ''}" id="lit"></span>${railHTML()}</nav></div>`
+
+/* ---------- rendering the live island ---------- */
+const isle = $('#isle'), clip = $('#clip'), bubc = $('#bubc')
+function setShape({ w, h, r }) { isle.style.setProperty('--w', w + 'px'); isle.style.setProperty('--h', h + 'px'); isle.style.setProperty('--r', r + 'px') }
+function swap(html) {
+  $$('.content', clip).forEach(o => { o.classList.add('out'); setTimeout(() => o.remove(), 90) })
+  const c = document.createElement('div'); c.className = 'content'; c.innerHTML = html; clip.appendChild(c); return c
+}
+function placeLit(animate = true) {
+  const lit = $('#lit'), on = $('.rail button.on'); if (!lit || !on) return
+  if (!animate) lit.style.transition = 'none'
+  lit.style.transform = `translateX(${on.offsetLeft}px)`; lit.style.width = on.offsetWidth + 'px'
+  if (!animate) { lit.offsetWidth; lit.style.transition = '' }
+}
+const restState = () => D.set.lyrics && S.playing ? 'live' : 'idle'
+function show(state) {
+  S.pill = state
+  isle.className = 'isle'
+  if (state === 'card') {
+    isle.classList.add('is-card')
+    setShape({ w: D.set.cardW, h: D.set.cardH, r: 26 })
+    swap(cardHTML())
+    requestAnimationFrame(() => placeLit(false))
+  } else {
+    const p = PILLS[state]
+    setShape(p.shape()); swap(p.html())
+    if (p.glow) isle.classList.add('g-' + p.glow)
+    if (p.split || (S.timer.active && ['idle', 'live', 'peek'].includes(state))) isle.classList.add('split')
+    if (D.set.smart && state === 'idle' && !S.timer.active) isle.classList.add('tucked')
+  }
+  clip.setAttribute('aria-label', state === 'card' ? TITLES[S.tab] : 'Island: ' + PILLS[state].label)
+  $$('#stateChips .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.state === state)))
+  $('#stateHint').textContent = state === 'card' ? 'The card. Switch groups on the rail along its bottom, pages inside a group from the header. Arrow keys step through pages, Esc closes. Everything you add is saved in this browser.' : PILLS[state].hint
+  $$('#pageChips .chip').forEach(b => b.setAttribute('aria-pressed', String(state === 'card' && b.dataset.page === S.tab)))
+}
+const restore = () => { clearTimeout(S.tt); show(S.call ? 'incall' : restState()) }
+const sync = () => { if (['idle', 'live'].includes(S.pill)) show(restState()) }
+function flash(state, ms = 3500) { show(state); clearTimeout(S.tt); S.tt = setTimeout(() => { if (S.pill === state) restore() }, ms) }
+function snack(t) {
+  const c = $('.card', clip); if (!c) return
+  $$('.snack', c).forEach(x => x.remove())
+  const el = document.createElement('div'); el.className = 'snack'; el.textContent = t; c.appendChild(el); setTimeout(() => el.remove(), 2200)
+}
+function tell(text, sub) { if (S.pill === 'card') snack(text); else { S.toast = { text, sub: sub || '' }; beep(740); flash('toast') } }
+function refreshPage(focus) {
+  if (S.pill !== 'card') return
+  const pg = $('#page'); if (!pg) return
+  const y = pg.scrollTop; pg.innerHTML = page(S.tab); pg.scrollTop = y
+  if (focus) { const f = $('#' + focus); if (f) f.focus() }
+  const log = $('#chatLog') || $('#thread'); if (log) log.scrollTop = log.scrollHeight
+}
+function refreshRail() {
+  const rail = $('.rail'); if (!rail) return
+  const tmp = document.createElement('div'); tmp.innerHTML = railHTML()
+  $$('button', rail).forEach((b, i) => { const nb = tmp.children[i]; b.className = nb.className; b.setAttribute('aria-current', nb.getAttribute('aria-current')); b.innerHTML = nb.innerHTML })
+  $('#lit').classList.toggle('astra', curGroup().id === 'astra'); placeLit()
+}
+function openTab(tab) {
+  const from = PAGES.indexOf(S.tab), to = PAGES.indexOf(tab)
+  if (tab !== 'friends') S.chatWith = null
+  S.tab = tab
+  if (S.pill !== 'card') { clearTimeout(S.tt); return show('card') }
+  const card = $('.card', clip)
+  card.querySelector('.c-head').outerHTML = headHTML()
+  const old = card.querySelector('.page'), pg = document.createElement('div')
+  pg.className = 'page enter'; pg.id = 'page'; pg.style.setProperty('--dx', (to >= from ? 14 : -14) + 'px'); pg.innerHTML = page(tab)
+  old.replaceWith(pg)
+  refreshRail()
+  $$('#pageChips .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.page === S.tab)))
+  const log = $('#chatLog') || $('#thread'); if (log) log.scrollTop = log.scrollHeight
+}
+
+/* ---------- features ---------- */
+function addTodo(t) { D.todos.push({ id: uid(), t, d: false }); save() }
+function startTimer(sec) { S.timer = { total: sec, left: sec, run: true, active: true } }
+function track_(d) {
+  S.ti = (S.ti + d + TRACKS.length) % TRACKS.length; S.pos = 0; S.playing = true
+  if (S.pill === 'card') refreshPage(); else flash('nowplaying')
+}
+function setVol(v, announce) {
+  D.vol = Math.max(0, Math.min(100, v)); save()
+  if (S.pill === 'volume') { const m = $('.content:last-child .meter b', clip); if (m) { m.style.width = D.vol + '%'; m.parentElement.nextElementSibling.textContent = D.vol } clearTimeout(S.tt); S.tt = setTimeout(restore, 1500) }
+  else if (announce && S.pill !== 'card') flash('volume', 1500)
+}
+function openThread(id) { const f = D.friends.find(x => x.id === id); if (!f) return; f.unread = 0; save(); S.chatWith = id; if (S.pill === 'card' && S.tab === 'friends') { refreshPage('msgIn'); refreshRail() } else openTab('friends') }
+function incoming(forceShow) {
+  const f = pick(D.friends.filter(x => x.on !== 'off') || D.friends); if (!f) return
+  const t = pick(['Are you free to call in ten minutes?', 'Did you see the new SCELE announcement?', 'Library at 4? I saved you a seat', 'Send me your notes from today please', 'Lunch at the kantin?'])
+  f.msgs.push({ me: 0, t }); if (!(S.pill === 'card' && S.tab === 'friends' && S.chatWith === f.id)) f.unread++; save()
+  S.msgFrom = f; beep(600)
+  if (S.pill === 'card') { snack(`${f.n}: ${t}`); refreshRail(); if (S.tab === 'friends') refreshPage() } else flash('message', 4500)
+}
+function startCall(c) { S.call = { ...c, t0: Date.now(), muted: false }; clearTimeout(S.tt); show('incall') }
+function addFiles(list) {
+  const arr = [...list]; if (!arr.length) return
+  arr.forEach(f => S.files.push({ id: 'f' + uid(), name: f.name, size: f.size }))
+  tell(`Added ${arr.length} file${arr.length > 1 ? 's' : ''} to the shelf`, arr[0].name); refreshPage()
+}
+function copyText(t, btn) {
+  const done = () => { if (btn) { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy' }, 1200) } }
+  try { navigator.clipboard.writeText(t).then(done, done) } catch (e) { done() }
+}
+
+/* ---------- Astra's brain, all local ---------- */
+function brain(q) {
+  const s = q.toLowerCase().replace(/[?.!]+$/, '').trim(); let m
+  if ((m = s.match(/^(?:add|create|new)\s+(?:a\s+)?(?:to-?do|task)\s*(?:to|:)?\s*(.+)$/)) || (m = s.match(/^remind me to (.+)$/)) || (m = s.match(/^todo\s*:?\s*(.+)$/))) { addTodo(cap(m[1])); return { text: `Added "${cap(m[1])}" to your to-do list.` } }
+  if (/timer/.test(s)) {
+    if (/stop|cancel|reset/.test(s)) { S.timer = { total: S.timer.total, left: S.timer.total, run: false, active: false }; return { text: 'Timer stopped.' } }
+    m = s.match(/(\d+)/); const min = m ? Math.min(180, +m[1]) : 25; startTimer(min * 60); return { text: `Timer set for ${min} minute${min > 1 ? 's' : ''}. I will tell you when it ends.` }
+  }
+  if (m = s.match(/^(?:add|new)\s+(?:a\s+)?(?:deadline)\s*(?:for|:)?\s*(.+)$/)) { D.deadlines.push({ id: uid(), t: cap(m[1]), c: '', due: Date.now() + 24 * H, d: false }); save(); return { text: `Added the deadline "${cap(m[1])}" for tomorrow.` } }
+  if (/due|deadline/.test(s)) { const o = open().slice(0, 3); return { text: o.length ? 'Next up: ' + o.map(x => `${x.t} ${dueLabel(x.due)}`).join('; ') + '.' : 'Nothing is due. Enjoy it.' } }
+  if ((m = s.match(/^(?:add|new|take)\s+(?:a\s+)?note\s*(?:to|:)?\s*(.+)$/)) || (m = s.match(/^note[: ]+(.+)$/))) { D.notes += '\n- ' + m[1]; save(); return { text: 'Saved to your notes.' } }
+  if (/next (song|track)|^skip|^next$/.test(s)) { track_(1); return { text: `Playing ${track().t} by ${track().a}.` } }
+  if (/previous|go back/.test(s)) { track_(-1); return { text: `Playing ${track().t}.` } }
+  if (/\bpause\b|stop (the )?music/.test(s)) { S.playing = false; return { text: 'Paused.' } }
+  if (/\bplay\b|music/.test(s)) { S.playing = true; return { text: `Playing ${track().t} by ${track().a}.` } }
+  if (m = s.match(/volume (?:to |at )?(\d+)/)) { setVol(+m[1]); return { text: `Volume set to ${D.vol}.` } }
+  if (/weather|rain|temperature|hot/.test(s)) { const w = CITIES[D.city]; return { text: `${D.city}: ${w.now} degrees, ${w.sum.toLowerCase()}.` } }
+  if (/schedule|classes|what'?s on|today/.test(s)) { const e = [...D.events].sort((a, b) => a.time.localeCompare(b.time)).filter(x => x.time >= hhmm()).slice(0, 3); return { text: e.length ? 'Coming up: ' + e.map(x => `${x.t} at ${x.time}`).join('; ') + '.' : 'Nothing else on your schedule today.' } }
+  if (m = s.match(/^open (\w+)/)) { const k = Object.keys(TITLES).find(p => p === m[1] || SHORT[p]?.toLowerCase() === m[1] || TITLES[p].toLowerCase().includes(m[1])); if (k) { setTimeout(() => openTab(k), 600); return { text: `Opening ${TITLES[k]}.` } } }
+  if (/^(hi|hello|hey)/.test(s)) return { text: `Hi ${D.profile.name || 'there'}. What can I do?` }
+  return { text: 'I can add to-dos, notes and deadlines, run timers, control music, and read your schedule, deadlines and weather. Try "add todo buy printer ink".' }
+}
+function ask(q) {
+  D.chat.push({ a: 0, t: q }); save(); refreshPage()
+  const log = $('#chatLog'); if (log) { log.insertAdjacentHTML('beforeend', `<div style="display:flex;gap:8px;align-items:flex-end">${eyes('up')}<div class="bubble-a typing"><i></i><i></i><i></i></div></div>`); log.scrollTop = log.scrollHeight }
+  setTimeout(() => { const r = brain(q); D.chat.push({ a: 1, t: r.text }); if (D.chat.length > 60) D.chat = D.chat.slice(-40); save(); if (S.pill === 'card' && S.tab === 'astra') refreshPage('chatIn') }, 900)
+}
+let voiceTimers = []
+const SAMPLES = ['add todo buy printer ink', "what's due today", 'start a 15 minute timer', "what's the weather", 'next song']
+function speak(t) { if (!D.set.sounds) return; try { const u = new SpeechSynthesisUtterance(t); u.rate = 1.05; speechSynthesis.cancel(); speechSynthesis.speak(u) } catch (e) {} }
+function voice() {
+  voiceTimers.forEach(clearTimeout); clearTimeout(S.tt); show('listening')
+  const finish = q => {
+    D.chat.push({ a: 0, t: q }); show('thinking')
+    voiceTimers.push(setTimeout(() => { const r = brain(q); D.chat.push({ a: 1, t: r.text }); save(); S.say = r.text; show('speaking'); speak(r.text); voiceTimers.push(setTimeout(() => { if (S.pill === 'speaking') restore() }, 3500 + r.text.length * 45)) }, 900))
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; let done = false
+  const once = q => { if (!done) { done = true; finish(q) } }
+  if (SR) { try { const rec = new SR(); rec.lang = 'en-US'; rec.onresult = e => once(e.results[0][0].transcript); rec.onerror = () => once(pick(SAMPLES)); rec.onend = () => once(pick(SAMPLES)); rec.start(); return } catch (e) {} }
+  voiceTimers.push(setTimeout(() => once(pick(SAMPLES)), 1800))
+}
+
+/* ---------- actions ---------- */
+const byId = (arr, id) => arr.find(x => String(x.id) === String(id))
+const ACTS = {
+  close() { restore() },
+  play() { S.playing = !S.playing; refreshPage() }, prev() { track_(-1) }, next() { track_(1) },
+  trun() { const T = S.timer; if (T.left <= 0) { T.left = T.total } T.run = !T.run; T.active = true; refreshPage() },
+  treset() { S.timer = { total: S.timer.total, left: S.timer.total, run: false, active: false }; refreshPage() },
+  tmin(el) { startTimer(+el.dataset.v * 60); refreshPage() },
+  todo(el) { const x = byId(D.todos, el.dataset.id); x.d = !x.d; save(); refreshPage() },
+  deltodo(el) { D.todos = D.todos.filter(x => String(x.id) !== el.dataset.id); save(); refreshPage() },
+  cleardone() { D.todos = D.todos.filter(x => !x.d); save(); refreshPage('todoIn') },
+  clearnotes() { D.notes = ''; save(); refreshPage('noteArea') },
+  dl(el) { const x = byId(D.deadlines, el.dataset.id); x.d = !x.d; save(); refreshPage() },
+  deldl(el) { D.deadlines = D.deadlines.filter(x => String(x.id) !== el.dataset.id); save(); refreshPage() },
+  delev(el) { D.events = D.events.filter(x => String(x.id) !== el.dataset.id); save(); refreshPage() },
+  room() { D.room = !D.room; save(); refreshPage() },
+  log25() { D.week[todayIdx()] += 25; save(); refreshPage(); snack('Logged 25 minutes') },
+  prun() { S.promptRun = !S.promptRun; refreshPage() },
+  prestart() { S.promptY = 0; S.promptRun = false; refreshPage() },
+  pedit() { S.promptEdit = !S.promptEdit; S.promptRun = false; refreshPage(S.promptEdit ? 'promptArea' : null) },
+  delfile(el) { S.files = S.files.filter(x => x.id !== el.dataset.id); refreshPage() },
+  clearshelf() { S.files = []; refreshPage() },
+  launch(el) { snack(`Opening ${el.dataset.v}`) },
+  delapp(el) { D.apps.splice(+el.dataset.id, 1); save(); refreshPage() },
+  copy(el) { const c = byId(D.clips, el.dataset.id); if (c) copyText(c.t, el) },
+  delclip(el) { D.clips = D.clips.filter(x => String(x.id) !== el.dataset.id); save(); refreshPage() },
+  chat(el) { openThread(+el.dataset.id) },
+  back() { S.chatWith = null; refreshPage() },
+  delfriend(el) { D.friends = D.friends.filter(x => String(x.id) !== el.dataset.id); save(); refreshPage(); refreshRail() },
+  callfriend(el) { const f = byId(D.friends, el.dataset.id); if (f.on === 'off') return snack(`${f.n} is offline`); startCall({ kind: 'friend', id: f.id, name: f.n, c: f.c }) },
+  gvoice(el) { const g = byId(D.groups, el.dataset.id); if (S.call && S.call.kind === 'group' && S.call.id === g.id) { S.call = null; refreshPage() } else startCall({ kind: 'group', id: g.id, name: g.n, c: g.c }) },
+  delgroup(el) { D.groups = D.groups.filter(x => String(x.id) !== el.dataset.id); save(); refreshPage() },
+  accept() { const f = callerOf(); startCall({ kind: 'friend', id: f.id, name: f.n, c: f.c }) },
+  decline() { S.caller = null; restore() },
+  hang() { S.call = null; restore() },
+  mute() { if (S.call) { S.call.muted = !S.call.muted; show('incall') } },
+  reply() { openThread((S.msgFrom || D.friends[0]).id) },
+  ask(el) { ask(el.dataset.v) }, voice() { voice() },
+  glaze(el) { D.glaze = el.dataset.v; save(); applyGlaze(); refreshPage() },
+  astra(el) { D.astra = el.dataset.v; save(); applyAstra(); refreshPage() },
+  spring(el) { D.spring = el.dataset.v; save(); applySpring(); syncPanel(); refreshPage() },
+  idle(el) { D.set.idle = el.dataset.v; save(); refreshPage() },
+  tog(el) { const k = el.dataset.v; D.set[k] = !D.set[k]; save(); refreshPage() },
+  reset() { try { localStorage.removeItem(KEY) } catch (e) {} D = DEF(); S.chatWith = null; applyGlaze(); applyAstra(); applySpring(); applyScale(); syncPanel(); show('card'); snack('Demo data reset') },
+}
+clip.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'), t = e.target.closest('[data-tab]'), g = e.target.closest('[data-group]')
+  if (a && ACTS[a.dataset.act]) { e.stopPropagation(); return ACTS[a.dataset.act](a, e) }
+  if (g) return openTab(GROUPS.find(x => x.id === g.dataset.group).pages[0])
+  if (t) return openTab(t.dataset.tab)
+  if (e.target.closest('input,textarea,select,label,form')) return
+  if (S.pill !== 'card') {
+    S.hover = false
+    if (S.pill === 'message') return ACTS.reply()
+    if (S.pill === 'nowplaying' || S.pill === 'live') return openTab('media')
+    if (S.pill === 'call' || S.pill === 'incall' || S.pill === 'listening' || S.pill === 'thinking' || S.pill === 'speaking') return
+    show('card')
+  }
+})
+clip.addEventListener('mouseenter', () => { S.hover = true; if (['idle', 'live'].includes(S.pill)) show(D.set.idle === 'due' && S.pill === 'idle' && open().length ? 'deadlines' : 'peek') })
+clip.addEventListener('mouseleave', () => { S.hover = false; if (['peek', 'deadlines'].includes(S.pill)) restore() })
+clip.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && S.pill !== 'card' && e.target === clip) { e.preventDefault(); show('card') } })
+clip.addEventListener('submit', e => {
+  e.preventDefault()
+  const f = e.target.dataset.form, v = id => { const el = $('#' + id); return el ? el.value.trim() : '' }
+  if (f === 'todo') { const t = v('todoIn'); if (t) { addTodo(cap(t)); refreshPage('todoIn') } }
+  if (f === 'dl') { const t = v('dlT'); if (t) { const due = new Date(v('dlD')).getTime() || Date.now() + 24 * H; D.deadlines.push({ id: uid(), t: cap(t), c: v('dlC'), due, d: false }); save(); refreshPage('dlT') } }
+  if (f === 'ev') { const t = v('evT'); if (t) { D.events.push({ id: uid(), time: v('evTime') || '09:00', t: cap(t), p: v('evP'), c: pick(PALETTE) }); save(); refreshPage('evT') } }
+  if (f === 'clip') { const t = v('clipIn'); if (t) { D.clips.unshift({ id: uid(), t, w: 'You' }); save(); refreshPage('clipIn') } }
+  if (f === 'app') { const t = v('appIn'); if (t) { D.apps.push(cap(t)); save(); refreshPage('appIn') } }
+  if (f === 'friend') { const t = v('friendIn'); if (t) { D.friends.push({ id: uid(), n: cap(t), c: pick(PALETTE), s: 'Just added', on: 'on', unread: 0, msgs: [] }); save(); refreshPage('friendIn') } }
+  if (f === 'group') { const t = v('groupIn'); if (t) { D.groups.push({ id: uid(), n: cap(t), c: pick(PALETTE), m: 1 }); save(); refreshPage('groupIn') } }
+  if (f === 'chat') { const t = v('chatIn'); if (t) ask(t) }
+  if (f === 'tmin') { const m = Math.min(180, Math.max(1, parseInt(v('tCustom'), 10) || 0)); if (m) { startTimer(m * 60); refreshPage() } }
+  if (f === 'msg') {
+    const t = v('msgIn'), fr = byId(D.friends, S.chatWith)
+    if (t && fr) {
+      fr.msgs.push({ me: 1, t }); save(); refreshPage('msgIn')
+      if (fr.on !== 'off') setTimeout(() => { fr.msgs.push({ me: 0, t: pick(['Got it', 'Sounds good', 'Haha okay', 'Give me five minutes', 'Thanks!']) }); save(); if (S.pill === 'card' && S.chatWith === fr.id) refreshPage('msgIn') }, 1200)
+    }
+  }
+})
+clip.addEventListener('input', e => {
+  const id = e.target.id
+  if (id === 'seek') { S.pos = +e.target.value; $('#posT').textContent = fmt(S.pos) }
+  if (id === 'vol') setVol(+e.target.value)
+  if (id === 'noteArea') { D.notes = e.target.value; save(); $('#noteCount').textContent = D.notes.length + ' characters, saved in this browser' }
+  if (id === 'promptArea') { D.prompt = e.target.value; save() }
+  if (id === 'pspeed') S.pspeed = +e.target.value
+  if (id === 'pname') { D.profile.name = e.target.value; save(); $('#profAva').textContent = (D.profile.name || '?')[0].toUpperCase() }
+  if (id === 'pstatus') { D.profile.status = e.target.value; save() }
+  if (id === 'cardW' || id === 'cardH') { D.set[id] = +e.target.value; save(); setShape({ w: D.set.cardW, h: D.set.cardH, r: 26 }); setTimeout(() => placeLit(false), 30) }
+  if (id === 'isleScale') { D.set.scale = +e.target.value; save(); applyScale() }
+})
+clip.addEventListener('change', e => {
+  if (e.target.id === 'citySel') { D.city = e.target.value; save(); refreshPage() }
+  if (e.target.id === 'shelfIn') { addFiles(e.target.files); e.target.value = '' }
+})
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,textarea,select')) return
+  if (e.key === 'Escape' && S.pill === 'card') { restore(); clip.focus() }
+  if (S.pill === 'card' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { const i = PAGES.indexOf(S.tab) + (e.key === 'ArrowRight' ? 1 : -1); openTab(PAGES[(i + PAGES.length) % PAGES.length]) }
+  if (S.pill !== 'card') {
+    if (e.key === 'ArrowUp') { e.preventDefault(); setVol(D.vol + 8, true) }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setVol(D.vol - 8, true) }
+    if (e.key.toLowerCase() === 'n') track_(1)
+    if (e.key.toLowerCase() === 'p') track_(-1)
+    if (e.key.toLowerCase() === 'k') { S.playing = !S.playing; sync() }
+  }
+})
+document.addEventListener('pointerdown', e => { if (S.pill === 'card' && !e.target.closest('#clip, .panel')) restore() })
+document.addEventListener('paste', e => {
+  if (S.pill === 'card' && S.tab === 'clipboard' && !e.target.matches('input,textarea')) {
+    const t = (e.clipboardData && e.clipboardData.getData('text') || '').trim()
+    if (t) { D.clips.unshift({ id: uid(), t: t.slice(0, 300), w: 'Pasted' }); save(); refreshPage(); snack('Saved from your clipboard') }
+  }
+})
+const scr = $('#screen')
+scr.addEventListener('dragover', e => { e.preventDefault(); scr.classList.add('drag') })
+scr.addEventListener('dragleave', () => scr.classList.remove('drag'))
+scr.addEventListener('drop', e => { e.preventDefault(); scr.classList.remove('drag'); if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files) })
+
+/* ---------- panel ---------- */
+const chips = $('#stateChips')
+chips.innerHTML = PILL_ORDER.map(k => `<button class="chip" data-state="${k}" aria-pressed="false">${PILLS[k].label}</button>`).join('') + '<button class="chip" data-state="card" aria-pressed="false">Open card</button><button class="chip" data-state="voice">Run "Hey Astra"</button>'
+chips.addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return
+  const k = b.dataset.state; voiceTimers.forEach(clearTimeout); clearTimeout(S.tt)
+  if (k === 'voice') return voice()
+  if (k === 'message') return incoming()
+  if (k === 'call') { S.caller = pick(D.friends.filter(f => f.on !== 'off')) || D.friends[0]; beep(520); return show('call') }
+  if (k === 'timer') { if (!S.timer.active) startTimer(25 * 60); return restore() }
+  if (k === 'volume') return flash('volume', 2500)
+  if (k === 'toast') { S.toast = { text: 'Added to your to-do list', sub: open()[0] ? open()[0].t : '' }; return flash('toast') }
+  if (k === 'nowplaying') return flash('nowplaying', 4000)
+  if (k === 'speaking') S.say = ''
+  show(k)
+})
+$('#pageChips').innerHTML = PAGES.map(p => `<button class="chip" data-page="${p}" aria-pressed="false">${p === 'astra' ? 'Astra' : SHORT[p]}</button>`).join('')
+$('#pageChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (b) openTab(b.dataset.page) })
+
+function applyGlaze() {
+  $('#screen').dataset.glaze = D.glaze; $('#gallery').dataset.glaze = D.glaze
+  $$('#glazeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.glaze === D.glaze)))
+}
+$('#glazeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { D.glaze = b.dataset.glaze; save(); applyGlaze(); refreshPage() } })
+function applyAstra() {
+  document.documentElement.style.setProperty('--astra', D.astra)
+  $$('#astraSw .sw').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === D.astra)))
+}
+$('#astraSw').innerHTML = ASTRA_COLORS.map(c => `<button class="sw" style="--c:${c}" data-c="${c}" aria-label="Astra colour ${c}" aria-pressed="false"></button>`).join('')
+$('#astraSw').addEventListener('click', e => { const b = e.target.closest('.sw'); if (b) { D.astra = b.dataset.c; save(); applyAstra(); refreshPage() } })
+function syncPanel() { $$('#springSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === D.spring))) }
+$('#springSeg').innerHTML = Object.entries(SPRINGS).map(([k, v]) => `<button data-k="${k}" aria-pressed="false">${v.label}</button>`).join('')
+$('#springSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { D.spring = b.dataset.k; save(); applySpring(); syncPanel(); refreshPage() } })
+function applyScale() { isle.style.setProperty('--sc', D.set.scale) }
+
+$$('.theme-tg button').forEach(b => b.addEventListener('click', () => {
+  const v = b.dataset.themeSet
+  if (v) document.documentElement.dataset.theme = v; else delete document.documentElement.dataset.theme
+  $$('.theme-tg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)))
+}))
+
+/* ---------- fit the screen into its column ---------- */
+const box = $('#screenBox')
+box.addEventListener('scroll', () => { box.scrollLeft = 0; box.scrollTop = 0 })
+function fit() { const s = Math.min(1, box.clientWidth / 1000); scr.style.transform = `scale(${s})`; box.style.height = 560 * s + 'px' }
+new ResizeObserver(fit).observe(box); fit()
+
+/* ---------- gallery ---------- */
+const GAL = {
+  idle: 'At rest. Smart mode slides it up out of sight.', live: 'Music playing and lyrics on. The line follows the song.', peek: 'On hover. A due count turns the clay red.',
+  timer: 'Running timer, bubble split off on the right.', deadlines: 'Hover in "Next due" mode, most urgent first.', volume: 'Arrow keys with the card closed.',
+  message: 'A friend wrote. Reply opens the chat.', nowplaying: 'A new song started.', call: 'Ringing, with the green halo.', incall: 'In a voice call, with mute and hang up.',
+  listening: 'Astra heard her name.', thinking: 'Astra is working.', speaking: 'Astra answers out loud.', toast: 'Short confirmations that leave by themselves.',
+}
+function buildGallery() {
+  $('#gallery').innerHTML = PILL_ORDER.map(k => {
+    const p = PILLS[k], { w, h, r } = p.shape()
+    const halo = p.glow ? `<span class="halo2" style="--hc:${p.glow === 'ring' ? 'var(--good)' : 'var(--astra)'}"></span>` : ''
+    const bub = p.split ? `<span class="mini-bub">${ring(.62, 28)}<span style="position:absolute">20</span></span>` : ''
+    return `<figure class="shot" style="margin:0"><div class="strip" style="--sh:${h + 44}px"><div class="mini" style="--w:${w}px;--h:${h}px;--r:${r}px">${halo}<div class="inner">${p.html().replace(/id="[^"]+"/g, '').replace(/data-act="[^"]+"/g, '')}</div>${bub}</div></div>
+      <figcaption class="g" style="gap:2px"><div class="cap"><b>${p.label}</b><code>${w} × ${h}, r ${r}</code></div><p>${GAL[k]}</p></figcaption></figure>`
+  }).join('')
+}
+
+/* ---------- spring curves ---------- */
+$('#springs').innerHTML = Object.entries(SPRINGS).map(([k, sp]) => {
+  const { pts, dur } = simulate(sp), W = 300, H2 = 120, top = 18, base = 104
+  const max = Math.max(...pts.map(p => p[1])), sy = x => base - (x / Math.max(1.0, max)) * (base - top)
+  const d = pts.map(([t, x], i) => `${i ? 'L' : 'M'}${(t / dur * (W - 20) + 10).toFixed(1)} ${sy(x).toFixed(1)}`).join(' ')
+  return `<div class="spr"><div class="cap"><b>${sp.label}</b><button class="chip" data-replay="${k}">Replay</button></div>
+    <svg viewBox="0 0 ${W} ${H2}" role="img" aria-label="${sp.label} spring curve"><line x1="10" x2="${W - 10}" y1="${sy(1)}" y2="${sy(1)}" stroke="var(--line)" stroke-dasharray="3 4"/><line x1="10" x2="${W - 10}" y1="${base}" y2="${base}" stroke="var(--line)"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/><circle cx="${W - 10}" cy="${sy(1)}" r="3.5" fill="var(--accent)"/><text x="12" y="${sy(1) - 6}" font-size="11" fill="var(--soft)" font-family="Onest, sans-serif">target</text></svg>
+    <div class="track"><span class="puck" id="puck-${k}"></span></div>
+    <dl><dt>Stiffness</dt><dd>${sp.k}</dd><dt>Damping</dt><dd>${sp.c}</dd><dt>Settles in</dt><dd>${Math.round(dur * 1000)} ms</dd><dt>Overshoot</dt><dd>${Math.max(0, (max - 1) * 100).toFixed(1)}%</dd></dl></div>`
+}).join('')
+$('#springs').addEventListener('click', e => {
+  const b = e.target.closest('[data-replay]'); if (!b) return
+  const { pts, dur } = simulate(SPRINGS[b.dataset.replay]), puck = $('#puck-' + b.dataset.replay), span = puck.parentElement.clientWidth - 66
+  const kf = pts.filter((_, i) => i % 2 === 0).map(([t, x]) => ({ transform: `translateX(${x * span}px)`, offset: t / dur })); kf[kf.length - 1].offset = 1
+  puck.animate(kf, { duration: reduce ? 1 : dur * 1000, fill: 'forwards' })
+})
+
+/* ---------- one-second tick ---------- */
+setInterval(() => {
+  const d = new Date()
+  $('#wallClock').textContent = hhmm(); $('#wallDate').textContent = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })
+  if (S.playing) {
+    S.pos += 1; if (S.pos >= track().len) { track_(1) }
+    const s = $('#seek'); if (s && document.activeElement !== s) { s.value = Math.floor(S.pos); $('#posT').textContent = fmt(S.pos) }
+    const ln = $('#lyricNow'); if (ln) ln.textContent = lyric()
+    if (S.pill === 'live') { const l = $('.content:last-child .lyric', clip); if (l && l.textContent !== lyric()) l.textContent = lyric() }
+  }
+  const T = S.timer
+  if (T.run && T.left > 0) {
+    T.left--
+    const tb = $('#tBig'); if (tb) tb.textContent = fmt(T.left)
+    if (T.left <= 0) {
+      T.run = false; T.active = false; D.week[todayIdx()] += Math.max(1, Math.round(T.total / 60)); save(); beep(880)
+      tell('Timer finished', `${Math.round(T.total / 60)} min added to Study`); if (S.tab === 'timer' || S.tab === 'study') refreshPage(); sync()
+    }
+  }
+  bubc.innerHTML = ring(T.total ? T.left / T.total : 0, 28) + `<span style="position:relative">${Math.ceil(T.left / 60)}</span>`
+  if (['idle', 'live', 'peek'].includes(S.pill)) isle.classList.toggle('split', T.active)
+  if (S.pill === 'idle' && D.set.idle === 'clock') { const r = $('.content:last-child .tnum', clip); if (r) r.textContent = hhmm() }
+  const ct = $('#callT'); if (ct && S.call) ct.textContent = callTime(S.call)
+  if (S.promptRun) { S.promptY += (S.pspeed || 2) * 3; const pt = $('#promptText'); if (pt) { if (S.promptY > pt.scrollHeight) S.promptY = -80; pt.style.transform = `translateY(${-S.promptY}px)` } }
+}, 1000)
+// now and then a friend writes, so the Message pill is not only a demo button
+setInterval(() => { if (S.pill === 'idle' || S.pill === 'live') { if (Math.random() < 0.25) incoming() } }, 45000)
+
+applyGlaze(); applyAstra(); applySpring(); applyScale(); syncPanel(); buildGallery()
+show(restState())
+})()
+</script>

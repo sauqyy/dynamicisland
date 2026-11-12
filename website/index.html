@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Astra Isle · Your desktop, alive</title>
+<meta name="description" content="A liquid, always-on-top island for your music, timers, alerts, files, friends and everything in between." />
+<link rel="icon" href="img/logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #07070d; --card: #0e0e18; --fg: #f4f3fb; --muted: #8b8aa6; --line: rgba(255,255,255,.08);
+    --blue: #5b6cff; --violet: #a45bff; --pink: #ff7ac6; --mint: #5eead4;
+    --grad: linear-gradient(100deg, #7d8bff, #b97bff 55%, #ff8fd0);
+    --ink: #4a3045;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'Manrope', 'Segoe UI Variable', system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: inherit; text-decoration: none; }
+  .wrap { width: min(1120px, 100% - 40px); margin-inline: auto; }
+  .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+  /* nav */
+  nav { position: fixed; inset: 14px 0 auto; z-index: 50; display: flex; justify-content: center; pointer-events: none; }
+  .nav-in { pointer-events: auto; width: min(1000px, 100% - 28px); display: flex; align-items: center; justify-content: space-between; padding: 9px 10px 9px 16px; border-radius: 999px;
+    background: rgba(14,14,24,.6); border: 1px solid var(--line); backdrop-filter: blur(20px) saturate(1.4); box-shadow: 0 10px 40px -12px #000; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; }
+  .brand img { width: 28px; height: 28px; border-radius: 8px; }
+  .nav-links { display: flex; gap: 26px; font-size: 13px; color: var(--muted); font-weight: 500; }
+  .nav-links a:hover { color: var(--fg); }
+  .btn { display: inline-flex; align-items: center; gap: 10px; font: inherit; font-weight: 600; font-size: 13px; border-radius: 999px; padding: 10px 18px; cursor: pointer; border: 1px solid var(--line); color: var(--fg); background: rgba(255,255,255,.05); transition: transform .2s, background .2s, box-shadow .2s; }
+  .btn:hover { transform: translateY(-2px); background: rgba(255,255,255,.1); }
+  .btn.pri { background: #fff; color: #0a0a14; border-color: #fff; }
+  .btn.pri:hover { background: #fff; box-shadow: 0 10px 40px -8px rgba(164,91,255,.7); }
+
+  /* hero */
+  .hero { position: relative; padding: 150px 0 80px; text-align: center; isolation: isolate; }
+  .hero::before { content: ''; position: absolute; inset: -120px -10% auto; height: 760px; z-index: -1;
+    background: radial-gradient(ellipse 50% 55% at 50% 0%, rgba(124,92,255,.38), transparent 70%), radial-gradient(ellipse 30% 40% at 78% 30%, rgba(255,122,198,.18), transparent 70%), radial-gradient(ellipse 30% 40% at 22% 35%, rgba(91,108,255,.2), transparent 70%); }
+  .hero::after { content: ''; position: absolute; inset: 0 0 auto; height: 640px; z-index: -1;
+    background-image: radial-gradient(rgba(255,255,255,.55) 1px, transparent 1.4px); background-size: 46px 46px; opacity: .16;
+    -webkit-mask-image: radial-gradient(ellipse 55% 60% at 50% 25%, #000, transparent 75%); mask-image: radial-gradient(ellipse 55% 60% at 50% 25%, #000, transparent 75%); }
+  .pill-wrap { display: flex; justify-content: center; margin-bottom: 36px; }
+  .island { display: flex; align-items: center; gap: 12px; background: #000; height: 52px; padding: 0 18px 0 9px; border-radius: 26px; border: 1px solid rgba(255,255,255,.1);
+    box-shadow: 0 20px 60px -10px rgba(164,91,255,.5), inset 0 1px 0 rgba(255,255,255,.14); animation: morph 9s cubic-bezier(.3,1.2,.5,1) infinite; overflow: hidden; }
+  .island .mini { width: 34px; height: 34px; flex: none; }
+  .island .txt { font-size: 12.5px; color: #d6d4ea; white-space: nowrap; overflow: hidden; max-width: 190px; animation: txt 9s ease infinite; }
+  .island .eq { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+  .island .eq i { width: 3px; border-radius: 2px; background: linear-gradient(#7dffb0, #3ddc84); animation: eq 1s ease-in-out infinite; }
+  .island .eq i:nth-child(2) { animation-delay: -.3s; } .island .eq i:nth-child(3) { animation-delay: -.6s; } .island .eq i:nth-child(4) { animation-delay: -.15s; }
+  @keyframes eq { 0%,100% { height: 4px; } 50% { height: 14px; } }
+  @keyframes morph { 0%,12%,92%,100% { width: 148px; } 20%,80% { width: 330px; } }
+  @keyframes txt { 0%,14%,90%,100% { opacity: 0; max-width: 0; } 24%,78% { opacity: 1; max-width: 190px; } }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
+  .eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+  h1 { margin: 22px 0 0; font-size: clamp(54px, 11vw, 128px); line-height: .92; letter-spacing: -.045em; font-weight: 800; text-transform: uppercase; }
+  .lead { max-width: 560px; margin: 28px auto 0; color: var(--muted); font-size: 17px; line-height: 1.65; }
+  .dl { display: grid; grid-template-columns: repeat(2, minmax(0, 270px)); gap: 14px; justify-content: center; margin: 44px auto 0; }
+  .dl a { display: flex; align-items: center; gap: 14px; text-align: left; padding: 16px 18px; border-radius: 20px; background: rgba(255,255,255,.04); border: 1px solid var(--line); backdrop-filter: blur(12px); transition: transform .25s, border-color .25s, box-shadow .25s; }
+  .dl a:hover { transform: translateY(-4px); border-color: rgba(185,123,255,.5); box-shadow: 0 20px 50px -16px rgba(164,91,255,.55); }
+  .dl a.win { background: linear-gradient(160deg, #fff, #ece8ff); color: #0a0a14; border-color: #fff; }
+  .dl small { display: block; font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; opacity: .55; }
+  .dl strong { display: block; font-size: 17px; margin-top: 2px; }
+  .dl svg { width: 24px; height: 24px; flex: none; }
+  .dl .arrow { margin-left: auto; opacity: .6; }
+  .free { margin-top: 22px; font-size: 12.5px; color: var(--muted); }
+
+  /* showcase */
+  .stage { position: relative; margin: 70px auto 0; width: min(920px, 100%); aspect-ratio: 16/8.5; border-radius: 32px; overflow: hidden; border: 1px solid var(--line);
+    background: radial-gradient(ellipse at 30% 20%, #4c3ad6, transparent 60%), radial-gradient(ellipse at 80% 90%, #ff7ac6, transparent 55%), linear-gradient(140deg, #26134f, #4a1d6e 55%, #a0437f);
+    box-shadow: 0 50px 120px -30px rgba(124,92,255,.55); }
+  .stage .bar { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); }
+  .stage .mascot { position: absolute; right: 8%; bottom: -2%; width: 26%; filter: drop-shadow(0 20px 30px rgba(0,0,0,.45)); }
+  .player { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); width: min(54%, 440px); padding: 18px; border-radius: 26px; background: rgba(0,0,0,.82); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 30px 60px -20px #000; }
+  .player .row { display: flex; gap: 14px; align-items: center; }
+  .player .art { width: 64px; height: 64px; border-radius: 14px; background: var(--grad); flex: none; }
+  .player b { display: block; font-size: 14px; } .player span { font-size: 12px; color: var(--muted); }
+  .lyrics { margin-top: 14px; font-size: 13px; line-height: 1.7; color: #6c6a88; }
+  .lyrics em { color: #fff; font-style: normal; font-weight: 700; }
+  .prog { margin-top: 12px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
+  .prog i { display: block; width: 38%; height: 100%; background: #fff; border-radius: 4px; animation: prog 12s linear infinite; }
+  @keyframes prog { from { width: 8%; } to { width: 92%; } }
+  .scroll { margin-top: 34px; font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: #5b5a74; }
+
+  /* marquee */
+  .marquee { border-block: 1px solid var(--line); padding: 20px 0; overflow: hidden; margin-top: 80px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+  .marquee div { display: flex; gap: 48px; width: max-content; animation: slide 30s linear infinite; font-size: 11px; letter-spacing: .24em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
+  .marquee span::after { content: '✦'; margin-left: 48px; color: var(--violet); }
+  @keyframes slide { to { transform: translateX(-50%); } }
+
+  /* sections */
+  section { padding: 120px 0 0; }
+  .head { text-align: center; max-width: 760px; margin: 0 auto 64px; }
+  .head .eyebrow::before { display: none; }
+  h2 { margin: 18px 0 0; font-size: clamp(40px, 7vw, 76px); line-height: .98; letter-spacing: -.04em; font-weight: 800; }
+  .head p { color: var(--muted); font-size: 16.5px; line-height: 1.65; margin: 20px auto 0; max-width: 520px; }
+
+  .feat { display: grid; grid-template-columns: 1fr 1.15fr; gap: 48px; align-items: center; padding: 44px; border-radius: 36px; background: linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.01)), var(--card); border: 1px solid var(--line); margin-bottom: 22px; position: relative; overflow: hidden; }
+  .feat::before { content: ''; position: absolute; width: 480px; height: 480px; right: -140px; top: -180px; background: radial-gradient(circle, var(--tint, rgba(164,91,255,.22)), transparent 65%); pointer-events: none; }
+  .feat:nth-of-type(even) { grid-template-columns: 1.15fr 1fr; } .feat:nth-of-type(even) .copy { order: 2; }
+  .tag { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; font-weight: 700; color: var(--violet); }
+  .feat h3 { margin: 14px 0 0; font-size: clamp(30px, 4.4vw, 50px); line-height: 1; letter-spacing: -.035em; font-weight: 800; }
+  .feat p { color: var(--muted); line-height: 1.7; margin: 18px 0 0; }
+  .feat ul { list-style: none; padding: 20px 0 0; margin: 22px 0 0; border-top: 1px solid var(--line); display: grid; gap: 11px; font-size: 14px; color: #cfcee6; }
+  .feat li { display: flex; align-items: center; gap: 12px; } .feat li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--violet); box-shadow: 0 0 10px var(--violet); }
+  .shot { border-radius: 24px; overflow: hidden; border: 1px solid var(--line); background: #000; box-shadow: 0 30px 70px -30px #000; position: relative; z-index: 1; transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+  .feat:hover .shot { transform: translateY(-6px) scale(1.01); }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  /* grid */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .tile { position: relative; min-height: 210px; padding: 24px; border-radius: 28px; background: var(--card); border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: transform .35s, border-color .35s; }
+  .tile::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--c) 28%, transparent), transparent 55%); opacity: .7; transition: opacity .35s; }
+  .tile:hover { transform: translateY(-6px); border-color: color-mix(in srgb, var(--c) 55%, transparent); } .tile:hover::before { opacity: 1; }
+  .tile .n { position: absolute; top: 22px; left: 24px; font-size: 11px; color: #5b5a74; font-weight: 700; }
+  .tile .dot { position: absolute; top: 24px; right: 24px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 16px var(--c); }
+  .tile h4 { margin: 0; font-size: 22px; letter-spacing: -.02em; position: relative; } .tile p { margin: 8px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--muted); position: relative; }
+
+
+  /* astra ai demo */
+  .ai { display: grid; gap: 22px; }
+  .ai-stage { position: relative; padding: 70px 20px 40px; border-radius: 36px; border: 1px solid var(--line); text-align: center; overflow: hidden;
+    background: radial-gradient(ellipse 60% 70% at 50% 0%, rgba(111,123,255,.22), transparent 70%), linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.01)), var(--card); }
+  .ai-island { --glow: rgba(255,255,255,0); margin: 0 auto; display: flex; align-items: center; gap: 14px; width: 150px; height: 76px; padding: 8px 12px; border-radius: 38px; background: #000; overflow: hidden; text-align: left;
+    border: 1px solid rgba(255,255,255,.1); box-shadow: 0 24px 60px -16px #000, 0 0 60px -6px var(--glow), inset 0 1px 0 rgba(255,255,255,.12);
+    transition: width .65s cubic-bezier(.3,1.2,.5,1), box-shadow .5s; }
+  .ai-island:not([data-state=idle]) { width: min(560px, 100%); }
+  .ai-island[data-state=listening] { --glow: rgba(94,234,212,.7); } .ai-island[data-state=thinking] { --glow: rgba(124,92,255,.8); }
+  .ai-island[data-state=speaking] { --glow: rgba(255,111,216,.7); } .ai-island[data-state=happy] { --glow: rgba(255,209,102,.6); }
+  .ai-astra { width: 56px; height: 56px; flex: none; overflow: visible; margin: 0 auto; }
+  .ai-island:not([data-state=idle]) .ai-astra { margin: 0; }
+  .ai-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 54px; animation: fadein .4s .2s both; }
+  .ai-island[data-state=idle] .ai-body { display: none; } @keyframes fadein { from { opacity: 0; } }
+  .wave { display: none; align-items: center; gap: 3px; height: 18px; } .ai-island[data-state=listening] .wave { display: flex; }
+  .wave i { width: 3px; border-radius: 2px; background: linear-gradient(#5eead4, #6f7bff); animation: wv .9s ease-in-out infinite; }
+  .wave i:nth-child(3n) { animation-delay: -.2s; } .wave i:nth-child(3n+1) { animation-delay: -.5s; } .wave i:nth-child(4n) { animation-delay: -.7s; animation-duration: 1.2s; }
+  @keyframes wv { 0%,100% { height: 3px; } 50% { height: 18px; } }
+  .ai-line { font-size: 14.5px; line-height: 1.45; color: #e7e6f6; min-height: 21px; }
+  .ai-island[data-state=listening] .ai-line { color: #9ff3e4; }
+  .ai-line u { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: currentColor; animation: caret 1s steps(1) infinite; }
+  .ai-island[data-state=thinking] .ai-line u, .ai-island[data-state=happy] .ai-line u { display: none; }
+  @keyframes caret { 50% { opacity: 0; } }
+  .ai-island[data-state=thinking] .ai-line span { font-size: 0; }
+  .ai-island[data-state=thinking] .ai-line span::after { content: 'Thinking…'; font-size: 14.5px; color: #b6a8ff; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .4; } }
+  .ai-chip { display: none; align-self: flex-start; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; color: #7dffb0; background: rgba(61,220,132,.12); border: 1px solid rgba(61,220,132,.3); animation: pop .4s cubic-bezier(.3,1.6,.5,1); }
+  .ai-chip.on { display: inline-block; } @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+
+  .ai-hint { margin-top: 34px; display: inline-flex; align-items: center; gap: 14px; font-size: 13px; color: var(--muted); }
+  .keys { display: inline-flex; gap: 6px; } kbd { font: 600 11.5px 'Manrope', sans-serif; color: #d8d7ee; padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 2px 0 rgba(255,255,255,.08); transition: transform .15s, background .2s; }
+  .ai-stage.held kbd { transform: translateY(2px); background: rgba(94,234,212,.2); border-color: rgba(94,234,212,.5); box-shadow: none; }
+  .ai-steps { margin-top: 22px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .ai-steps span { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; padding: 6px 12px; border-radius: 999px; color: #5b5a74; border: 1px solid var(--line); transition: color .3s, border-color .3s, background .3s; }
+  .ai-steps span.on { color: #fff; border-color: rgba(185,123,255,.6); background: rgba(164,91,255,.18); }
+  .ai-caps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cap { padding: 22px; border-radius: 24px; background: var(--card); border: 1px solid var(--line); transition: transform .3s, border-color .3s; } .cap:hover { transform: translateY(-5px); border-color: rgba(185,123,255,.45); }
+  .cap b { font-size: 17px; letter-spacing: -.02em; } .cap p { margin: 10px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+
+  /* astra states inside the demo */
+  .ai-astra .m, .ai-astra .e-arc, .ai-astra .sparks, .ai-astra .confetti, .ai-astra .ripples, .ai-astra .halo { display: none; }
+  .ai-astra .halo { opacity: .3; }
+  .ai-astra .m, .ai-astra .confetti circle, .ai-astra .ripples rect { transform-box: fill-box; transform-origin: center; }
+  [data-state=idle] .m-idle, [data-state=listening] .m-listen, [data-state=thinking] .m-think, [data-state=speaking] .m-speak, [data-state=happy] .m-happy { display: inline; }
+  [data-state=speaking] .m-speak { animation: talk .28s ease-in-out infinite alternate; } @keyframes talk { from { transform: scaleY(.5); } to { transform: scaleY(1.4); } }
+  [data-state=happy] .e-star { display: none; } [data-state=happy] .e-arc { display: inline; }
+  [data-state=listening] .e-star { transform: scale(1.18); transform-box: fill-box; transform-origin: center; }
+  [data-state=listening] .ripples, [data-state=thinking] .sparks, [data-state=happy] .confetti, [data-state=listening] .halo, [data-state=speaking] .halo { display: inline; }
+  .ripples rect { fill: none; stroke: #5eead4; stroke-width: 2.5; animation: ripple 1.5s ease-out infinite; } @keyframes ripple { from { transform: scale(1); opacity: .7; } to { transform: scale(1.45); opacity: 0; } }
+  .sparks { transform-origin: 70px 71px; animation: spin 3s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+  [data-state=thinking] .a-d1 { animation-duration: 2.2s; } [data-state=thinking] .ai-astra .a-bob { animation: wob 2.4s ease-in-out infinite; } @keyframes wob { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+  .confetti circle:nth-child(1) { animation: cf1 .9s ease-out forwards; } .confetti circle:nth-child(2) { animation: cf2 .9s .04s ease-out forwards; } .confetti circle:nth-child(3) { animation: cf3 .9s .08s ease-out forwards; }
+  .confetti circle:nth-child(4) { animation: cf4 .9s .12s ease-out forwards; } .confetti circle:nth-child(5) { animation: cf5 .9s .16s ease-out forwards; }
+  @keyframes cf1 { to { transform: translate(-48px,-40px) scale(.4); opacity: 0; } } @keyframes cf2 { to { transform: translate(44px,-46px) scale(.4); opacity: 0; } }
+  @keyframes cf3 { to { transform: translate(-60px,6px) scale(.4); opacity: 0; } } @keyframes cf4 { to { transform: translate(58px,2px) scale(.4); opacity: 0; } } @keyframes cf5 { to { transform: translate(4px,-62px) scale(.4); opacity: 0; } }
+  [data-state=happy] .ai-astra .a-bob { animation: hop .8s ease-out; } @keyframes hop { 0%,100% { transform: translateY(0); } 25% { transform: translateY(-10px); } 55% { transform: translateY(0); } 75% { transform: translateY(-5px); } }
+
+
+  /* astra's star eyes */
+  .star-eyes { width: 120px; margin: 0 auto 22px; filter: drop-shadow(0 0 18px rgba(143,168,255,.55)); transform: translate(var(--ex,0px), var(--ey,0px)); transition: transform .2s; }
+  .star-eyes svg { display: block; width: 100%; overflow: visible; }
+  .se-glow { filter: blur(3px); opacity: .85; }
+  .star-eyes .se-l, .star-eyes .se-r { transform-box: fill-box; transform-origin: center; animation: twinkle 2.8s ease-in-out infinite; }
+  .se-glow, .se-main { transform-box: fill-box; transform-origin: center; animation: blink 6s infinite; }
+  .star-eyes .se-r { animation-delay: -1.4s; }
+
+  .head-star { display: block; color: #cdd6f6; font-size: 18px; letter-spacing: .5em; margin: 0 0 14px .5em; text-shadow: 0 0 14px rgba(143,168,255,.9); animation: twinkle 3s ease-in-out infinite; }
+
+  /* mascot */
+  .meet { display: grid; grid-template-columns: .9fr 1.1fr; gap: 40px; align-items: center; padding: 56px; border-radius: 40px; border: 1px solid var(--line); background: radial-gradient(ellipse at 20% 50%, rgba(94,234,212,.12), transparent 55%), var(--card); }
+  .meet .astra { width: min(320px, 80%); margin: auto; filter: drop-shadow(0 30px 40px rgba(0,0,0,.5)); }
+  .meet h2 { font-size: clamp(36px, 5.5vw, 62px); } .meet p { color: var(--muted); line-height: 1.7; margin: 18px 0 26px; max-width: 440px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; } .chip { padding: 8px 14px; border-radius: 999px; font-size: 12.5px; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: #cfcee6; }
+
+  /* cta */
+  .cta { text-align: center; padding: 120px 0 80px; position: relative; isolation: isolate; }
+  .cta::before { content: ''; position: absolute; left: 50%; top: 50%; width: 900px; height: 500px; transform: translate(-50%, -50%); z-index: -1; background: radial-gradient(ellipse, rgba(164,91,255,.3), transparent 65%); }
+  .cta h2 { font-size: clamp(44px, 8vw, 96px); }
+  .cta .dl { margin-top: 40px; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 13px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; } footer a:hover { color: var(--fg); }
+
+  /* reveal */
+  .rv { opacity: 0; transform: translateY(28px); transition: opacity .9s cubic-bezier(.2,.8,.2,1), transform .9s cubic-bezier(.2,.8,.2,1); }
+  .rv.in { opacity: 1; transform: none; }
+  .eyes { transform: translate(var(--ex,0px), var(--ey,0px)); transition: transform .15s; }
+  .eye { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; }
+  .spark { transform-box: fill-box; transform-origin: center; animation: twinkle 2.6s ease-in-out infinite; }
+  @keyframes blink { 0%,94%,100% { transform: scaleY(1); } 96.5% { transform: scaleY(.12); } }
+  @keyframes twinkle { 50% { transform: scale(1.12); } }
+  .a-bob { animation: bob 3.2s ease-in-out infinite; } @keyframes bob { 50% { transform: translateY(-2px); } }
+  .a-d1, .a-d2, .a-d3 { transform-box: fill-box; transform-origin: center; }
+  .a-d1 { animation: dr1 7s ease-in-out infinite; } .a-d2 { animation: dr2 5.6s ease-in-out infinite; } .a-d3 { animation: dr1 8.4s ease-in-out infinite reverse; }
+  @keyframes dr1 { 0%,100% { transform: translateX(-10px) scaleX(1); } 50% { transform: translateX(10px) scaleX(1.12); } }
+  @keyframes dr2 { 0%,100% { transform: translateX(10px); } 50% { transform: translateX(-16px); } }
+  .a-gloss { animation: gloss 6s ease-in-out infinite; } @keyframes gloss { 0%,60% { transform: translateX(0) rotate(20deg); } 85%,100% { transform: translateX(170px) rotate(20deg); } }
+  @media (max-width: 860px) {
+    .nav-links { display: none; } .feat, .feat:nth-of-type(even), .meet { grid-template-columns: 1fr; padding: 26px; gap: 28px; } .feat:nth-of-type(even) .copy { order: 0; }
+    .grid { grid-template-columns: 1fr 1fr; } .ai-caps { grid-template-columns: 1fr 1fr; } .hero { padding-top: 120px; } .player { width: 78%; top: 18%; } .stage .mascot { display: none; }
+  }
+  @media (max-width: 560px) { .dl { grid-template-columns: 1fr; } .grid, .ai-caps { grid-template-columns: 1fr; } .ai-stage { padding: 50px 14px 30px; } .stage { aspect-ratio: 4/4.4; } .player { padding: 14px; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } .rv { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<!-- Astra: the app's mascot (same drawing as src/mascot/Mascot.tsx, idle state) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="a-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#232438"/><stop offset="1" stop-color="#0c0c16"/></linearGradient>
+    <linearGradient id="a-glow" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#5eead4"/><stop offset=".5" stop-color="#6f7bff"/><stop offset="1" stop-color="#ff6fd8"/></linearGradient>
+    <linearGradient id="a-rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity=".06"/></linearGradient>
+    <filter id="a-blur" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
+    <filter id="a-halo" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="12"/></filter>
+    <clipPath id="a-clip"><rect x="14" y="20" width="112" height="102" rx="46"/></clipPath>
+    <symbol id="astra" viewBox="0 0 140 140" overflow="visible">
+      <g class="a-bob">
+        <rect x="14" y="20" width="112" height="102" rx="46" fill="url(#a-glow)" filter="url(#a-halo)" opacity=".3"/>
+        <rect x="14" y="20" width="112" height="102" rx="46" fill="url(#a-body)"/>
+        <g clip-path="url(#a-clip)">
+          <g filter="url(#a-blur)">
+            <ellipse class="a-d1" cx="70" cy="130" rx="74" ry="36" fill="url(#a-glow)" opacity=".85"/>
+            <ellipse class="a-d2" cx="98" cy="134" rx="38" ry="22" fill="#ff6fd8" opacity=".5"/>
+            <ellipse class="a-d3" cx="40" cy="132" rx="30" ry="20" fill="#5eead4" opacity=".45"/>
+          </g>
+          <rect class="a-gloss" x="-20" y="10" width="26" height="130" fill="#fff" opacity=".14" transform="rotate(20 70 70)"/>
+        </g>
+        <rect x="14.5" y="20.5" width="111" height="101" rx="45.5" fill="none" stroke="url(#a-rim)" stroke-opacity=".5"/>
+        <path d="M32 38 Q52 28 84 30" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none" opacity=".18"/>
+        <g class="eyes" style="filter:drop-shadow(0 0 3px rgba(255,255,255,.85))">
+          <g class="eye"><path class="spark" d="M50 57 L53.6 67.4 L62 69 L53.6 70.6 L50 83 L46.4 70.6 L38 69 L46.4 67.4 Z" fill="#fff" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/></g>
+          <g class="eye"><path class="spark" d="M90 57 L93.6 67.4 L102 69 L93.6 70.6 L90 83 L86.4 70.6 L78 69 L86.4 67.4 Z" fill="#fff" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/></g>
+        </g>
+        <ellipse cx="34" cy="90" rx="8" ry="4.6" fill="#ff6fd8" opacity=".32"/><ellipse cx="106" cy="90" rx="8" ry="4.6" fill="#ff6fd8" opacity=".32"/>
+        <path d="M62 94 Q70 101 78 94" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<canvas id="stars" aria-hidden="true"></canvas>
+
+<nav><div class="nav-in">
+  <a class="brand" href="#top"><img src="img/logo.svg" alt="" />Astra Isle</a>
+  <div class="nav-links"><a href="#features">Features</a><a href="#ai">Astra AI</a><a href="#more">Everything else</a><a href="#mascot">Mascot</a></div>
+  <a class="btn pri" href="https://github.com/sauqyy/dynamicisland/releases/latest">Download</a>
+</div></nav>
+
+<header class="hero" id="top"><div class="wrap">
+  <div class="pill-wrap"><div class="island">
+    <svg class="mini astra"><use href="#astra"/></svg>
+    <span class="txt">city lights are fading slow</span>
+    <span class="eq"><i></i><i></i><i></i><i></i></span>
+  </div></div>
+  <div class="star-eyes" aria-hidden="true"><svg viewBox="0 0 64 28"><defs><linearGradient id="se" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#cdd6f6"/></linearGradient></defs><g class="se-glow" stroke-width="2" stroke-linejoin="round" fill="#8fa8ff" stroke="#8fa8ff"><g class="se-l"><path d="M17 3.5 L20.3 10.7 L27.5 14 L20.3 17.3 L17 24.5 L13.7 17.3 L6.5 14 L13.7 10.7 Z"/></g><g class="se-r" transform="translate(30 0)"><path d="M17 3.5 L20.3 10.7 L27.5 14 L20.3 17.3 L17 24.5 L13.7 17.3 L6.5 14 L13.7 10.7 Z"/></g></g><g class="se-main" stroke-width="2" stroke-linejoin="round" fill="url(#se)" stroke="url(#se)"><g class="se-l"><path d="M17 3.5 L20.3 10.7 L27.5 14 L20.3 17.3 L17 24.5 L13.7 17.3 L6.5 14 L13.7 10.7 Z"/></g><g class="se-r" transform="translate(30 0)"><path d="M17 3.5 L20.3 10.7 L27.5 14 L20.3 17.3 L17 24.5 L13.7 17.3 L6.5 14 L13.7 10.7 Z"/></g></g></svg></div>
+  <span class="eyebrow">Available for Windows &amp; macOS</span>
+  <h1>Your desktop,<br><span class="grad">alive.</span></h1>
+  <p class="lead">A liquid, always-on-top island for your music, timers, alerts, files, friends, and everything in between.</p>
+  <div class="dl">
+    <a class="win" href="https://github.com/sauqyy/dynamicisland/releases/latest">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.4 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg>
+      <span><small>Windows 10 / 11</small><strong>Windows</strong></span>
+      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+    </a>
+    <a href="https://github.com/sauqyy/dynamicisland/releases/latest">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.600-2.800-1.800-3.400-1.800-1.400-.1-2.800.9-3.500.9s-1.800-.8-3-.8c-1.500 0-2.900.9-3.700 2.200-1.600 2.800-.4 6.800 1.100 9 .8 1.100 1.600 2.300 2.800 2.300 1.100 0 1.500-.7 2.900-.7s1.700.7 2.900.7 2-1.100 2.700-2.200c.9-1.200 1.200-2.400 1.200-2.500 0 0-2.400-.9-2.400-3.500zM14.200 5.700c.6-.8 1-1.800.9-2.800-.9 0-2 .6-2.600 1.400-.6.700-1.100 1.700-.9 2.700 1 .1 2-.5 2.600-1.300z"/></svg>
+      <span><small>Universal build</small><strong>macOS</strong></span>
+      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+    </a>
+  </div>
+  <div class="free">Free and open source · updates itself</div>
+
+  <div class="stage rv">
+    <div class="bar island" style="animation:none;width:150px"><svg class="mini astra"><use href="#astra"/></svg></div>
+    <div class="player">
+      <div class="row"><div class="art"></div><div><b>City Lights</b><span>Now playing</span></div></div>
+      <div class="lyrics">every mile a little glow<br><em>out where the night winds go</em><br>hold the wheel and let it show</div>
+      <div class="prog"><i></i></div>
+    </div>
+    <svg class="mascot astra" viewBox="0 0 100 100"><use href="#astra"/></svg>
+  </div>
+  <div class="scroll">Scroll to explore</div>
+</div></header>
+
+<div class="marquee"><div>
+  <span>Now playing</span><span>Liquid motion</span><span>Always on top</span><span>Windows + macOS</span><span>Calls &amp; chat</span><span>Focus timers</span>
+  <span>Now playing</span><span>Liquid motion</span><span>Always on top</span><span>Windows + macOS</span><span>Calls &amp; chat</span><span>Focus timers</span>
+</div></div>
+
+<section id="features"><div class="wrap">
+  <div class="head rv"><span class="head-star" aria-hidden="true">✦ ✦</span><span class="eyebrow">What lives in the island</span><h2>Small space.<br><span class="grad">Big personality.</span></h2><p>It stays out of your way until you need it, then melts open with exactly the right controls.</p></div>
+
+  <article class="feat rv" style="--tint:rgba(164,91,255,.25)"><div class="copy"><span class="tag">01 / Now playing</span><h3>Every song gets the main stage.</h3><p>Album art, transport controls and time-synced lyrics from LRCLIB, right where you're already looking.</p>
+    <ul><li>Click any lyric to jump to it</li><li>Three animated equalizer styles</li><li>Colors adapt to the album art</li></ul></div>
+    <div class="shot"><img src="img/now-playing.svg" alt="Now playing in the island" /></div></article>
+
+  <article class="feat rv" style="--tint:rgba(94,234,212,.22)"><div class="copy"><span class="tag">02 / Focus</span><h3>Time that breaks free.</h3><p>Start a timer, stopwatch, or Pomodoro. The active timer stretches from the island and splits into its own gooey bubble, always visible without getting in the way.</p>
+    <ul><li>Timer with draining progress</li><li>Stopwatch with lap tracking</li><li>Built-in Pomodoro sessions</li></ul></div>
+    <div class="shot"><img src="img/timer-split.svg" alt="Timer splitting off the island" /></div></article>
+
+  <article class="feat rv" style="--tint:rgba(255,160,70,.2)"><div class="copy"><span class="tag">03 / System alerts</span><h3>Useful updates. Zero interruption.</h3><p>Volume, brightness, battery, charging and downloads appear for a moment, show their progress, then quietly fold back into the pill.</p></div>
+    <div class="shot"><img src="img/alerts.svg" alt="System alerts" /></div></article>
+
+  <article class="feat rv" style="--tint:rgba(255,122,198,.2)"><div class="copy"><span class="tag">04 / Together</span><h3>Your people are one click away.</h3><p>See who is online, chat one-to-one or in groups, and take voice calls with up to six people. Incoming calls ring right inside the island.</p>
+    <ul><li>Friends, groups, and read receipts</li><li>One-to-one and group voice calls</li></ul></div>
+    <div class="shot"><img src="img/calls.svg" alt="Incoming call" /></div></article>
+</div></section>
+
+<section id="ai"><div class="wrap">
+  <div class="head rv"><span class="head-star" aria-hidden="true">✦ ✦</span><span class="eyebrow">Astra · AI assistant</span><h2>Just say it.<br><span class="grad">Astra does it.</span></h2><p>Press a hotkey and the island wakes up. Talk, and Astra listens, thinks, answers out loud and gets things done.</p></div>
+  <div class="ai rv">
+    <div class="ai-stage">
+      <div class="ai-island" id="aiIsland" data-state="idle">
+        <svg class="ai-astra" viewBox="0 0 140 140" aria-hidden="true">
+          <g class="a-bob">
+            <g class="ripples"><rect x="14" y="20" width="112" height="102" rx="46"/><rect x="14" y="20" width="112" height="102" rx="46" style="animation-delay:.6s"/></g>
+            <rect x="14" y="20" width="112" height="102" rx="46" fill="url(#a-glow)" filter="url(#a-halo)" class="halo"/>
+            <rect x="14" y="20" width="112" height="102" rx="46" fill="url(#a-body)"/>
+            <g clip-path="url(#a-clip)"><g filter="url(#a-blur)">
+              <ellipse class="a-d1" cx="70" cy="130" rx="74" ry="36" fill="url(#a-glow)" opacity=".85"/>
+              <ellipse class="a-d2" cx="98" cy="134" rx="38" ry="22" fill="#ff6fd8" opacity=".5"/>
+              <ellipse class="a-d3" cx="40" cy="132" rx="30" ry="20" fill="#5eead4" opacity=".45"/></g></g>
+            <rect x="14.5" y="20.5" width="111" height="101" rx="45.5" fill="none" stroke="url(#a-rim)" stroke-opacity=".5"/>
+            <path d="M32 38 Q52 28 84 30" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none" opacity=".18"/>
+            <g class="eyes" style="filter:drop-shadow(0 0 3px rgba(255,255,255,.85))">
+              <g class="e-star"><g class="eye"><path class="spark" d="M50 57 L53.6 67.4 L62 69 L53.6 70.6 L50 83 L46.4 70.6 L38 69 L46.4 67.4 Z" fill="#fff" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/></g><g class="eye"><path class="spark" d="M90 57 L93.6 67.4 L102 69 L93.6 70.6 L90 83 L86.4 70.6 L78 69 L86.4 67.4 Z" fill="#fff" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/></g></g>
+              <g class="e-arc"><path d="M42 73 Q50 60 58 73 M82 73 Q90 60 98 73" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none"/></g>
+            </g>
+            <ellipse cx="34" cy="90" rx="8" ry="4.6" fill="#ff6fd8" opacity=".32"/><ellipse cx="106" cy="90" rx="8" ry="4.6" fill="#ff6fd8" opacity=".32"/>
+            <path class="m m-idle" d="M62 94 Q70 101 78 94" stroke="#fff" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+            <path class="m m-listen" d="M65 94 Q70 101 75 94 Z" fill="#fff"/>
+            <path class="m m-think" d="M65 97 L75 97" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+            <path class="m m-speak" d="M62 94 Q70 106 78 94 Z" fill="#fff"/>
+            <path class="m m-happy" d="M60 92 Q70 107 80 92 Z" fill="#fff"/>
+            <g class="sparks"><circle cx="70" cy="5" r="4.5" fill="#5eead4"/><circle cx="127" cy="104" r="4.5" fill="#6f7bff"/><circle cx="13" cy="104" r="4.5" fill="#ff6fd8"/></g>
+            <g class="confetti"><circle cx="70" cy="71" r="4" fill="#ffd166"/><circle cx="70" cy="71" r="4" fill="#ff6fd8"/><circle cx="70" cy="71" r="4" fill="#6f7bff"/><circle cx="70" cy="71" r="4" fill="#3be0c3"/><circle cx="70" cy="71" r="4" fill="#fff"/></g>
+          </g>
+        </svg>
+        <div class="ai-body">
+          <div class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="ai-line"><span id="aiText"></span><u></u></div>
+          <div class="ai-chip" id="aiChip"></div>
+        </div>
+      </div>
+      <div class="ai-hint"><span class="keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd></span><span id="aiLbl">Hold to talk</span></div>
+      <div class="ai-steps"><span data-s="listening">Listening</span><span data-s="thinking">Thinking</span><span data-s="speaking">Answering</span><span data-s="happy">Done</span></div>
+    </div>
+    <div class="ai-caps">
+      <div class="cap"><b>Talk, don't tap</b><p>Hold the hotkey, speak, let go. Your words show live as you say them.</p></div>
+      <div class="cap"><b>It gets things done</b><p>Open apps, sites and files, control music, start timers, run your own routines.</p></div>
+      <div class="cap"><b>Answers out loud</b><p>A natural voice replies while Astra's mouth moves with every word.</p></div>
+      <div class="cap"><b>Yours to shape</b><p>Pick her glow, voice, accessories and exactly what she is allowed to do.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section id="more"><div class="wrap">
+  <div class="head rv"><span class="head-star" aria-hidden="true">✦ ✦</span><span class="eyebrow">And that is not all</span><h2>A tiny home for the <span class="grad">useful stuff.</span></h2></div>
+  <div class="grid">
+    <div class="tile rv" style="--c:#38bdf8"><span class="n">01</span><i class="dot"></i><h4>Weather</h4><p>Current conditions and the forecast, tucked into the island.</p></div>
+    <div class="tile rv" style="--c:#a45bff"><span class="n">02</span><i class="dot"></i><h4>To-do &amp; Notes</h4><p>Capture a thought or check off a task without leaving your flow.</p></div>
+    <div class="tile rv" style="--c:#ff7ac6"><span class="n">03</span><i class="dot"></i><h4>File Shelf</h4><p>Drop files onto the island, then drag them out exactly where needed.</p></div>
+    <div class="tile rv" style="--c:#5b6cff"><span class="n">04</span><i class="dot"></i><h4>Clipboard</h4><p>Your recent clipboard history, always one click away.</p></div>
+    <div class="tile rv" style="--c:#fb923c"><span class="n">05</span><i class="dot"></i><h4>Quick Apps</h4><p>Keep the apps you use most within effortless reach.</p></div>
+    <div class="tile rv" style="--c:#4ade80"><span class="n">06</span><i class="dot"></i><h4>Assistant</h4><p>A little friend who answers, reminds and keeps you company.</p></div>
+  </div>
+</div></section>
+
+<section id="mascot"><div class="wrap"><div class="meet rv">
+  <svg class="astra" viewBox="0 0 140 140"><use href="#astra"/></svg>
+  <div><span class="eyebrow">Meet your companion</span><h2>Say hi to <span class="grad">Astra.</span></h2>
+  <p>A little glass companion with an aurora glow inside. It blinks, glances around and naps while you work, swells with your voice, spins while it thinks and bursts into confetti when it is happy.</p>
+  <div class="chips"><span class="chip">Headphones</span><span class="chip">Cat ears</span><span class="chip">Crown</span><span class="chip">Glasses</span><span class="chip">Halo</span><span class="chip">Scarf</span><span class="chip">+ more</span></div></div>
+</div></div></section>
+
+<div class="cta"><div class="wrap rv">
+  <h2>Give your desktop <span class="grad">a pulse.</span></h2>
+  <div class="dl">
+    <a class="win" href="https://github.com/sauqyy/dynamicisland/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.4 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg><span><small>Windows 10 / 11</small><strong>Windows</strong></span></a>
+    <a href="https://github.com/sauqyy/dynamicisland/releases/latest"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.2-1.6 2.8-.4 6.8 1.1 9 .8 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7 2-1.1 2.7-2.2c.9-1.2 1.200-2.400 1.200-2.500 0 0-2.400-.9-2.400-3.500zM14.200 5.700c.6-.8 1-1.800.9-2.800-.9 0-2 .6-2.600 1.400-.6.700-1.100 1.700-.9 2.700 1 .1 2-.5 2.600-1.300z"/></svg><span><small>Universal build</small><strong>macOS</strong></span></a>
+  </div>
+</div></div>
+
+<footer><div class="wrap"><span>© Astra Isle · Free and open source</span><span><a href="https://github.com/sauqyy/dynamicisland">GitHub</a> · <a href="https://github.com/sauqyy/dynamicisland/releases">Releases</a></span></div></footer>
+
+<script>
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });
+  document.querySelectorAll('.rv').forEach((el, i) => { el.style.transitionDelay = (i % 3) * 70 + 'ms'; io.observe(el); });
+  // the cats' eyes follow the cursor (custom properties inherit into the <use> shadow tree)
+  addEventListener('pointermove', e => document.querySelectorAll('svg.astra, .star-eyes').forEach(v => {
+    const r = v.getBoundingClientRect(); if (!r.width) return;
+    v.style.setProperty('--ex', (e.clientX - r.x - r.width / 2) / innerWidth * 6 + 'px');
+    v.style.setProperty('--ey', (e.clientY - r.y - r.height / 2) / innerHeight * 5 + 'px');
+  }));
+
+  // Astra AI demo: idle > listening > thinking > speaking > happy, looping through a few requests
+  (() => {
+    const isl = document.getElementById('aiIsland'), txt = document.getElementById('aiText'), chip = document.getElementById('aiChip'), lbl = document.getElementById('aiLbl');
+    const stage = isl.closest('.ai-stage'), steps = [...stage.querySelectorAll('.ai-steps span')];
+    const scenes = [
+      { say: 'Open Spotify and play something chill', reply: 'Opening Spotify. Playing your chill mix.', chip: 'Opened Spotify ✓' },
+      { say: 'Start a 25 minute focus timer', reply: 'Done. 25 minutes, starting now.', chip: 'Timer · 25:00 ✓' },
+      { say: 'What is due this week?', reply: 'Two things: your report on Thursday and the quiz on Friday.', chip: 'Checked deadlines ✓' },
+      { say: 'Turn the volume down a bit', reply: 'Volume is down to 30 percent.', chip: 'Volume 30% ✓' },
+    ];
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    let live = false;
+    new IntersectionObserver(e => { live = e[0].isIntersecting; }, { threshold: .25 }).observe(stage);
+    const set = (st, label) => { isl.dataset.state = st; lbl.textContent = label; steps.forEach(x => x.classList.toggle('on', x.dataset.s === st)); stage.classList.toggle('held', st === 'listening'); };
+    const type = async (str, ms) => { txt.textContent = ''; for (const ch of str) { txt.textContent += ch; await wait(ms); } };
+    (async function loop() {
+      for (let i = 0; ; i = (i + 1) % scenes.length) {
+        while (!live) await wait(400);
+        const sc = scenes[i];
+        txt.textContent = ''; chip.classList.remove('on'); set('idle', 'Hold to talk'); await wait(1600);
+        set('listening', 'Listening…'); await wait(500); await type(sc.say, 42); await wait(500);
+        set('thinking', 'Thinking…'); txt.textContent = 'x'; await wait(1500);
+        set('speaking', 'Astra is answering'); await type(sc.reply, 28); chip.textContent = sc.chip; chip.classList.add('on'); await wait(1700);
+        set('happy', 'All done'); await wait(1500);
+      }
+    })();
+  })();
+
+  // starfield: twinkling stars that drift slightly with the scroll
+  (() => {
+    const c = document.getElementById('stars'), g = c.getContext('2d');
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const tints = ['255,255,255', '205,214,246', '185,150,255', '143,168,255'];
+    let stars = [], w = 0, h = 0;
+    const build = () => {
+      const d = Math.min(devicePixelRatio || 1, 2);
+      w = innerWidth; h = innerHeight; c.width = w * d; c.height = h * d; g.setTransform(d, 0, 0, d, 0, 0);
+      stars = Array.from({ length: Math.round(w * h / 5500) }, () => ({
+        x: Math.random() * w, y: Math.random() * h * 1.4, r: Math.random() * 1.2 + .3, z: Math.random() * .6 + .1,
+        t: Math.random() * 6.28, sp: Math.random() * 1.6 + .5, c: tints[Math.random() * tints.length | 0], big: Math.random() < .05,
+      }));
+    };
+    const draw = now => {
+      g.clearRect(0, 0, w, h);
+      for (const s of stars) {
+        const a = .25 + .75 * (.5 + .5 * Math.sin(now / 1000 * s.sp + s.t));
+        const y = ((s.y - scrollY * s.z) % (h * 1.4) + h * 1.4) % (h * 1.4) - h * .2;
+        g.fillStyle = `rgba(${s.c},${a * (s.big ? 1 : .8)})`;
+        if (s.big) { // the four-point sparkle, like Astra's eyes
+          const k = 4 + 3 * a; g.beginPath();
+          g.moveTo(s.x, y - k); g.quadraticCurveTo(s.x, y, s.x + k, y); g.quadraticCurveTo(s.x, y, s.x, y + k);
+          g.quadraticCurveTo(s.x, y, s.x - k, y); g.quadraticCurveTo(s.x, y, s.x, y - k); g.fill();
+        } else { g.beginPath(); g.arc(s.x, y, s.r, 0, 6.28); g.fill(); }
+      }
+      if (!calm) requestAnimationFrame(draw);
+    };
+    build(); addEventListener('resize', build); requestAnimationFrame(draw);
+  })();
+</script>
+</body>
+</html>

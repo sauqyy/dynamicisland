@@ -432,9 +432,9 @@ function load(): Settings {
       }
     }
     merged.cardFit = false
-    // the card used to be a tall 400-490 column: keep it inside the new wide, short range
-    merged.cardW = Math.min(SIZE_LIMITS.cardW.max, Math.max(SIZE_LIMITS.cardW.min, merged.cardW))
-    merged.cardH = Math.min(SIZE_LIMITS.cardH.max, Math.max(SIZE_LIMITS.cardH.min, merged.cardH))
+    // the card width is locked to the default and can't be changed
+    merged.cardW = SIZE_DEFAULTS.cardW
+    merged.cardH = SIZE_DEFAULTS.cardH
     normalizeOutfit(merged)
     return merged
   } catch {
@@ -447,7 +447,7 @@ export function useSettings() {
 
   const update = useCallback((patch: Partial<Settings>) => {
     if (Object.keys(patch).some((k) => !LOCAL_ONLY.includes(k as keyof Settings))) setLocalAt(Date.now())
-    setSettings((s) => ({ ...s, ...patch }))
+    setSettings((s) => ({ ...s, ...patch, cardW: SIZE_DEFAULTS.cardW, cardH: SIZE_DEFAULTS.cardH, cardFit: false }))
   }, [])
 
   /** take the account's copy without counting it as a change made here */
@@ -464,6 +464,9 @@ export function useSettings() {
       if (next.mascotName === 'Pip') next.mascotName = DEFAULTS.mascotName
       // an older device may still send the single shared accessory colour
       if (remote.mascotAccessoryColor) next.mascotAccessoryColor = remote.mascotAccessoryColor
+      next.cardW = SIZE_DEFAULTS.cardW
+      next.cardH = SIZE_DEFAULTS.cardH
+      next.cardFit = false
       normalizeOutfit(next)
       return next
     })

@@ -3,7 +3,7 @@ name: Build
 on:
   workflow_dispatch:
   push:
-    tags: ['v*', 'ui-v*']
+    tags: ['v*']
 
 permissions:
   contents: write
@@ -14,17 +14,17 @@ env:
 
 jobs:
   release:
-    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/ui-v')
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Create the release if it doesn't exist yet
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" || gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes ${{ startsWith(github.ref_name, 'ui-v') && '--prerelease' || '' }}
+        run: gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" || gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --title "${{ github.ref_name }}" --generate-notes
 
   macos:
     needs: [release]
-    if: always() && !startsWith(github.ref, 'refs/tags/ui-v') && (needs.release.result == 'success' || needs.release.result == 'skipped')
+    if: always() && (needs.release.result == 'success' || needs.release.result == 'skipped')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,41 +66,31 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - name: Build the installer
-        if: ${{ !startsWith(github.ref, 'refs/tags/ui-v') }}
         run: npx tauri build --bundles nsis
-      - name: Build the Universitas Indonesia installer
-        if: ${{ startsWith(github.ref, 'refs/tags/ui-v') }}
-        run: npm run tauri:build:ui
       - uses: actions/upload-artifact@v4
         with:
           name: astra-isle-windows
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/ui-v')
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           f=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
-          case "$GITHUB_REF_NAME" in
-            ui-v*) out="AstraIsleUI_${GITHUB_REF_NAME#ui-v}_x64-setup.exe" ;;
-            *) out="AstraIsle_${GITHUB_REF_NAME#v}_x64-setup.exe" ;;
-          esac
+          out="AstraIsle_${GITHUB_REF_NAME#v}_x64-setup.exe"
           cp "$f" "$out"
           gh release upload "$GITHUB_REF_NAME" "$out" --clobber
       - name: Build the custom Setup
-        if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/ui-v')
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p setup/payload
           cp "$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)" setup/payload/installer.exe
-          case "$GITHUB_REF_NAME" in
-            ui-v*) ver="${GITHUB_REF_NAME#ui-v}"; feat="--features ui"; out="AstraIsleUI_Setup_${ver}.exe"; tdir=target-ui ;;
-            *) ver="${GITHUB_REF_NAME#v}"; feat=""; out="AstraIsle_Setup_${ver}.exe"; tdir=target ;;
-          esac
+          ver="${GITHUB_REF_NAME#v}"; out="AstraIsle_Setup_${ver}.exe"; tdir=target
           sed -i "0,/^version = .*/s//version = \"$ver\"/" setup/Cargo.toml
-          (cd setup && CARGO_TARGET_DIR="$tdir" cargo build --release $feat)
+          (cd setup && CARGO_TARGET_DIR="$tdir" cargo build --release)
           cp "setup/$tdir/release/dynamic-island-setup.exe" "$out"
           gh release upload "$GITHUB_REF_NAME" "$out" --clobber
