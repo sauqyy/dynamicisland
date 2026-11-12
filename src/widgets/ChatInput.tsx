@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 
 interface Props {
   value: string
@@ -18,6 +18,21 @@ export function ChatInput({ value, placeholder, onChange, onSend }: Props) {
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [value])
+
+  // the box can be measured while the card is still growing (narrow, so its placeholder wraps): measure again at the real width
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let w = el.clientWidth
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === w) return
+      w = el.clientWidth
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <textarea

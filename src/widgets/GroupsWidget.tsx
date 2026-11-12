@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { play } from '../lib/sound'
 import type { Message, Profile } from '../lib/supabase'
 import { inviteLink, type Group, type GroupMessage, type Groups } from '../lib/useGroups'
@@ -12,6 +12,7 @@ import { ChatInput } from './ChatInput'
 import { HeadphonesIcon } from './CallBar'
 import { VoiceBar } from './VoiceBar'
 import { dayLabel, dayStart, noteText, Ticks, timeLabel } from './FriendsWidget'
+import { LinkIcon, PlusIcon, SocialEmpty, UserPlusIcon } from './SocialEmpty'
 
 const ICONS = ['👥', '📚', '🎮', '🎧', '🎨', '💻', '⚽', '🍕', '🎬', '✈️', '🏠', '💼', '🔥', '🌙', '🚀', '🐱']
 
@@ -226,7 +227,7 @@ function GroupInfo({ group, me, groups, onLeft }: { group: Group; me: string; gr
   )
 }
 
-export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText, onBack, fullscreen, onFullscreen }: { group: Group; me: string; groups: Groups; voice?: GroupVoice; voiceBlocked?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
+export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText, onBack, fullscreen, onFullscreen, inline }: { group: Group; me: string; groups: Groups; voice?: GroupVoice; voiceBlocked?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void; inline?: boolean }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -271,42 +272,10 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
     if (hit) lastReadMsg.set(hit.id, [...(lastReadMsg.get(hit.id) ?? []), p])
   }
 
-  return (
-    <div className="chat">
-      <div className="chat-head">
-        <button className="chip" onClick={() => { play('navigate', { direction: 'back' }); onBack() }}>
-          ‹ Back
-        </button>
-        <GroupIcon group={group} size={22} />
-        <span className="chat-title">
-          <b>{group.name}</b>
-          <small className="handle">{group.members.length} {group.members.length === 1 ? 'member' : 'members'}</small>
-        </span>
-        <button className={`chip group-info-btn ${info ? 'on' : ''}`} aria-pressed={info} title="Members and invites" onClick={() => setInfo((v) => !v)}>
-          Info
-        </button>
-        {onFullscreen && (
-          <button
-            className="chip chat-full"
-            aria-pressed={Boolean(fullscreen)}
-            data-cuelume-toggle
-            title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-            onClick={() => onFullscreen(!fullscreen)}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              {fullscreen ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
-            </svg>
-          </button>
-        )}
-      </div>
-      {info ? (
-        <GroupInfo group={group} me={me} groups={groups} onLeft={onBack} />
-      ) : (
-        <>
-          {voice && <VoiceBar voice={voice} group={group} me={me} />}
-          {/* a voice chat is going on without you: who is in it, how many, and a way in */}
-          {!inThisVoice && inVoice.length > 0 && (
+  // a voice chat is going on without you: who is in it, how many, and a way in
+  const voiceLive =
+    !inThisVoice && inVoice.length > 0 ? (
+
             <div className="voice-live" role="status">
               <span className="voice-faces" title={`In the voice chat: ${inVoice.map(nameOf).join(', ')}`} aria-hidden>
                 {inVoice.map((p) => (
@@ -329,7 +298,47 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
                 </button>
               )}
             </div>
-          )}
+    ) : null
+
+  return (
+    <div className="chat">
+      <div className="chat-head">
+        {!inline && (
+          <button className="chip" onClick={() => { play('navigate', { direction: 'back' }); onBack() }}>
+            ‹ Back
+          </button>
+        )}
+        <GroupIcon group={group} size={22} />
+        <span className="chat-title">
+          <b>{group.name}</b>
+          <small className="handle">{group.members.length} {group.members.length === 1 ? 'member' : 'members'}</small>
+        </span>
+        {inline && voiceLive}
+        <button className={`chip group-info-btn ${info ? 'on' : ''}`} aria-pressed={info} title="Members, invite code and invites" onClick={() => setInfo((v) => !v)}>
+          <UserPlusIcon />
+          {group.owner === me ? 'Invite' : 'Members'}
+        </button>
+        {onFullscreen && (
+          <button
+            className="chip chat-full"
+            aria-pressed={Boolean(fullscreen)}
+            data-cuelume-toggle
+            title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            onClick={() => onFullscreen(!fullscreen)}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {fullscreen ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+            </svg>
+          </button>
+        )}
+      </div>
+      {info ? (
+        <GroupInfo group={group} me={me} groups={groups} onLeft={onBack} />
+      ) : (
+        <>
+          {voice && <VoiceBar voice={voice} group={group} me={me} />}
+          {!inline && voiceLive}
           <div className="chat-list">
             {!list ? (
               <div className="empty">Loading…</div>
@@ -414,122 +423,143 @@ export function GroupChat({ group, me, groups, voice, voiceBlocked, activityText
 
 interface Props {
   me: string
-  onOpen: (groupId: string) => void
   groups: Groups
+  /** the group whose chat is open on the right */
+  selectedId?: string
+  onSelect: (groupId: string) => void
+  /** the open group chat, built by the Friends page (it also needs voice and call state) */
+  chatView: ReactNode
 }
 
-/** The Groups section of the Friends page: invitations, your groups, create and join. */
-export function GroupsPanel({ me, groups, onOpen }: Props) {
+/** The Groups page: invitations and your groups down the left, the open chat or the Create and Join forms on the right. */
+export function GroupsSplit({ me, groups, selectedId, onSelect, chatView }: Props) {
   const [mode, setMode] = useState<'create' | 'join' | null>(null)
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('👥')
   const [color, setColor] = useState(ACCENTS[1])
   const [code, setCode] = useState('')
-  const [msg, setMsg] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null)
 
   const done = (err: string | null, ok: string) => {
     play(err ? 'error' : 'success', { emphasis: 'subtle' })
-    setMsg(err ?? ok)
+    setMsg({ text: err ?? ok, bad: Boolean(err) })
     if (!err) {
       setMode(null)
       setName('')
       setCode('')
     }
   }
+  const open = (m: 'create' | 'join') => {
+    setMsg(null)
+    setMode((cur) => (cur === m ? null : m))
+  }
 
-  return (
-    <div className="friends scroll-panel" onClick={(e) => e.stopPropagation()}>
-      {groups.invites.map((inv) => (
-        <div key={inv.group.id} className="friend-row request">
-          <GroupIcon group={inv.group} />
-          <div className="friend-meta">
-            <b>{inv.group.name}</b>
-            <small>{inv.from ? `${inv.from.display_name || `@${inv.from.username}`} invited you` : 'You were invited'}</small>
-          </div>
-          <button className="chip on" data-cuelume-tap onClick={() => groups.respond(inv.group.id, true)}>
-            Accept
-          </button>
-          <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => groups.respond(inv.group.id, false)}>
-            Decline
+  const nobody = !groups.groups.length && !groups.invites.length
+  if (nobody && !mode) {
+    return (
+      <div className="friends soc" onClick={(e) => e.stopPropagation()}>
+        <SocialEmpty kind="groups" onPrimary={() => open('create')} onSecondary={() => open('join')} />
+      </div>
+    )
+  }
+
+  const form =
+    mode === 'create' ? (
+      <form
+        className="soc-pane"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (name.trim()) done(await groups.create(name, emoji, color), 'Group created')
+        }}
+      >
+        <b className="soc-pane-t">New group</b>
+        <div className="friend-add">
+          <GroupIcon group={{ emoji, color }} size={34} />
+          <input className="todo-input" placeholder="Group name" value={name} maxLength={40} autoFocus data-cuelume-type onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+          <button className="pill-btn" type="submit" disabled={!name.trim()} data-cuelume-tap>
+            Create
           </button>
         </div>
-      ))}
-
-      <div className="group-actions">
-        <button className={`group-action ${mode === 'create' ? 'on' : ''}`} aria-pressed={mode === 'create'} onClick={() => setMode(mode === 'create' ? null : 'create')}>
-          <span className="ga-icon" aria-hidden>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </span>
-          <span className="ga-text">
-            <b>New group</b>
-            <small>Chat with friends</small>
-          </span>
-        </button>
-        <button className={`group-action ${mode === 'join' ? 'on' : ''}`} aria-pressed={mode === 'join'} onClick={() => setMode(mode === 'join' ? null : 'join')}>
-          <span className="ga-icon" aria-hidden>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
-              <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
-            </svg>
-          </span>
-          <span className="ga-text">
-            <b>Join a group</b>
-            <small>Use an invite code</small>
-          </span>
-        </button>
-      </div>
-
-      {mode === 'create' && (
-        <form
-          className="group-create"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            if (name.trim()) done(await groups.create(name, emoji, color), 'Group created')
-          }}
-        >
-          <div className="friend-add">
-            <GroupIcon group={{ emoji, color }} size={34} />
-            <input className="todo-input" placeholder="Group name" value={name} maxLength={40} data-cuelume-type onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
-            <button className="pill-btn" type="submit" disabled={!name.trim()} data-cuelume-tap>
-              Create
-            </button>
-          </div>
-          <IconPicker emoji={emoji} color={color} onEmoji={setEmoji} onColor={setColor} />
-        </form>
-      )}
-      {mode === 'join' && (
-        <form
-          className="friend-add"
-          onSubmit={async (e) => {
-            e.preventDefault()
-            if (code.trim()) done(await groups.join(code), 'Joined the group')
-          }}
-        >
-          <input className="todo-input" placeholder="Invite code or link" value={code} data-cuelume-type onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+        <IconPicker emoji={emoji} color={color} onEmoji={setEmoji} onColor={setColor} />
+        <small className={`soc-note ${msg ? (msg.bad ? 'bad' : 'good') : ''}`}>{msg?.text ?? 'You can invite friends, or share the group code, once it exists.'}</small>
+      </form>
+    ) : mode === 'join' ? (
+      <form
+        className="soc-pane"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          if (code.trim()) done(await groups.join(code), 'Joined the group')
+        }}
+      >
+        <b className="soc-pane-t">Join a group</b>
+        <div className="friend-add">
+          <input className="todo-input" placeholder="Invite code or link" value={code} autoFocus data-cuelume-type onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
           <button className="pill-btn" type="submit" disabled={!code.trim()} data-cuelume-tap>
             Join
           </button>
-        </form>
-      )}
-      {msg && <div className="form-msg">{msg}</div>}
-
-      {groups.groups.map((g) => (
-        <div key={g.id} className="friend-row" data-cuelume-navigate onClick={() => onOpen(g.id)}>
-          <GroupIcon group={g} />
-          <div className="friend-meta">
-            <b>{g.name}</b>
-            <small>
-              {g.members.length} {g.members.length === 1 ? 'member' : 'members'}
-              {g.owner === me && ' · you own this'}
-            </small>
-          </div>
-          {groups.unread[g.id] > 0 && <span className="badge">{groups.unread[g.id]}</span>}
         </div>
-      ))}
+        <small className={`soc-note ${msg ? (msg.bad ? 'bad' : 'good') : ''}`}>{msg?.text ?? 'Ask a member to open the group, press Invite and copy the code or link.'}</small>
+      </form>
+    ) : null
 
-      {!mode && !groups.groups.length && !groups.invites.length && <div className="empty">No groups yet. Create one or join with an invite code.</div>}
+  return (
+    <div className="friends soc" onClick={(e) => e.stopPropagation()}>
+      <div className="soc-list">
+        <div className="soc-lh">
+          <span className="soc-h">
+            Groups <i>{groups.groups.length}</i>
+          </span>
+          <span className="soc-lh-btns">
+            <button className={`chip soc-add ${mode === 'create' ? 'on' : ''}`} aria-pressed={mode === 'create'} data-cuelume-tap onClick={() => open('create')}>
+              <PlusIcon />
+              Create
+            </button>
+            <button className={`chip soc-add ${mode === 'join' ? 'on' : ''}`} aria-pressed={mode === 'join'} data-cuelume-tap onClick={() => open('join')}>
+              <LinkIcon />
+              Join
+            </button>
+          </span>
+        </div>
+        <div className="soc-rows">
+          {groups.invites.map((inv) => (
+            <div key={inv.group.id} className="soc-row request">
+              <GroupIcon group={inv.group} size={26} />
+              <span className="friend-meta">
+                <b>{inv.group.name}</b>
+                <small>{inv.from ? `${nameOf(inv.from)} invited you` : 'You were invited'}</small>
+              </span>
+              <button className="chip on soc-mini" aria-label={`Accept ${inv.group.name}`} data-cuelume-tap onClick={() => groups.respond(inv.group.id, true)}>
+                ✓
+              </button>
+              <button className="chip soc-mini" aria-label={`Decline ${inv.group.name}`} data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => groups.respond(inv.group.id, false)}>
+                ×
+              </button>
+            </div>
+          ))}
+          {groups.groups.map((g) => (
+            <button
+              key={g.id}
+              className={`soc-row ${!mode && g.id === selectedId ? 'active' : ''}`}
+              data-cuelume-select
+              onClick={() => {
+                setMode(null)
+                onSelect(g.id)
+              }}
+            >
+              <GroupIcon group={g} size={26} />
+              <span className="friend-meta">
+                <b>{g.name}</b>
+                <small>
+                  {g.members.length} {g.members.length === 1 ? 'member' : 'members'}
+                  {g.owner === me && ' · you own this'}
+                </small>
+              </span>
+              {groups.unread[g.id] > 0 && <span className="badge">{groups.unread[g.id]}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="soc-main">{form ?? chatView ?? <SocialEmpty kind="groups" onPrimary={() => open('create')} onSecondary={() => open('join')} />}</div>
     </div>
   )
 }

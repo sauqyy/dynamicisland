@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { BACKEND_READY, type Message, type Profile } from '../lib/supabase'
 import type { Auth } from '../lib/useAuth'
@@ -7,7 +7,8 @@ import type { Groups } from '../lib/useGroups'
 import type { Call } from '../lib/useCall'
 import type { GroupVoice } from '../lib/useGroupVoice'
 import { CallBar } from './CallBar'
-import { GroupChat, GroupIcon, GroupsPanel } from './GroupsWidget'
+import { GroupChat, GroupIcon, GroupsSplit } from './GroupsWidget'
+import { SocialEmpty, UserPlusIcon } from './SocialEmpty'
 import { DEMO_SOCIAL } from '../lib/useDemo'
 import { shownPresence, SHOWN_LABEL } from '../lib/presence'
 import { Avatar } from './Avatar'
@@ -98,7 +99,7 @@ function Bubble({ m, mine }: { m: Message; mine: boolean }) {
   )
 }
 
-function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fullscreen, onFullscreen }: { friend: Friend; me: string; social: Social; call?: Call; voiceBusy?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void }) {
+function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fullscreen, onFullscreen, inline }: { friend: Friend; me: string; social: Social; call?: Call; voiceBusy?: boolean; activityText: string; onBack: () => void; fullscreen?: boolean; onFullscreen?: (on: boolean) => void; inline?: boolean }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
@@ -139,9 +140,11 @@ function Chat({ friend, me, social, call, voiceBusy, activityText, onBack, fulls
   return (
     <div className="chat">
       <div className="chat-head">
-        <button className="chip" onClick={() => { play('navigate', { direction: 'back' }); onBack() }}>
-          ‹ Back
-        </button>
+        {!inline && (
+          <button className="chip" onClick={() => { play('navigate', { direction: 'back' }); onBack() }}>
+            ‹ Back
+          </button>
+        )}
         <ProfileAvatar profile={friend.profile} size={22} presence />
         <b>{friend.profile.display_name || `@${friend.profile.username}`}</b>
         {friend.profile.display_name && <small className="handle">@{friend.profile.username}</small>}
@@ -279,11 +282,118 @@ export function FriendsWidget(props: Props) {
   )
 }
 
+/** The Friends page: your friends and their requests down the left, the open chat (or the Add friend panel) on the right. */
+function FriendsSplit({ social, selectedId, onSelect, chatView }: { social: Social; selectedId?: string; onSelect: (id: string) => void; chatView: ReactNode }) {
+  const [adding, setAdding] = useState(false)
+  const [username, setUsername] = useState('')
+  const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null)
+  const nameOf = (p: Profile) => p.display_name || `@${p.username}`
+  const nobody = !social.friends.length && !social.incoming.length && !social.outgoing.length
+  const add = async () => {
+    const err = await social.addFriend(username)
+    play(err ? 'error' : 'success', { emphasis: 'subtle' })
+    setMsg({ text: err ?? `Request sent to @${username.trim().replace(/^@/, '')}`, bad: Boolean(err) })
+    if (!err) setUsername('')
+  }
+  const addForm = (
+    <div className="soc-pane">
+      <b className="soc-pane-t">Add a friend</b>
+      <form
+        className="friend-add"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (username.trim()) add()
+        }}
+      >
+        <input className="todo-input" placeholder="@username" value={username} autoFocus data-cuelume-type onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.stopPropagation()} />
+        <button className="pill-btn" type="submit" disabled={!username.trim()} data-cuelume-tap>
+          Send request
+        </button>
+      </form>
+      <small className={`soc-note ${msg ? (msg.bad ? 'bad' : 'good') : ''}`}>{msg?.text ?? 'Ask a friend for their username. It is on their Profile page.'}</small>
+      {!nobody && (
+        <button className="chip soc-back" onClick={() => setAdding(false)}>
+          Back to chat
+        </button>
+      )}
+    </div>
+  )
+  if (nobody && !adding) {
+    return (
+      <div className="friends soc" onClick={(e) => e.stopPropagation()}>
+        <SocialEmpty kind="friends" onPrimary={() => setAdding(true)} />
+      </div>
+    )
+  }
+  return (
+    <div className="friends soc" onClick={(e) => e.stopPropagation()}>
+      <div className="soc-list">
+        <div className="soc-lh">
+          <span className="soc-h">
+            Friends <i>{social.friends.length}</i>
+          </span>
+          <button className={`chip soc-add ${adding ? 'on' : ''}`} aria-pressed={adding} data-cuelume-tap onClick={() => setAdding((v) => !v)}>
+            <UserPlusIcon />
+            Add friend
+            {social.incoming.length > 0 && <b className="soc-badge">{social.incoming.length}</b>}
+          </button>
+        </div>
+        <div className="soc-rows">
+          {social.incoming.map((r) => (
+            <div key={r.friendshipId} className="soc-row request">
+              <Avatar profile={r.profile} size={26} />
+              <span className="friend-meta">
+                <b>{nameOf(r.profile)}</b>
+                <small>wants to be friends</small>
+              </span>
+              <button className="chip on soc-mini" aria-label={`Accept ${nameOf(r.profile)}`} data-cuelume-tap onClick={() => social.accept(r.friendshipId)}>
+                ✓
+              </button>
+              <button className="chip soc-mini" aria-label={`Decline ${nameOf(r.profile)}`} data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
+                ×
+              </button>
+            </div>
+          ))}
+          {social.friends.map((f) => (
+            <button
+              key={f.friendshipId}
+              className={`soc-row ${!adding && f.profile.id === selectedId ? 'active' : ''}`}
+              data-cuelume-select
+              onClick={() => {
+                setAdding(false)
+                onSelect(f.profile.id)
+              }}
+            >
+              <Avatar profile={f.profile} size={26} presence={shownPresence(f.profile)} />
+              <span className="friend-meta">
+                <b>{nameOf(f.profile)}</b>
+                <small>{f.activity || f.profile.status || SHOWN_LABEL[shownPresence(f.profile)]}</small>
+              </span>
+              {social.unread[f.profile.id] > 0 && <span className="badge">{social.unread[f.profile.id]}</span>}
+            </button>
+          ))}
+          {social.outgoing.map((r) => (
+            <div key={r.friendshipId} className="soc-row pending">
+              <Avatar profile={r.profile} size={26} />
+              <span className="friend-meta">
+                <b>{nameOf(r.profile)}</b>
+                <small>request sent</small>
+              </span>
+              <button className="chip soc-mini" aria-label="Cancel request" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="soc-main">{adding ? addForm : (chatView ?? <SocialEmpty kind="friends" onPrimary={() => setAdding(true)} />)}</div>
+    </div>
+  )
+}
+
 function FriendsBody({ auth, social, call, voice, groups, section = 'friends', chat: open, onChat, activityText, onGoProfile, openChatId, onChatOpened, fullscreen, onFullscreen }: Props) {
   // in a group voice chat, so a one-to-one call cannot start
   const voiceBusy = Boolean(voice?.state.groupId)
-  const [username, setUsername] = useState('')
-  const [msg, setMsg] = useState<string | null>(null)
   // going back plays the chat's closing animation first, then really leaves
   const [leaving, setLeaving] = useState(false)
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -312,8 +422,9 @@ function FriendsBody({ auth, social, call, voice, groups, section = 'friends', c
   }
 
   // a friend's chat belongs to the Friends page, a group's to the Groups page
-  const friend = section === 'friends' ? social.friends.find((f) => f.profile.id === open.friend) : undefined
-  const group = section === 'groups' ? groups?.groups.find((g) => g.id === open.group) : undefined
+  // on the card the first friend or group is open by default, like the design; fullscreen only shows a chat you opened
+  const friend = section === 'friends' ? (social.friends.find((f) => f.profile.id === open.friend) ?? (fullscreen ? undefined : social.friends[0])) : undefined
+  const group = section === 'groups' ? (groups?.groups.find((g) => g.id === open.group) ?? (fullscreen ? undefined : groups?.groups[0])) : undefined
   const openFriend = (id: string) => {
     onChat({ friend: id, group: null }, 'friends')
   }
@@ -330,18 +441,15 @@ function FriendsBody({ auth, social, call, voice, groups, section = 'friends', c
     }, CHAT_CLOSE_MS)
   }
   const chatView = friend ? (
-    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} voiceBusy={voiceBusy} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+    <Chat key={friend.profile.id} friend={friend} me={auth.user.id} social={social} call={call} voiceBusy={voiceBusy} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} inline={!fullscreen} />
   ) : group && groups ? (
-    <GroupChat key={group.id} group={group} me={auth.user.id} groups={groups} voice={voice} voiceBlocked={Boolean(call && call.state.phase !== 'idle')} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} />
+    <GroupChat key={group.id} group={group} me={auth.user.id} groups={groups} voice={voice} voiceBlocked={Boolean(call && call.state.phase !== 'idle')} activityText={activityText} onBack={back} fullscreen={fullscreen} onFullscreen={onFullscreen} inline={!fullscreen} />
   ) : null
+  if (!fullscreen) {
+    if (section === 'groups' && groups) return <GroupsSplit me={auth.user.id} groups={groups} selectedId={group?.id} onSelect={openGroup} chatView={chatView} />
+    return <FriendsSplit social={social} selectedId={friend?.profile.id} onSelect={openFriend} chatView={chatView} />
+  }
   if (chatView) {
-    if (!fullscreen) {
-      return (
-        <div className={`friends ${leaving ? 'leaving' : ''}`} onClick={(e) => e.stopPropagation()}>
-          {chatView}
-        </div>
-      )
-    }
     // fullscreen: friends down the left with the group chats below them, the open chat filling the right
     return (
       <div className={`friends fs-split ${leaving ? 'leaving' : ''}`} onClick={(e) => e.stopPropagation()}>
@@ -377,132 +485,5 @@ function FriendsBody({ auth, social, call, voice, groups, section = 'friends', c
       </div>
     )
   }
-
-  if (groups && section === 'groups') {
-    return <GroupsPanel me={auth.user.id} groups={groups} onOpen={openGroup} />
-  }
-
-  const add = async () => {
-    const err = await social.addFriend(username)
-    play(err ? 'error' : 'success', { emphasis: 'subtle' })
-    setMsg(err ?? 'Request sent')
-    if (!err) setUsername('')
-  }
-
-  return (
-    <div className="friends scroll-panel" onClick={(e) => e.stopPropagation()}>
-      <form
-        className="friend-add"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (username.trim()) add()
-        }}
-      >
-        <input
-          className="todo-input"
-          placeholder="Add a friend by @username"
-          value={username}
-          data-cuelume-type
-          onChange={(e) => setUsername(e.target.value)}
-          onKeyDown={(e) => e.stopPropagation()}
-        />
-        <button className="pill-btn" type="submit" disabled={!username.trim()} data-cuelume-tap>
-          Add
-        </button>
-      </form>
-      {msg && <div className="form-msg">{msg}</div>}
-      {call && social.friends.map((f) => <CallBar key={f.friendshipId} call={call} friend={f} />)}
-
-      <div
-        className="friend-cards"
-        onWheel={(e) => {
-          // a mouse wheel scrolls the row sideways
-          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY
-        }}
-      >
-        {social.incoming.map((r) => (
-          <div key={r.friendshipId} className="friend-row friend-card request">
-            <ProfileAvatar profile={r.profile} size={50} />
-            <div className="friend-meta">
-              <b>{r.profile.display_name || `@${r.profile.username}`}</b>
-              <small>
-                <span className="handle">@{r.profile.username}</span> wants to be friends
-              </small>
-            </div>
-            <div className="friend-actions">
-            <button className="chip on" data-cuelume-tap onClick={() => social.accept(r.friendshipId)}>
-              Accept
-            </button>
-            <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
-              Decline
-            </button>
-            </div>
-          </div>
-        ))}
-        {social.friends.map((f) => {
-          const shown = shownPresence(f.profile)
-          return (
-            <div key={f.friendshipId} className="friend-row friend-card" data-cuelume-navigate onClick={() => openFriend(f.profile.id)}>
-              <ProfileAvatar profile={f.profile} size={50} presence />
-              <div className="friend-meta">
-                <b>{f.profile.display_name || `@${f.profile.username}`}</b>
-                <small>{f.activity || f.profile.status || SHOWN_LABEL[shown]}</small>
-              </div>
-              {call && shown !== 'offline' ? (
-                <button
-                  className="chip friend-call"
-                  disabled={call.state.phase !== 'idle' || voiceBusy}
-                  data-cuelume-tap
-                  aria-label={`Call ${f.profile.display_name || f.profile.username}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    call.start(f.profile.id)
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                    <path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z" />
-                  </svg>
-                  Call
-                </button>
-              ) : (
-                <span className="friend-call-gap" />
-              )}
-              {social.unread[f.profile.id] > 0 && <span className="badge">{social.unread[f.profile.id]}</span>}
-              <button
-                className="x"
-                aria-label="Remove friend"
-                data-cuelume-close
-                data-cuelume-emphasis="subtle"
-                title="Remove friend"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  social.remove(f.friendshipId)
-                }}
-              >
-                ×
-              </button>
-            </div>
-          )
-        })}
-        {social.outgoing.map((r) => (
-          <div key={r.friendshipId} className="friend-row friend-card pending">
-            <ProfileAvatar profile={r.profile} size={50} />
-            <div className="friend-meta">
-              <b>{r.profile.display_name || `@${r.profile.username}`}</b>
-              <small>
-                <span className="handle">@{r.profile.username}</span> · request sent
-              </small>
-            </div>
-            <button className="chip" data-cuelume-close data-cuelume-emphasis="subtle" onClick={() => social.remove(r.friendshipId)}>
-              Cancel
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {!social.friends.length && !social.incoming.length && !social.outgoing.length && (
-        <div className="empty">No friends yet. Add someone by their username.</div>
-      )}
-    </div>
-  )
+  return null
 }

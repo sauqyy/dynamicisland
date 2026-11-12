@@ -632,9 +632,30 @@
 .notes {
   height: 100%;
   padding-bottom: 4px;
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+}
+.notes-side {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.notes-state {
+  font-weight: 700;
+  color: var(--fg);
+}
+.notes-count,
+.notes-hint {
+  color: rgb(var(--fg-rgb) / 0.5);
 }
 .notes-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   /* the card is as tall as its page, so a percentage height alone collapses to two rows */
   min-height: 170px;
@@ -776,8 +797,6 @@
   gap: 16px;
   overflow-y: auto;
   padding: 2px 6px 8px 0;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--fg-rgb) / 0.3) transparent;
 }
 .settings .row {
   flex: none;
@@ -980,8 +999,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--fg-rgb) / 0.3) transparent;
 }
 .scroll-panel > * {
   flex: none;
@@ -1387,8 +1404,6 @@
   border-radius: 16px;
   background: color-mix(in srgb, var(--island-bg) 70%, rgb(var(--fg-rgb)) 14%);
   box-shadow: 0 10px 26px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(var(--fg-rgb) / 0.1);
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--fg-rgb) / 0.3) transparent;
   animation: pop 0.15s ease-out;
 }
 .city-list button {
@@ -2776,8 +2791,6 @@ button.ao-text:hover {
 .xbody > .page {
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
 }
 .page-fit {
   display: flex;
@@ -6574,8 +6587,6 @@ button.ao-text:hover {
 .sys-main {
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(var(--fg-rgb) / 0.3) transparent;
 }
 .sys-page {
   max-width: 900px;
@@ -7007,8 +7018,6 @@ button.ao-text:hover {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
   padding-bottom: 6px;
 }
 .friend-card { min-width: 130px; }
@@ -7027,8 +7036,6 @@ button.ao-text:hover {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
   padding-bottom: 6px;
   flex: 0 1 auto;
 }
@@ -7276,11 +7283,14 @@ button.ao-text:hover {
   gap: 18px;
   align-items: center;
 }
+/* focus follows the accent; break and long break shift its hue so they never match it */
 .tt.phase-break {
-  --tt-c: #3ddc84;
+  --tt-c: #5ac8ff;
+  --tt-c: hsl(from var(--accent) calc(h - 60) max(s, 55) clamp(55, l, 68));
 }
 .tt.phase-long {
-  --tt-c: #5ac8ff;
+  --tt-c: #c084fc;
+  --tt-c: hsl(from var(--accent) calc(h + 70) max(s, 55) clamp(55, l, 68));
 }
 .tt-left {
   align-self: start;
@@ -7352,9 +7362,17 @@ button.ao-text:hover {
 .tt-input {
   width: 100%;
   padding: 7px 11px;
+  border: 0;
+  outline: 0;
   border-radius: 10px;
   background: var(--raised);
+  color: var(--text-1);
+  font: inherit;
   font-size: 12.5px;
+  user-select: text;
+}
+.tt-input::placeholder {
+  color: var(--text-3);
 }
 .tt-main {
   display: flex;
@@ -7583,10 +7601,13 @@ button.ao-text:hover {
 
 /* the ring follows the phase: green for a break, blue for the long one */
 .tt .pomo-ring.break .ring-fg {
-  stroke: #3ddc84;
+  stroke: hsl(from var(--accent) calc(h - 60) max(s, 55) clamp(55, l, 68));
 }
 .tt .pomo-ring.long .ring-fg {
-  stroke: #5ac8ff;
+  stroke: hsl(from var(--accent) calc(h + 70) max(s, 55) clamp(55, l, 68));
+}
+.tt .pomo-ring.focus .ring-fg {
+  stroke: var(--accent);
 }
 
 /* ---------- Now Playing: the cover glows in its own colour, controls in the middle, lyrics on the right ---------- */
@@ -7987,8 +8008,6 @@ button.ao-text:hover {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
 }
 .expanded:not(.fs) .st-c .st-sec h4 {
   margin: 0 0 6px;
@@ -8065,6 +8084,91 @@ button.ao-text:hover {
 }
 .expanded:not(.fs) .tp.reading .tp-bar {
   justify-content: flex-start;
+}
+/* reading: Speed, Text size, Mirror and Edit stacked in the right column */
+.tp-label {
+  display: none;
+}
+.tp-bar .tp-play {
+  display: none;
+}
+.tp-fs .tp-bar .tp-play {
+  display: inline-flex;
+}
+.tp-fs .tp-side .chip:not(.tp-play):not(.wk-full) {
+  min-width: 0;
+}
+.tp-fs .tp-group small {
+  display: none;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-side {
+  flex-direction: column;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.55;
+  margin-top: 2px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-label:first-child {
+  margin-top: 0;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-wk-hide,
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .wk-full {
+  display: none;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-group {
+  gap: 8px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-group small {
+  display: inline;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-speed small {
+  min-width: 30px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-bar .chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-bar .chip.round {
+  width: 26px;
+  min-width: 26px;
+  padding: 0;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-stage {
+  height: 150px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-view {
+  background: rgb(var(--fg-rgb) / 0.05);
+  padding: 0 22px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-text {
+  text-align: left;
+  /* the first line sits just above the reading line, the last one can scroll up to it */
+  padding: 42px 0 100px;
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-view {
+  /* the line being read is bright; what comes next fades away below it */
+  mask-image: linear-gradient(transparent, #000 30%, #000 55%, rgb(0 0 0 / 0.4) 75%, transparent);
+  -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 55%, rgb(0 0 0 / 0.4) 75%, transparent);
+}
+.expanded:not(.fs) .tp.reading:not(.tp-fs) .tp-line {
+  opacity: 1;
+  left: 0;
+  right: 0;
+  top: 52%;
 }
 .expanded:not(.fs) .notes-input {
   min-height: 150px;
@@ -8162,8 +8266,6 @@ button.ao-text:hover {
   grid-area: list;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
 }
 .expanded:not(.fs) .chat.astra-chat > .astra-compose {
   grid-area: compose;
@@ -8278,8 +8380,6 @@ button.ao-text:hover {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
 }
 .expanded:not(.fs) .setcard .settings.settings2 {
   columns: 2 250px;
@@ -8622,8 +8722,6 @@ button.ao-text:hover {
 .expanded:not(.fs) .sc-nav {
   gap: 4px;
   padding: 0 6px 10px 0;
-  scrollbar-width: thin;
-  scrollbar-color: var(--pressed) transparent;
 }
 .expanded:not(.fs) .sc-item {
   gap: 11px;
@@ -8636,4 +8734,333 @@ button.ao-text:hover {
   width: 24px;
   height: 24px;
   border-radius: 7px;
+}
+
+
+/* ---------- scrollbars: a slim rounded thumb that shows only while the pointer is over the area ---------- */
+.expanded ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.expanded ::-webkit-scrollbar-track,
+.expanded ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.expanded ::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  min-width: 28px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  background-clip: padding-box;
+}
+.expanded *:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--fg-rgb) / 0.28);
+}
+.expanded ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--fg-rgb) / 0.5);
+}
+.chat-list,
+.fs-contacts,
+.soc-rows {
+  scrollbar-width: auto;
+}
+
+/* ---------- Friends and Groups: the list on the left, the chat or a form on the right ---------- */
+.friends.soc {
+  display: grid;
+  grid-template-columns: 214px minmax(0, 1fr);
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.soc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+}
+.soc-lh {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 26px;
+}
+.soc-h {
+  font-size: 11.5px;
+  font-weight: 700;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+.soc-h i {
+  font-style: normal;
+  margin-left: 2px;
+}
+.soc-lh-btns {
+  display: flex;
+  gap: 4px;
+}
+.soc-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.soc-badge {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--accent, #4ade80);
+  color: var(--on-accent, #000);
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+}
+.soc-add.on .soc-badge {
+  background: var(--on-accent, #000);
+  color: var(--accent, #4ade80);
+}
+.soc-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.soc-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 12px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  transition: background 0.15s;
+}
+button.soc-row:hover {
+  background: rgb(var(--fg-rgb) / 0.08);
+}
+.soc-row.active {
+  background: rgb(var(--fg-rgb) / 0.16);
+}
+.soc-row .friend-meta {
+  flex: 1;
+  min-width: 0;
+  align-items: flex-start;
+}
+.soc-row .friend-meta b {
+  font-size: 12.5px;
+}
+.soc-row .friend-meta small {
+  font-size: 11px;
+}
+.soc-row .badge {
+  position: static;
+  flex: none;
+}
+.soc-row.pending {
+  opacity: 0.65;
+}
+.soc-mini {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+}
+.soc-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.soc-main > .chat {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.soc-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding-top: 2px;
+  max-width: 460px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.soc-pane-t {
+  font-size: 14px;
+}
+.soc-note {
+  min-height: 15px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.soc-note.good {
+  color: #4ade80;
+  opacity: 1;
+}
+.soc-note.bad {
+  color: #f87171;
+  opacity: 1;
+}
+.soc-back {
+  align-self: flex-start;
+}
+
+/* nobody here yet */
+.soc-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  height: 100%;
+  padding: 0 22px;
+}
+.soc-ghosts {
+  flex: none;
+  display: flex;
+}
+.soc-ghosts i {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed rgb(var(--fg-rgb) / 0.35);
+  border-radius: 50%;
+  background: rgb(var(--fg-rgb) / 0.04);
+  color: rgb(var(--fg-rgb) / 0.4);
+}
+.soc-ghosts i + i {
+  margin-left: -14px;
+}
+.soc-ghosts i:first-child {
+  opacity: 0.55;
+}
+.soc-ghosts i:nth-child(2) {
+  opacity: 0.8;
+}
+.soc-empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: 46ch;
+}
+.soc-empty-text b {
+  font-size: 17px;
+  letter-spacing: -0.015em;
+}
+.soc-empty-text p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  opacity: 0.65;
+}
+.soc-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.soc-empty-actions .pill-btn,
+.soc-empty-actions .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- a chat on the card shows about four messages: one line each, the time beside the text ---------- */
+.expanded:not(.fs) .chat {
+  gap: 4px;
+}
+.expanded:not(.fs) .chat-list {
+  gap: 3px;
+  padding: 1px 2px;
+}
+.expanded:not(.fs) .chat-list > :first-child {
+  margin-top: auto;
+}
+.expanded:not(.fs) .msg {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.expanded:not(.fs) .msg small {
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-size: 11px;
+}
+.expanded:not(.fs) .msg time {
+  margin-left: auto;
+  align-self: center;
+}
+.expanded:not(.fs) .chat-day {
+  margin: 3px 0 1px;
+  padding: 1px 9px;
+  font-size: 10px;
+}
+.expanded:not(.fs) .chat-head {
+  min-height: 24px;
+}
+.expanded:not(.fs) .seen-by {
+  margin-top: -1px;
+}
+
+/* the group header and the live voice chat row take one line each on the card, so the messages keep their room */
+.expanded:not(.fs) .chat-title {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+.expanded:not(.fs) .chat-title b {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.expanded:not(.fs) .voice-live {
+  min-height: 0;
+  padding: 2px 8px;
+  gap: 8px;
+}
+.expanded:not(.fs) .voice-live .voice-join {
+  padding: 2px 10px;
+}
+/* in the header the live voice chat is a small pill beside the Invite button */
+.chat-head > .voice-live {
+  margin-left: auto;
+  padding: 1px 4px 1px 6px;
+}
+.chat-head > .voice-live + .group-info-btn {
+  margin-left: 0;
+}
+.expanded:not(.fs) .msg-row {
+  gap: 5px;
+}
+.expanded:not(.fs) .msg-row .avatar {
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 11px !important;
 }
