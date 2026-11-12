@@ -8408,3 +8408,232 @@ button.ao-text:hover {
 .expanded:not(.fs) .notes-input {
   display: block;
 }
+
+/* ---------- Login: what you get on the left, one form on the right ---------- */
+.lg {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 26px;
+  align-items: center;
+  /* clear of the header above and the section bar below */
+  padding: 14px 0;
+  box-sizing: border-box;
+}
+.lg-side {
+  display: grid;
+  gap: 9px;
+  align-content: center;
+  min-width: 0;
+  padding-right: 22px;
+  border-right: 1px solid rgb(var(--fg-rgb) / 0.08);
+}
+.lg-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.lg-mode {
+  display: inline-flex;
+  justify-self: start;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--raised);
+}
+.lg-mode button {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text-3);
+  transition: color 0.2s, background 0.2s;
+}
+.lg-mode button.on {
+  background: var(--pressed);
+  color: var(--text-1);
+}
+.lg-perks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.lg-perks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.lg-perks svg {
+  flex: none;
+  color: var(--accent);
+}
+.lg-form {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  min-width: 0;
+}
+.lg-google {
+  width: 100%;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lg-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.lg-or::before,
+.lg-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgb(var(--fg-rgb) / 0.1);
+}
+.lg-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.lg-in {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--text-1);
+  font-size: 12.5px;
+  user-select: text;
+}
+.lg-in:focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 1px var(--text-3);
+}
+.lg-in::placeholder {
+  color: var(--text-3);
+}
+.lg-pass {
+  position: relative;
+  display: block;
+}
+.lg-pass .lg-in {
+  padding-right: 34px;
+}
+.lg-eye {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--text-3);
+}
+.lg-eye:hover {
+  color: var(--text-1);
+  background: var(--pressed);
+}
+.lg-act {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+}
+.lg-go {
+  flex: none;
+  min-width: 132px;
+  padding: 7px 18px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform 0.15s, filter 0.15s;
+}
+.lg-go:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.lg-go:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.lg-go:disabled {
+  opacity: 0.4;
+}
+.lg-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.lg-note.bad {
+  color: #ff6b6b;
+}
+
+/* Settings: room above the list, even spacing, and the full-window button as a corner icon */
+.expanded:not(.fs) .setcard {
+  position: relative;
+  padding-top: 8px;
+  box-sizing: border-box;
+}
+.expanded:not(.fs) .sc-nav {
+  gap: 2px;
+}
+.expanded:not(.fs) .sc-item {
+  padding: 2px 8px;
+}
+.expanded:not(.fs) .sc-open {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  z-index: 2;
+  margin: 0;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--text-3);
+}
+.expanded:not(.fs) .sc-open:hover {
+  color: var(--text-1);
+  background: var(--pressed);
+}
+
+/* Settings sections: bigger, more open items. The list scrolls when they do not all fit. */
+.expanded:not(.fs) .setcard {
+  grid-template-columns: 176px minmax(0, 1fr);
+  padding-top: 10px;
+}
+.expanded:not(.fs) .sc-nav {
+  gap: 4px;
+  padding: 0 6px 10px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pressed) transparent;
+}
+.expanded:not(.fs) .sc-item {
+  gap: 11px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  flex: none;
+}
+.expanded:not(.fs) .sc-ic {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}

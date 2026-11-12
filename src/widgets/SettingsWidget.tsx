@@ -1200,18 +1200,17 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           {SYS_CATS.map(({ id, label, color, Icon }) => (
             <button key={id} className={`sc-item ${id === current.id ? 'on' : ''}`} aria-current={id === current.id ? 'page' : undefined} data-cuelume-select onClick={() => setCat(id)}>
               <span className="sc-ic" style={{ background: color }}>
-                <Icon size={12} strokeWidth={2.3} aria-hidden />
+                <Icon size={14} strokeWidth={2.3} aria-hidden />
               </span>
               {label}
             </button>
           ))}
-          {onFullscreen && (
-            <button className="sc-open" data-cuelume-tap onClick={() => onFullscreen(true)}>
-              <Maximize2 size={12} strokeWidth={2.2} aria-hidden />
-              Open in full window
-            </button>
-          )}
         </nav>
+        {onFullscreen && (
+          <button className="sc-open" aria-label="Open in full window" title="Open in full window" data-cuelume-tap onClick={() => onFullscreen(true)}>
+            <Maximize2 size={13} strokeWidth={2.2} aria-hidden />
+          </button>
+        )}
         <div className="sc-main">
           <SysCat.Provider value={current.id}>{body}</SysCat.Provider>
         </div>

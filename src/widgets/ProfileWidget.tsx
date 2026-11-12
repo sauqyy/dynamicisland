@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Cloud, Eye, EyeOff, Flame, Users } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { ACCENTS, type Settings } from '../lib/settings'
 import { BACKEND_READY } from '../lib/supabase'
@@ -170,8 +171,11 @@ function PhotoCropper({ source, crop, onChange, onDone }: { source: Source; crop
 }
 
 function SignIn({ auth }: { auth: Auth }) {
+  // one form for both jobs: the switch on the left decides what the main button does
+  const [mode, setMode] = useState<'in' | 'up'>('in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [show, setShow] = useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -183,52 +187,89 @@ function SignIn({ auth }: { auth: Auth }) {
   }
   const ready = email.includes('@') && password.length >= 6
   const tooShort = password.length > 0 && password.length < 6
+  const submit = () => {
+    if (!ready || busy) return
+    play('tap')
+    void run(() => (mode === 'in' ? auth.signIn(email, password) : auth.signUp(email, password)))
+  }
+  const onKey = (e: React.KeyboardEvent) => {
+    e.stopPropagation()
+    if (e.key === 'Enter') submit()
+  }
+  const pick = (m: 'in' | 'up') => {
+    setMode(m)
+    setMsg(null)
+  }
+  const bad = tooShort || Boolean(msg && !msg.startsWith('Check'))
 
   return (
-    <div className="profile-auth">
-      <button className="google-btn" disabled={busy} data-cuelume-tap onClick={() => run(auth.signInWithGoogle)}>
-        <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
-          <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z" />
-          <path fill="#4285F4" d="M46.5 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.4z" />
-          <path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z" />
-          <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
-        </svg>
-        Continue with Google
-      </button>
-      <div className="or">or</div>
-      <input
-        className="todo-input"
-        type="email"
-        placeholder="Email"
-        value={email}
-        data-cuelume-type
-        onChange={(e) => setEmail(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
-      />
-      <input
-        className="todo-input"
-        type="password"
-        placeholder="Password (6+ characters)"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        onKeyDown={(e) => {
-          e.stopPropagation()
-          if (e.key === 'Enter' && ready) {
-            play('tap')
-            run(() => auth.signIn(email, password))
-          }
-        }}
-      />
-      {tooShort && <div className="form-warn">Password must be at least 6 characters ({password.length}/6)</div>}
-      <div className="presets">
-        <button className="pill-btn" disabled={!ready || busy} data-cuelume-tap onClick={() => run(() => auth.signIn(email, password))}>
-          Sign in
-        </button>
-        <button className="pill-btn" disabled={!ready || busy} data-cuelume-tap onClick={() => run(() => auth.signUp(email, password))}>
-          Create account
-        </button>
+    <div className="lg">
+      <div className="lg-side">
+        <b className="lg-title">{mode === 'in' ? 'Welcome back' : 'Make an account'}</b>
+        <div className="lg-mode" role="tablist" aria-label="Sign in or create an account">
+          <button role="tab" aria-selected={mode === 'in'} className={mode === 'in' ? 'on' : ''} data-cuelume-select onClick={() => pick('in')}>
+            Sign in
+          </button>
+          <button role="tab" aria-selected={mode === 'up'} className={mode === 'up' ? 'on' : ''} data-cuelume-select onClick={() => pick('up')}>
+            Create account
+          </button>
+        </div>
+        <ul className="lg-perks">
+          <li>
+            <Users size={14} strokeWidth={2.2} aria-hidden />
+            Friends, groups and calls
+          </li>
+          <li>
+            <Flame size={14} strokeWidth={2.2} aria-hidden />
+            Study rooms and a leaderboard
+          </li>
+          <li>
+            <Cloud size={14} strokeWidth={2.2} aria-hidden />
+            Your profile, saved to your account
+          </li>
+        </ul>
       </div>
-      {msg && <div className="form-msg">{msg}</div>}
+
+      <div className="lg-form">
+        <button className="google-btn lg-google" disabled={busy} data-cuelume-tap onClick={() => run(auth.signInWithGoogle)}>
+          <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden>
+            <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z" />
+            <path fill="#4285F4" d="M46.5 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.4z" />
+            <path fill="#FBBC05" d="M10.5 28.7a14.5 14.5 0 0 1 0-9.4l-7.9-6.1a24 24 0 0 0 0 21.6l7.9-6.1z" />
+            <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
+          </svg>
+          Continue with Google
+        </button>
+        <div className="lg-or">
+          <span>or use your email</span>
+        </div>
+        <div className="lg-fields">
+          <input className="lg-in" type="email" placeholder="Email" aria-label="Email" autoComplete="email" value={email} data-cuelume-type onChange={(e) => setEmail(e.target.value)} onKeyDown={onKey} />
+          <span className="lg-pass">
+            <input
+              className="lg-in"
+              type={show ? 'text' : 'password'}
+              placeholder="Password"
+              aria-label="Password"
+              autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={onKey}
+            />
+            <button className="lg-eye" type="button" aria-label={show ? 'Hide password' : 'Show password'} aria-pressed={show} onClick={() => setShow((v) => !v)}>
+              {show ? <EyeOff size={14} strokeWidth={2.2} aria-hidden /> : <Eye size={14} strokeWidth={2.2} aria-hidden />}
+            </button>
+          </span>
+        </div>
+        <div className="lg-act">
+          <button className="lg-go" disabled={!ready || busy} data-cuelume-tap onClick={submit}>
+            {busy ? 'One moment…' : mode === 'in' ? 'Sign in' : 'Create account'}
+          </button>
+          <span className={`lg-note ${bad ? 'bad' : ''}`} role="status">
+            {msg ?? (tooShort ? `Passwords have at least 6 characters (${password.length}/6)` : mode === 'up' ? 'Use at least 6 characters for the password' : '')}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
