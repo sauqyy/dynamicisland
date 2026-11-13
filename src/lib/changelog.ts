@@ -7,6 +7,17 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.9.1',
+    title: 'A new look',
+    items: [
+      'A wide, low island with one card height for every page, a new Now Playing, Timer and forms, and Friends and Groups on their own pages.',
+      'Settings opens in its own window from the gear at the top right of the card, in the colours of your theme.',
+      'Chats get a taller card, so six or seven messages fit. You can turn it off in Settings.',
+      'The Home pages no longer scroll, and Weather fits the card.',
+      'The Astra welcome no longer overlaps its dots, and its steps are centred.',
+    ],
+  },
+  {
     version: '0.8.5',
     title: 'Astra in the pill',
     items: [
