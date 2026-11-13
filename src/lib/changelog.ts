@@ -7,6 +7,14 @@ export interface Release {
 /** Newest first. Add an entry here when you bump the version; it shows once in the island after the update installs. */
 export const CHANGELOG: Release[] = [
   {
+    version: '0.9.2',
+    title: 'Empty pages that show the way',
+    items: [
+      'Now Playing, Deadlines and Clipboard show faded placeholders when they are empty, so you can see what will appear there.',
+      'Weather opens on your own city straight away. Tap the city at the top to change it.',
+    ],
+  },
+  {
     version: '0.9.1',
     title: 'A new look',
     items: [
