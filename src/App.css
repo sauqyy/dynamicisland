@@ -5481,7 +5481,9 @@ button.ao-text:hover {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: 100%;
+  /* as wide as its steps, so the page's centring puts the whole list in the middle */
+  width: fit-content;
+  max-width: 100%;
   text-align: left;
 }
 .astra-steps li {
