@@ -100,13 +100,46 @@ export function MediaWidget({ track, position, lyricOffset = 0, playing, onToggl
   const [seeking, setSeeking] = useState(false)
 
   if (!track) {
+    // nothing is playing: the page keeps its shape, with faded placeholder text where a song would be
     return (
-      <div className="media nothing" onClick={(e) => e.stopPropagation()}>
-        <div className="nothing-icon">
-          <Music2 size={28} strokeWidth={1.7} aria-hidden />
+      <div className="np2 np2-empty" role="status" aria-label="Nothing playing. Start a song in Spotify or any media app." onClick={(e) => e.stopPropagation()}>
+        <div className="np2-art">
+          <div className="ph-art" aria-hidden>
+            <Music2 size={34} strokeWidth={1.5} />
+          </div>
         </div>
-        <div>Nothing playing</div>
-        <small>Start a song in Spotify or any media app</small>
+        <div className="np2-mid" aria-hidden>
+          <div className="np2-meta">
+            <b>Song title</b>
+            <span>Artist</span>
+          </div>
+          <div className="np2-time">
+            <span>0:00</span>
+            <div className="np2-bar live">
+              <i style={{ width: '0%' }} />
+            </div>
+            <span>-0:00</span>
+          </div>
+          <div className="np2-ctl">
+            <span className="np2-skip">
+              <SkipBack size={17} fill="currentColor" />
+            </span>
+            <span className="np2-play">
+              <Play size={18} fill="currentColor" />
+            </span>
+            <span className="np2-skip">
+              <SkipForward size={17} fill="currentColor" />
+            </span>
+            <span className="np2-hint">Start a song in Spotify or any media app</span>
+          </div>
+        </div>
+        <div className="np2-side" aria-hidden>
+          <div className="ph-lyrics">
+            <span>Lyrics show up here</span>
+            <span className="now">line by line</span>
+            <span>as the song plays</span>
+          </div>
+        </div>
       </div>
     )
   }

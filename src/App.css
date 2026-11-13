@@ -9491,3 +9491,68 @@ button.soc-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Now Playing with nothing playing: the page's own layout, in faded placeholder text ---------- */
+.np2-empty::before {
+  display: none;
+}
+.np2-empty .ph-art {
+  width: 148px;
+  height: 148px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--text-3);
+  background: rgb(var(--fg-rgb) / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(var(--fg-rgb) / 0.08);
+}
+.np2-empty .np2-meta b,
+.np2-empty .np2-meta > span,
+.np2-empty .np2-time {
+  color: var(--text-3);
+}
+.np2-empty .np2-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 99px;
+  background: rgb(var(--fg-rgb) / 0.1);
+}
+.np2-empty .np2-skip,
+.np2-empty .np2-play {
+  cursor: default;
+  pointer-events: none;
+}
+.np2-empty .np2-play {
+  background: rgb(var(--fg-rgb) / 0.12);
+  color: var(--text-3);
+}
+.np2-empty .np2-skip {
+  color: var(--text-3);
+}
+.np2-empty .np2-hint {
+  color: var(--text-2);
+  white-space: normal;
+  text-align: right;
+  max-width: 150px;
+}
+.ph-lyrics {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+.ph-lyrics span {
+  font-size: 14px;
+}
+.ph-lyrics span.now {
+  font-size: 19px;
+  color: var(--text-2);
+}
