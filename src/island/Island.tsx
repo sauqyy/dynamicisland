@@ -138,6 +138,8 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
   const fl = useMotionValue(docked ? 2 : floating ? 1 : 0)
   useEffect(() => fl.set(docked ? 2 : floating ? 1 : 0), [floating, docked, fl])
   const d = useTransform([w, h, r, fl], ([wv, hv, rv, fv]: number[]) => notchPath(wv, hv, rv, fv === 1, fv === 2))
+  // the open card's accent light starts at its top-left corner; this strip carries it into the curve left of the card
+  const earX = useTransform(w, (wv: number) => STAGE_W / 2 - wv / 2 - EAR - 1)
 
   // when the app opens the island drops in from above the screen, using the Animation setting's spring
   // (`translate` is its own CSS property, so it composes with the stage's centring/scale transform)
@@ -223,6 +225,13 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
           <filter id="glass-soft" x="-10%" y="-10%" width="120%" height="120%">
             <feGaussianBlur stdDeviation="5" />
           </filter>
+          <linearGradient id="ear-glow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: 'var(--accent)', stopOpacity: 'var(--ear-glow, 0.2)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--accent)', stopOpacity: 0 }} />
+          </linearGradient>
+          <clipPath id="ear-clip">
+            <motion.path d={d} />
+          </clipPath>
           <clipPath id="glass-clip">
             <motion.path d={d} />
           </clipPath>
@@ -234,6 +243,9 @@ export function Island({ shape, contentKey, children, bubble, onClick, onHover, 
           </linearGradient>
         </defs>
         <motion.path d={d} style={{ fill: 'var(--island-bg)' }} />
+        <g clipPath="url(#ear-clip)">
+          <motion.rect className="ear-glow" x={earX} y={-HIDDEN_TOP} width={EAR + 2} height={HIDDEN_TOP + 136} fill="url(#ear-glow)" />
+        </g>
         <motion.path className="glass-tint" d={d} fill="url(#glass-tint)" />
         <motion.path className="glass-sheen" d={d} fill="url(#glass-sheen)" />
         <g className="glass-fx" clipPath="url(#glass-clip)">

@@ -8409,7 +8409,8 @@ button.ao-text:hover {
   min-height: 0;
   overflow-y: auto;
   align-content: start;
-  scrollbar-width: thin;
+  /* auto, not thin: a set scrollbar-width makes WebView2 ignore the custom slim thumb */
+  scrollbar-width: auto;
 }
 .expanded:not(.fs) .wk .wk-week {
   height: auto;
@@ -8742,6 +8743,11 @@ button.ao-text:hover {
   width: 8px;
   height: 8px;
 }
+.expanded ::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
 .expanded ::-webkit-scrollbar-track,
 .expanded ::-webkit-scrollbar-corner {
   background: transparent;
@@ -9063,4 +9069,423 @@ button.soc-row:hover {
   width: 20px !important;
   height: 20px !important;
   font-size: 11px !important;
+}
+
+/* the message bar is one slim row on the card, so the chat above it gets the height */
+.expanded:not(.fs) .chat-compose {
+  align-items: center;
+  gap: 6px;
+}
+.expanded:not(.fs) .chat-compose .chat-input {
+  min-height: 30px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  align-self: center;
+}
+.expanded:not(.fs) .chat-compose .pill-btn {
+  align-self: center;
+  height: 30px;
+  padding: 0 14px;
+}
+.expanded:not(.fs) .chat-compose .chat-plus,
+.expanded:not(.fs) .chat-compose .chat-call {
+  width: 28px;
+  height: 28px;
+  align-self: center;
+}
+
+/* ---------- Settings: smaller rows, switches and labels, so more of a section fits in one view ---------- */
+.settings2 .set-card {
+  padding: 1px 12px;
+  border-radius: 13px;
+}
+.settings2 .set-card > .row {
+  min-height: 30px;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.settings2 .set-card > .row.stack {
+  gap: 5px;
+  padding: 6px 0;
+}
+.settings2 .set-card > .page-toggles {
+  padding: 6px 0;
+}
+.settings2 .set-card > .anim-preview {
+  padding: 2px 0 8px;
+}
+.settings2 .toggle {
+  width: 30px;
+  height: 17px;
+  border-radius: 9px;
+  flex: none;
+}
+.settings2 .toggle span {
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+}
+.settings2 .toggle.on span {
+  transform: translateX(13px);
+}
+.settings2 .set-group > h4 {
+  min-height: 18px;
+  font-size: 10px;
+}
+.settings2 .set-note {
+  font-size: 10.5px;
+}
+.settings2 .set-input {
+  padding: 3px 8px;
+  font-size: 11.5px;
+}
+.settings2 .chip {
+  padding: 2px 9px;
+  font-size: 11px;
+}
+.settings2 .segmented button {
+  padding: 2px 9px;
+  font-size: 11px;
+}
+.settings2 .swatches button {
+  width: 20px;
+  height: 20px;
+}
+.expanded:not(.fs) .setcard .settings.settings2 > .set-group {
+  margin-bottom: 8px;
+}
+.settings.settings2 {
+  gap: 10px;
+}
+.sysset .settings.settings2 {
+  gap: 14px;
+}
+.sysset .set-card {
+  padding: 1px 14px;
+}
+
+/* fullscreen chat: the list sits at the left edge and the chat fills everything to its right (the 5vw side gutter was pushing both inwards) */
+.expanded.fs .xbody:has(.fs-split) {
+  padding: 6px 14px 14px 10px;
+}
+.expanded.fs .fs-split {
+  gap: 16px;
+  width: 100%;
+}
+.expanded.fs .fs-contacts {
+  width: 300px;
+  padding-right: 8px;
+}
+.expanded.fs .fs-split > .chat {
+  width: auto;
+  max-width: none;
+  margin: 0;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* the strip of accent light in the curve beside the open card: shown only while the card is open and hanging from the top */
+.ear-glow {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.stage:has(.expanded) .ear-glow {
+  opacity: 1;
+}
+.root.light {
+  --ear-glow: 0.12;
+}
+
+/* ---------- Settings button (top right of the card) and the Settings window ---------- */
+.xtop-gear {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 4px;
+  border-radius: 999px;
+  color: var(--text-2);
+  background: var(--raised);
+  transition: background 0.15s, color 0.15s;
+}
+.xtop-gear:hover {
+  color: var(--text-1);
+  background: var(--pressed);
+}
+.xtop-gear .rail-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+.settings-window .sys-back {
+  display: none;
+}
+.settings-window .sysset {
+  height: 100%;
+}
+
+/* browser demo: Settings floats in a window of its own, like the native one */
+.demo-win {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  top: 56%;
+  translate: -50% -50%;
+  width: min(980px, 94vw);
+  height: min(660px, 72vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+.demo-win-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 6px 14px;
+  font-size: 12px;
+  color: #ddd;
+  background: #1c1c1e;
+}
+.demo-win-bar button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: #ddd;
+  font-size: 16px;
+}
+.demo-win-bar button:hover { background: #e5484d; color: #fff; }
+.demo-win iframe { flex: 1; width: 100%; border: 0; }
+
+/* =====================================================================
+   Settings window: the island preview on top, a quiet list below.
+   One loud thing (the preview); everything else is type and hairlines.
+   ===================================================================== */
+.settings-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  --sw-gap: 28px;
+}
+.sw-body {
+  flex: 1;
+  min-height: 0;
+  position: static;
+  width: 100%;
+  padding: 0;
+}
+.settings-window .sysset {
+  height: 100%;
+  grid-template-columns: 196px 1fr;
+  gap: 0;
+}
+/* sidebar: text, a thin marker, no tiles */
+.settings-window .sys-side {
+  padding: 22px 12px 16px 16px;
+  gap: 0;
+  border-radius: 0;
+  background: transparent;
+  border-right: 1px solid var(--line);
+}
+.settings-window .sys-title {
+  padding: 0 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  letter-spacing: 0;
+}
+.settings-window .sys-item {
+  position: relative;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.settings-window .sys-item:hover {
+  background: var(--raised);
+  color: var(--text-1);
+}
+.settings-window .sys-item.on {
+  background: transparent;
+  color: var(--text-1);
+  font-weight: 650;
+}
+.settings-window .sys-item.on::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.settings-window .sys-ic {
+  width: 18px;
+  height: 18px;
+  border-radius: 0;
+  background: none !important;
+  box-shadow: none;
+  color: var(--text-3);
+}
+.settings-window .sys-item.on .sys-ic {
+  color: var(--accent);
+}
+/* page: heading, one line of context, then flat rows */
+.settings-window .sys-main {
+  padding: 0;
+}
+.settings-window .sys-page {
+  zoom: 1;
+  max-width: 640px;
+  margin: 0;
+  padding: 24px var(--sw-gap) 48px;
+  gap: 0;
+}
+.settings-window .sys-page h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.settings-window .sys-desc {
+  margin: 4px 0 22px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.settings-window .sysset .settings.settings2 {
+  gap: 26px;
+}
+.settings-window .sysset .set-group {
+  gap: 4px;
+}
+.settings-window .sysset .set-group > h4 {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-1);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.settings-window .sysset .set-card {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.settings-window .settings2 .set-card > .row {
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+.settings-window .settings2 .set-card > .row > span:first-child {
+  font-weight: 450;
+}
+.settings-window .sys-main:focus-visible,
+.settings-window button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .settings-window .sysset { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .settings-window .sys-side { border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
+  .settings-window .sys-side nav { flex-direction: row; overflow-x: auto; }
+  .settings-window .sys-title { display: none; }
+  .settings-window .sys-item.on::before { left: 8px; right: 8px; top: auto; bottom: 0; width: auto; height: 3px; }
+}
+
+/* Settings window title bar, drawn in the app's own colours */
+.sw-bar {
+  flex: none;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 14px;
+  background: var(--island-bg);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+}
+.sw-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.sw-bar-title i {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.sw-bar-btns {
+  display: flex;
+  height: 100%;
+}
+.sw-bar-btns button {
+  width: 46px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+  transition: background 0.12s, color 0.12s;
+}
+.sw-bar-btns button:hover {
+  background: var(--raised);
+  color: var(--text-1);
+}
+.sw-bar-btns button.close:hover {
+  background: #e5484d;
+  color: #fff;
+}
+
+/* more air between the header (title, clock) and the page under it; the card is 22px taller to pay for it */
+.expanded .xbody {
+  padding-top: 14px;
+}
+
+/* Home (Now Playing, Weather, Timer) never scrolls: each page is laid out to fit the card */
+.expanded .xbody > .page.page-home {
+  overflow: hidden;
+}
+.expanded .page-home .page-fit > .city-picker {
+  min-height: 0;
+  height: 100%;
+  justify-content: center;
+  padding-top: 0;
+}
+.expanded .page-home .city-picker .city-list {
+  max-height: 64px;
+}
+
+/* Weather fits the card: a smaller number, a one-line rain note and tighter gaps, so nothing is cut off */
+.expanded:not(.fs) .wx-now { gap: 3px; }
+.expanded:not(.fs) .wx-temp { font-size: 44px; line-height: 1; }
+.expanded:not(.fs) .wx-desc { line-height: 1.3; }
+.expanded:not(.fs) .wx > .wx-rain {
+  margin-top: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  min-width: 0;
+}
+.expanded:not(.fs) .wx > .wx-rain > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

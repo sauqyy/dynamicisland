@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { emit, listen } from '@tauri-apps/api/event'
 import { BACKEND_READY, supabase } from './supabase'
 import { IS_TAURI } from './useMedia'
 import type { Tab } from '../types'
@@ -25,6 +26,8 @@ export interface Settings {
   /** 0 = primary monitor, n = n-th monitor */
   monitor: number
   hideInFullscreen: boolean
+  /** chats (Astra, a friend, a group) open a taller card so 6-7 messages fit */
+  tallChat: boolean
   /** keep the island out of sight until the cursor reaches the top middle of the screen */
   smartMode: boolean
   anim: Anim
@@ -305,12 +308,14 @@ export function clampPos(x: number, y: number) {
 }
 
 /** Every page of the card is the same height; the content is laid out to fit it. */
-export const CARD_HEIGHT = 252
+export const CARD_HEIGHT = 274
+export const CHAT_HEIGHT = 330
 export const SIZE_DEFAULTS = { scale: 1, cardW: 820, cardH: CARD_HEIGHT, cardFit: false }
 
 const DEFAULTS: Settings = {
   monitor: 0,
   hideInFullscreen: true,
+  tallChat: true,
   smartMode: false,
   anim: 'bouncy',
   clock24: true,
@@ -431,6 +436,15 @@ function load(): Settings {
         /* ignore */
       }
     }
+    // taller chat cards became the default: switch everyone over once (they can still turn it off)
+    if (!localStorage.getItem('di.tallChatDefault')) {
+      merged.tallChat = true
+      try {
+        localStorage.setItem('di.tallChatDefault', '1')
+      } catch {
+        /* ignore */
+      }
+    }
     merged.cardFit = false
     // the card width is locked to the default and can't be changed
     merged.cardW = SIZE_DEFAULTS.cardW
@@ -472,13 +486,49 @@ export function useSettings() {
     })
   }, [])
 
+  // the last text this window saved, so a change made in the Settings window (same storage) is told apart from our own
+  const written = useRef('')
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(settings))
+      const text = JSON.stringify(settings)
+      const changed = text !== written.current
+      written.current = text
+      localStorage.setItem(KEY, text)
+      // webviews of the app don't reliably share storage events, so tell the other windows directly
+      if (changed && IS_TAURI) void emit('di-settings', text).catch(() => {})
     } catch {
       /* ignore */
     }
   }, [settings])
+
+  // Settings can be open in its own window: take its changes as they are saved
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== KEY || e.newValue === null || e.newValue === written.current) return
+      setSettings(load())
+    }
+    window.addEventListener('storage', onStorage)
+    let off: (() => void) | undefined
+    let gone = false
+    if (IS_TAURI) {
+      listen<string>('di-settings', (e) => {
+        if (e.payload === written.current) return
+        try {
+          localStorage.setItem(KEY, e.payload)
+        } catch {
+          /* ignore */
+        }
+        setSettings(load())
+      })
+        .then((f) => (gone ? f() : (off = f)))
+        .catch(() => {})
+    }
+    return () => {
+      gone = true
+      off?.()
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
 
   // push the settings Rust cares about
   useEffect(() => {

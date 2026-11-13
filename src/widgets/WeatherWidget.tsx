@@ -81,10 +81,10 @@ export function WeatherWidget({ settings, update }: Props) {
   const rainUntil = rainingNow ? hours.findIndex((h, i) => i > 0 && !isRain(h.code)) : -1
   const rainText = rainingNow
     ? rainUntil > 0
-      ? `Raining now, easing around ${hours[rainUntil].hour}:00`
-      : 'Raining now, for the next few hours'
+      ? `Raining, easing about ${hours[rainUntil].hour}:00`
+      : 'Raining for the next few hours'
     : rainFrom > 0
-      ? `Rain from ${hours[rainFrom].hour}:00. Bring an umbrella if you head out.`
+      ? `Rain from ${hours[rainFrom].hour}:00, take an umbrella`
       : ''
   return (
     <div className="wx" onClick={(e) => e.stopPropagation()}>

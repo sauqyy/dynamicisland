@@ -12,6 +12,8 @@ import { Ring } from './widgets/TimerWidget'
 import { TimerTab, type ClockMode } from './widgets/TimerTab'
 import { TodoWidget } from './widgets/TodoWidget'
 import { useUpdater } from './lib/useUpdater'
+import { Settings as SettingsIcon } from 'lucide-react'
+import { openSettingsWindow } from './lib/settingsWindow'
 import { getVersion } from '@tauri-apps/api/app'
 import { CHANGELOG, releaseToShow, type Release } from './lib/changelog'
 import { SettingsWidget } from './widgets/SettingsWidget'
@@ -62,7 +64,7 @@ import {
   useStoredList,
   type FileItem,
 } from './lib/files'
-import { CLOUD_MODEL, SPRINGS, STAGE, useSettings, useSettingsSync } from './lib/settings'
+import { CHAT_HEIGHT, CLOUD_MODEL, SPRINGS, STAGE, useSettings, useSettingsSync } from './lib/settings'
 import { onAccent, useResolvedTheme } from './lib/theme'
 import { currentLineIndex } from './lib/lyrics'
 import { IS_TAURI, useMedia } from './lib/useMedia'
@@ -252,6 +254,12 @@ export default function App() {
   const [fs, setFs] = useState<{ w: number; h: number } | null>(null)
   const [fsWin, setFsWin] = useState(false) // the window is covering the monitor
   const fsTimer = useRef(0)
+  const [demoSettings, setDemoSettings] = useState(false)
+  useEffect(() => {
+    const open = () => setDemoSettings(true)
+    window.addEventListener('open-settings-demo', open)
+    return () => window.removeEventListener('open-settings-demo', open)
+  }, [])
   const [notes, setNotes] = useState<Release | null>(null) // "What's new" card after an update
   const afterIntro = useRef<Release | null>(null) // the update notes that wait behind it
   // the browser demo's button panel can be dragged out of the way by its title
@@ -324,7 +332,7 @@ export default function App() {
     () =>
       PAGES.filter(
         (p) =>
-          (p.id === 'settings' || !settings.hiddenPages.includes(p.id)) &&
+          p.id !== 'settings' && !settings.hiddenPages.includes(p.id) &&
           (p.id !== 'astra' || settings.assistant),
       ),
     [settings.hiddenPages, settings.assistant],
@@ -337,7 +345,7 @@ export default function App() {
   const group = groups.find((g) => g.pages.includes(tab)) ?? groups[0]
   // a saved Astra page falls back to the first visible one once talking to the island is off
   useEffect(() => {
-    if (tab === 'astra' && !settings.assistant) setTab(pages[0]?.id ?? 'media')
+    if ((tab === 'astra' && !settings.assistant) || tab === 'settings') setTab(pages[0]?.id ?? 'media')
   }, [tab, settings.assistant, pages])
   // each group remembers the page you were last on, so tapping it again returns there
   const lastInGroup = useRef<Record<string, Tab>>({})
@@ -1127,7 +1135,9 @@ export default function App() {
     ? CARD_MAX
     : settings.cardFit
       ? Math.round(Math.min(CARD_MAX, Math.max(CARD_MIN, CARD_TOP + CARD_PAD + (hasActions ? ACTIONS_H : 0) + pageH)))
-      : Math.min(CARD_MAX, settings.cardH)
+      : settings.tallChat && (tab === 'astra' || tab === 'friends' || tab === 'groups')
+        ? Math.min(CARD_MAX, CHAT_HEIGHT)
+        : Math.min(CARD_MAX, settings.cardH)
 
   // grow the pill to fit the lyric line, up to what the stage can hold
   const idleW = live ? Math.max(320, liveWidth(live)) : idleExtra ? Math.min(textWidth(idleExtra), Math.max(200, idleExtra.length * 9 + 60)) : 200
@@ -1558,6 +1568,10 @@ export default function App() {
             {playing && track && <Bars active hue={track.hue} />}
             {timer && <Ring fraction={remaining / (timer.total / 1000)} size={16} stroke={2.5} />}
             <b className="xtop-time">{clock}</b>
+            <button className="xtop-gear" aria-label="Settings" title="Settings" data-cuelume-tap onClick={(e) => { e.stopPropagation(); void openSettingsWindow() }}>
+              <SettingsIcon size={15} strokeWidth={2.2} aria-hidden />
+              {updater.state.s === 'available' && <i className="rail-dot" />}
+            </button>
           </span>
         </div>
         <div className="xbody">
@@ -1566,7 +1580,7 @@ export default function App() {
             <motion.div
               // Friends and Groups share one page, so moving between them (e.g. from a chat) does not animate
               key={tab === 'groups' ? 'friends' : tab}
-              className="page"
+              className={`page ${tab === 'media' || tab === 'weather' || tab === 'timer' ? 'page-home' : ''}`}
               custom={dirRef.current}
               variants={PAGE_VARIANTS[settings.tabAnim]}
               initial="enter"
@@ -2075,6 +2089,16 @@ export default function App() {
       >
         {content}
       </Island>
+
+      {!IS_TAURI && demoSettings && (
+        <div className="demo-win" onClick={(e) => e.stopPropagation()}>
+          <div className="demo-win-bar">
+            <span>Astra Isle Settings</span>
+            <button aria-label="Close settings" onClick={() => setDemoSettings(false)}>×</button>
+          </div>
+          <iframe title="Settings" src="/#settings" />
+        </div>
+      )}
 
       {!IS_TAURI && (
         <div

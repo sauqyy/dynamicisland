@@ -302,6 +302,10 @@ fn work_bottom(monitor: &Monitor) -> f64 {
 /// change and the island can't jump. The window is click-through outside the pill.
 /// Does nothing when it is already in place, so it is cheap to call repeatedly.
 fn place_window(window: &WebviewWindow) {
+    // only the island's own window is pinned to the monitor; Settings and any other window place themselves
+    if window.label() != "main" {
+        return;
+    }
     let Some(monitor) = target_monitor(window) else { return };
     let scale = monitor.scale_factor();
     let height = if FULLSCREEN.load(Ordering::Relaxed) {

@@ -27,7 +27,6 @@ export const GROUPS: { id: string; title: string; icon: string; pages: Tab[] }[]
   { id: 'plan', title: 'Plan', icon: '📅', pages: ['deadlist', 'schedule', 'study'] },
   { id: 'files', title: 'Files', icon: '🗂️', pages: ['shelf', 'apps', 'clipboard'] },
   { id: 'social', title: 'Social', icon: '👥', pages: ['friends', 'groups', 'profile'] },
-  { id: 'settings', title: 'Settings', icon: '⚙️', pages: ['settings'] },
 ]
 
 const TITLES: Record<Tab, string> = {

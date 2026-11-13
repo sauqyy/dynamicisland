@@ -36,13 +36,13 @@ interface Props {
 }
 
 /** The sidebar of the full-screen settings, and which titled card belongs to which entry. */
-const SYS_CATS: { id: string; label: string; color: string; Icon: ComponentType<{ size?: number | string; strokeWidth?: number | string }>; titles: string[] }[] = [
-  { id: 'general', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Notifications and calendar', 'Updates'] },
-  { id: 'appearance', label: 'Appearance', color: '#0a84ff', Icon: Palette, titles: ['Appearance', 'Pill', 'Motion'] },
-  { id: 'sound', label: 'Sound', color: '#ff453a', Icon: Volume2, titles: ['Sound', 'Calls'] },
-  { id: 'astra', label: 'Astra', color: '#bf5af2', Icon: AstraStar, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
-  { id: 'pages', label: 'Pages', color: '#ff9f0a', Icon: LayoutGrid, titles: ['Pages'] },
-  { id: 'privacy', label: 'Study & privacy', color: '#30d158', Icon: ShieldCheck, titles: ['Study', 'Clipboard privacy'] },
+const SYS_CATS: { id: string; blurb: string; label: string; color: string; Icon: ComponentType<{ size?: number | string; strokeWidth?: number | string }>; titles: string[] }[] = [
+  { id: 'general', blurb: 'Startup, clock, display and updates.', label: 'General', color: '#8e8e93', Icon: SlidersHorizontal, titles: ['General', 'Notifications and calendar', 'Updates'] },
+  { id: 'appearance', blurb: 'Theme, accent colour, the pill and how things move.', label: 'Appearance', color: '#0a84ff', Icon: Palette, titles: ['Appearance', 'Pill', 'Motion'] },
+  { id: 'sound', blurb: 'Interface sounds, volume and call devices.', label: 'Sound', color: '#ff453a', Icon: Volume2, titles: ['Sound', 'Calls'] },
+  { id: 'astra', blurb: 'Your buddy: name, look, voice and what it can do.', label: 'Astra', color: '#bf5af2', Icon: AstraStar, titles: ['Buddy', 'Buddy brain and voice', 'Buddy actions'] },
+  { id: 'pages', blurb: 'Choose which pages show on the card.', label: 'Pages', color: '#ff9f0a', Icon: LayoutGrid, titles: ['Pages'] },
+  { id: 'privacy', blurb: 'Study sharing and what the clipboard keeps.', label: 'Study & privacy', color: '#30d158', Icon: ShieldCheck, titles: ['Study', 'Clipboard privacy'] },
 ]
 /** the entry being shown in full-screen settings; null shows every card in one list */
 const SysCat = createContext<string | null>(null)
@@ -1136,6 +1136,10 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
           <Toggle on={settings.hideInFullscreen} onChange={(v) => update({ hideInFullscreen: v })} />
         </div>
         <div className="row">
+          <span>Taller card for chats</span>
+          <Toggle on={settings.tallChat} onChange={(v) => update({ tallChat: v })} />
+        </div>
+        <div className="row">
           <span>Smart mode (show on hover)</span>
           <Toggle on={settings.smartMode} onChange={(v) => update({ smartMode: v })} />
         </div>
@@ -1205,10 +1209,12 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
   return (
     <div className="sysset" onClick={(e) => e.stopPropagation()}>
       <aside className="sys-side">
-        <button className="sys-back" data-cuelume-close onClick={() => onFullscreen?.(false)}>
-          <ChevronLeft size={15} strokeWidth={2.4} aria-hidden />
-          Back
-        </button>
+        {onFullscreen && (
+          <button className="sys-back" data-cuelume-close onClick={() => onFullscreen(false)}>
+            <ChevronLeft size={15} strokeWidth={2.4} aria-hidden />
+            Back
+          </button>
+        )}
         <b className="sys-title">Settings</b>
         <nav>
           {SYS_CATS.map(({ id, label, color, Icon }) => (
@@ -1224,6 +1230,7 @@ export function SettingsWidget({ settings, update, updater, fullscreen, onFullsc
       <main className="sys-main">
         <div className="sys-page">
           <h2>{current.label}</h2>
+          <p className="sys-desc">{current.blurb}</p>
           <SysCat.Provider value={current.id}>{body}</SysCat.Provider>
         </div>
       </main>

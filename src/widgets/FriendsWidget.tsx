@@ -422,9 +422,9 @@ function FriendsBody({ auth, social, call, voice, groups, section = 'friends', c
   }
 
   // a friend's chat belongs to the Friends page, a group's to the Groups page
-  // on the card the first friend or group is open by default, like the design; fullscreen only shows a chat you opened
-  const friend = section === 'friends' ? (social.friends.find((f) => f.profile.id === open.friend) ?? (fullscreen ? undefined : social.friends[0])) : undefined
-  const group = section === 'groups' ? (groups?.groups.find((g) => g.id === open.group) ?? (fullscreen ? undefined : groups?.groups[0])) : undefined
+  // the first friend or group is open by default, on the card and in fullscreen (the fullscreen button is pressed before any chat was picked)
+  const friend = section === 'friends' ? (social.friends.find((f) => f.profile.id === open.friend) ?? social.friends[0]) : undefined
+  const group = section === 'groups' ? (groups?.groups.find((g) => g.id === open.group) ?? groups?.groups[0]) : undefined
   const openFriend = (id: string) => {
     onChat({ friend: id, group: null }, 'friends')
   }
