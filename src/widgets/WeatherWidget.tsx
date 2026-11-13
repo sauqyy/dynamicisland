@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { play } from '../lib/sound'
-import { cachedWeather, describe, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
+import { cachedWeather, DEFAULT_CITY, describe, detectCity, fetchWeather, isFresh, searchCities, type CityHit, type Weather } from '../lib/weather'
 import type { Settings } from '../lib/settings'
 import { CloudRain, Droplets, Wind } from 'lucide-react'
 import { WeatherIcon, isNight } from './WeatherIcon'
@@ -15,8 +15,21 @@ export function WeatherWidget({ settings, update }: Props) {
   const [weather, setWeather] = useState<Weather | null>(() => (city ? cachedWeather(city, fahrenheit) : null))
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [editing, setEditing] = useState(!city)
+  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(city)
+
+  // first visit: start on the user's own city (or a default one) so the forecast shows straight away; the city chip changes it
+  useEffect(() => {
+    if (city) return
+    const ctl = new AbortController()
+    void detectCity(ctl.signal).then((hit) => {
+      if (ctl.signal.aborted) return
+      const pick = hit ?? DEFAULT_CITY
+      update({ city: pick.name, cityLat: pick.latitude, cityLon: pick.longitude })
+    })
+    return () => ctl.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city])
 
   useEffect(() => {
     if (!city) return
@@ -40,11 +53,19 @@ export function WeatherWidget({ settings, update }: Props) {
 
   const unit = fahrenheit ? '°F' : '°C'
 
-  if (editing || !city) {
+  if (!city) {
+    return (
+      <div className="weather center" role="status" onClick={(e) => e.stopPropagation()}>
+        <div className="timer-label">Finding your location…</div>
+      </div>
+    )
+  }
+
+  if (editing) {
     return (
       <CityPicker
         initial={draft}
-        canCancel={!!city}
+        canCancel
         onCancel={() => setEditing(false)}
         onPick={(hit) => {
           update({ city: hit.name, cityLat: hit.latitude, cityLon: hit.longitude })

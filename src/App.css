@@ -9556,3 +9556,38 @@ button.soc-row:hover {
   font-size: 19px;
   color: var(--text-2);
 }
+
+/* ---------- empty pages drawn as faded placeholders (Deadlines, Clipboard, Weather before a city is set) ---------- */
+.dl-item.ph {
+  pointer-events: none;
+  opacity: 0.42;
+}
+.dl-item.ph .check {
+  border-style: dashed;
+}
+.dl-ph-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 0 2px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.clip-ph {
+  display: grid;
+  gap: 6px;
+}
+.clip-ph .clip-row.ph {
+  pointer-events: none;
+  opacity: 0.4;
+}
+.clip-ph .clip-row.ph .clip {
+  color: var(--text-2);
+}
+.clip-ph small {
+  padding-top: 4px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-2);
+}

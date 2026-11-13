@@ -178,10 +178,26 @@ export function DeadlinesWidget({ deadlines, setDeadlines, now, onStart, studyin
           ))}
         </AnimatePresence>
         {!deadlines.length && (
-          <div className="empty">
-            <CalendarClock size={20} strokeWidth={1.7} aria-hidden />
-            No deadlines yet. Press Add deadline to start.
-          </div>
+          <>
+            {/* faded rows show what a deadline will look like once one is added */}
+            {[
+              ['Assignment title', 'Course, Mon 12 Jan, 09:00', 'in 2d'],
+              ['Report draft', 'Course, Fri 16 Jan, 17:00', 'in 6d'],
+            ].map(([t, sub, left]) => (
+              <li key={t} className="dl-item ph" aria-hidden>
+                <span className="check" />
+                <span className="dl-text">
+                  <b>{t}</b>
+                  <small>{sub}</small>
+                </span>
+                <span className="dl-left">{left}</span>
+              </li>
+            ))}
+            <li className="dl-ph-note" role="status">
+              <CalendarClock size={14} strokeWidth={1.9} aria-hidden />
+              No deadlines yet. Press Add deadline to start.
+            </li>
+          </>
         )}
       </ul>
     </div>

@@ -28,7 +28,16 @@ export function ClipboardWidget({ items, paused, mask, onCopy, onRemove }: Props
           </div>
         ))
       ) : (
-        !paused && <div className="empty">Copy some text or an image and it will show up here</div>
+        !paused && (
+          <div className="clip-ph" role="status" aria-label="Nothing copied yet. Copy some text or an image and it will show up here.">
+            {['Text you copy shows up here', 'A link, a code snippet, an image'].map((t) => (
+              <div key={t} className="clip-row ph" aria-hidden>
+                <span className="clip">{t}</span>
+              </div>
+            ))}
+            <small>Copy some text or an image and it will show up here</small>
+          </div>
+        )
       )}
     </div>
   )

@@ -63,6 +63,22 @@ export async function searchCities(query: string, signal?: AbortSignal): Promise
   return ((await res.json()) as { results?: CityHit[] }).results ?? []
 }
 
+/** Where to start when the place can't be found: the page still shows a forecast, and the city can be changed from it. */
+export const DEFAULT_CITY: CityHit = { name: 'Jakarta', admin1: 'Jakarta', country: 'Indonesia', latitude: -6.2146, longitude: 106.8451 }
+
+/** A first guess at the user's city from their connection (no key, no permission prompt), or null when it can't be told. */
+export async function detectCity(signal?: AbortSignal): Promise<CityHit | null> {
+  try {
+    const res = await fetch('https://ipwho.is/?fields=success,city,region,country,latitude,longitude', { signal })
+    if (!res.ok) return null
+    const j = (await res.json()) as { success?: boolean; city?: string; region?: string; country?: string; latitude?: number; longitude?: number }
+    if (!j.success || !j.city || typeof j.latitude !== 'number' || typeof j.longitude !== 'number') return null
+    return { name: j.city, admin1: j.region, country: j.country, latitude: j.latitude, longitude: j.longitude }
+  } catch {
+    return null
+  }
+}
+
 interface GeoResult {
   results?: { name: string; latitude: number; longitude: number }[]
 }
