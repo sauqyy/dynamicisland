@@ -6335,7 +6335,7 @@ button.ao-text:hover {
   height: 100%;
   min-height: 0;
 }
-.astra-stage {
+.astra-split > .astra-stage {
   flex: 0 0 38%;
   display: grid;
   place-items: center;
