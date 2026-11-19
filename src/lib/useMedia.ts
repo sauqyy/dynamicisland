@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { fetchLyrics, type LyricLine } from './lyrics'
 import { DEMO } from './mock'
+import { fetchArtwork } from './artwork'
 import type { Track } from '../types'
 
 export const IS_TAURI = '__TAURI_INTERNALS__' in window
@@ -65,6 +66,7 @@ export function useMedia() {
     const offs = [
       listen<NativeMedia | null>('media', (e) => {
         const m = e.payload
+        infoRef.current = m
         setInfo(m)
         if (m) resync(m.position, m.playing)
       }),
@@ -86,6 +88,23 @@ export function useMedia() {
     })
     return () => ctrl.abort()
   }, [trackId])
+
+  // Give native artwork time to arrive before looking up a missing cover.
+  const artId = art?.id
+  useEffect(() => {
+    if (!IS_TAURI || !trackId || artId === trackId) return
+    const track = infoRef.current!
+    const ctrl = new AbortController()
+    const timer = setTimeout(async () => {
+      const url = await fetchArtwork(track, ctrl.signal)
+      if (!url || ctrl.signal.aborted || infoRef.current?.id !== trackId) return
+      setArt((current) => current?.id === trackId ? current : { id: trackId, url })
+    }, 1500)
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  }, [trackId, artId])
 
   // local clock between events
   const duration = info?.duration ?? 0

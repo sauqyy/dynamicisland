@@ -81,7 +81,7 @@ export interface Track {
   /** seconds, 0 when unknown (live streams) */
   duration: number
   hue: number
-  /** data: URL of the cover art, once Windows has provided it */
+  /** Cover URL from the media app or the catalog lookup */
   art?: string
   lyrics: LyricLine[] | null
   lyricsLoading: boolean

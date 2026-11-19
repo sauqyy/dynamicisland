@@ -35,6 +35,7 @@ The app checks GitHub for updates on its own and shows what's new after each upd
 Works with anything that uses the system media controls: Spotify, YouTube in the browser, Apple Music, VLC and more.
 
 - Cover art, title, artist, a seekable timeline and previous / play / next on one row
+- When a media app (including Apple Music) supplies no cover, the song and artist are sent to Apple's public iTunes catalog to find matching artwork. Internet access and a matching catalog entry are required; system-provided artwork takes priority.
 - Time-synced lyrics from [LRCLIB](https://lrclib.net). Click a line to jump to it
 - While music plays, the pill shows the cover, the current lyric and an equalizer (Bars, Wave or Pulse, tinted by the album art, your accent, or a colour you pick)
 - A short *Now playing* alert when the song changes
